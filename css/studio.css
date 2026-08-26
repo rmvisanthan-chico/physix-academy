@@ -1,0 +1,91 @@
+/* ============================================================
+   PhysiX Academy — Studio page (motion-site port)
+   Palette: ink #101311 · lime #c9ff38 · coral #ff7357
+   ============================================================ */
+
+.studio{background:#101311;color:#f4f2ea;font-family:'Space Grotesk','Segoe UI',sans-serif}
+.studio .eyebrow{font-family:'DM Mono','Consolas',monospace;font-size:11px;text-transform:uppercase;
+  letter-spacing:.18em;color:#c9ff38;margin:0 0 26px}
+
+/* ---------- hero ---------- */
+.st-hero{min-height:100vh;position:relative;overflow:hidden;padding:150px 5vw 40px;
+  background:radial-gradient(circle at 76% 37%,#263221 0,#171d17 22%,transparent 44%),#101311}
+.st-hero:before{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);
+  background-size:80px 80px;
+  -webkit-mask-image:linear-gradient(90deg,#000,transparent 72%);mask-image:linear-gradient(90deg,#000,transparent 72%)}
+.st-hero-copy{position:relative;z-index:2;max-width:600px}
+.st-display{font-size:clamp(64px,10.5vw,150px);line-height:.85;letter-spacing:-.06em;margin:0;font-weight:700}
+.st-display span{color:#c9ff38;font-style:italic}
+.st-intro{color:#adb4a9;font-size:16px;line-height:1.55;max-width:320px;margin:36px 0}
+.circle-link{width:116px;height:116px;border:1px solid #d4dfb533;border-radius:50%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:#c9ff38;font-size:30px;cursor:pointer;background:none;
+  transition:background .3s,color .3s,transform .3s;font-family:inherit}
+.circle-link span{font-family:'DM Mono',monospace;font-size:11px;color:#d9e1ce;margin-top:5px}
+.circle-link:hover{background:#c9ff38;color:#101311;transform:scale(1.05)}
+.circle-link:hover span{color:#101311}
+.st-scene{position:absolute;top:12vh;right:4vw;width:min(46vw,640px);height:min(76vh,720px);z-index:1}
+.st-scene canvas{width:100%!important;height:100%!important}
+.scene-label{position:absolute;bottom:14px;left:16px;font-family:'DM Mono',monospace;font-size:11px;color:#c9ff38;z-index:2}
+.scene-label span{color:#879083;margin-left:10px}
+.st-hero-bottom{position:absolute;bottom:22px;left:5vw;right:5vw;display:flex;align-items:center;gap:18px;
+  font-family:'DM Mono',monospace;font-size:11px;color:#879083;z-index:2}
+.st-hero-bottom .rule{flex:1;height:1px;background:#ffffff1a}
+
+/* ---------- statement ---------- */
+.st-statement{padding:20vh 5vw;border-top:1px solid #ffffff0d}
+.statement-copy{font-size:clamp(34px,5.6vw,74px);line-height:1.04;letter-spacing:-.04em;margin:0;font-weight:600;max-width:1100px}
+.statement-copy span{color:#c9ff38;font-style:italic}
+
+/* ---------- work ---------- */
+.st-work{padding:10vh 5vw;border-top:1px solid #ffffff0d}
+.st-head{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin-bottom:56px;flex-wrap:wrap}
+.st-head h2{font-size:clamp(44px,6.5vw,92px);line-height:.9;letter-spacing:-.05em;margin:0;font-weight:700}
+.st-head h2 i{color:#ff7357}
+.st-note{font-family:'DM Mono',monospace;font-size:11.5px;line-height:1.7;color:#879083;text-align:right}
+.st-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:26px}
+.study{cursor:pointer;border:1px solid #ffffff12;border-radius:14px;overflow:hidden;background:#161b15;
+  transition:transform .35s ease,border-color .35s ease}
+.study:hover{transform:translateY(-8px);border-color:#c9ff3866}
+.study-art{position:relative;height:230px;display:flex;align-items:flex-end;padding:16px}
+.art-shape{position:absolute;inset:0;transition:transform .5s ease}
+.study:hover .art-shape{transform:scale(1.08)}
+.art-lime .art-shape{background:radial-gradient(circle at 70% 25%,#c9ff38 0%,#4a6b00 34%,#141a10 75%)}
+.art-coral .art-shape{background:radial-gradient(circle at 30% 30%,#ff7357 0%,#6e2317 38%,#191210 78%)}
+.art-mix .art-shape{background:conic-gradient(from 210deg at 62% 38%,#c9ff38 0deg,#101311 120deg,#ff7357 240deg,#101311 360deg);
+  filter:saturate(.95)}
+.study-num{position:absolute;top:14px;left:16px;font-family:'DM Mono',monospace;font-size:12px;color:#f4f2eacc;z-index:2}
+.study-go{position:absolute;top:12px;right:14px;width:42px;height:42px;border-radius:50%;border:1px solid #ffffff2e;
+  display:grid;place-items:center;color:#f4f2ea;font-size:17px;z-index:2;background:#10131166;backdrop-filter:blur(4px);
+  transition:.3s}
+.study:hover .study-go{background:#c9ff38;color:#101311;border-color:transparent}
+.study-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-top:1px solid #ffffff10}
+.study-meta h3{margin:0 0 3px;font-size:19px;letter-spacing:-.01em}
+.study-meta p{margin:0;color:#879083;font-size:13px}
+.study-meta time{font-family:'DM Mono',monospace;font-size:11px;color:#c9ff38}
+
+/* ---------- method ---------- */
+.st-method{padding:12vh 5vw;border-top:1px solid #ffffff0d;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:48px}
+.st-method h2{font-size:clamp(44px,6vw,86px);line-height:.92;letter-spacing:-.05em;margin:0;font-weight:700}
+.st-method h2 span{color:#c9ff38;font-style:italic}
+.step{border-top:1px solid #ffffff1a;padding:26px 4px 0}
+.step span{font-family:'DM Mono',monospace;font-size:12px;color:#ff7357}
+.step h3{margin:10px 0 8px;font-size:24px}
+.step p{margin:0;color:#adb4a9;font-size:15px;line-height:1.6;max-width:340px}
+
+/* ---------- cta ---------- */
+.st-cta{padding:14vh 5vw;border-top:1px solid #ffffff0d;text-align:left}
+.st-cta h2{font-size:clamp(40px,6vw,84px);letter-spacing:-.05em;line-height:.94;margin:0 0 34px;font-weight:700}
+.st-cta h2 span{color:#ff7357;font-style:italic}
+.st-cta-row{display:flex;gap:16px;flex-wrap:wrap}
+.pill-btn{display:inline-flex;align-items:center;gap:10px;padding:15px 28px;border-radius:999px;
+  border:1px solid #ffffff2a;color:#f4f2ea;text-decoration:none;font-size:14px;letter-spacing:.04em;transition:.3s}
+.pill-btn:hover{background:#c9ff38;color:#101311;border-color:transparent;transform:translateY(-3px)}
+.pill-btn.alt:hover{background:#ff7357}
+
+@media(max-width:960px){
+  .st-scene{position:relative;top:auto;right:auto;width:100%;height:52vh;margin-top:30px}
+  .st-hero{padding-top:120px}
+  .st-note{text-align:left}
+}

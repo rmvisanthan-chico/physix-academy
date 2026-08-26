@@ -1,0 +1,12 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Temp
+C:\Users\acer\AppData\Local\Temp\opencode\
+
+# Deploy zip (regenerate via python)
+PhysiX-Academy-site.zip
+
+# Editor
+.vscode/

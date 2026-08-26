@@ -1,0 +1,116 @@
+/* ============================================================
+   PhysiX Academy — 3D depth layer
+   Tilt cards, parallax hero, cinematic page entrances.
+   Everything degrades gracefully + respects reduced motion.
+   ============================================================ */
+
+/* ---------- global stage ---------- */
+body { perspective: 1400px; overflow-x: hidden; }
+
+/* main content enters like a card swinging up */
+#main { transform-style: preserve-3d; }
+.page-in { animation: pageIn .55s cubic-bezier(.22,.9,.3,1) both; }
+@keyframes pageIn {
+  from { opacity: 0; transform: perspective(1200px) rotateX(5deg) translateY(26px) scale(.985); }
+  to   { opacity: 1; transform: perspective(1200px) rotateX(0)    translateY(0)    scale(1); }
+}
+
+/* ---------- tilt cards ---------- */
+.tiltable {
+  transition: transform .18s ease, box-shadow .25s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tiltable:hover { z-index: 2; }
+.tiltable .tilt-shine {
+  position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(circle at var(--shx,50%) var(--shy,50%),
+    rgba(255,255,255,.14), transparent 55%);
+  opacity: 0; transition: opacity .2s ease; pointer-events: none;
+}
+[data-theme="light"] .tiltable .tilt-shine {
+  background: radial-gradient(circle at var(--shx,50%) var(--shy,50%),
+    rgba(109,93,246,.10), transparent 55%);
+}
+.tiltable:hover .tilt-shine { opacity: 1; }
+/* inner elements can pop out */
+.tiltable.pop h3 { transform: translateZ(26px); }
+.tiltable.pop .btn { transform: translateZ(34px); }
+.tiltable.pop .lv-num { transform: translateZ(40px); }
+
+/* ---------- hero parallax layers ---------- */
+.hero { perspective: 1000px; }
+.hero > * { position: relative; }
+.hero-kicker { animation: floatY 5s ease-in-out infinite; }
+@keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+
+.orbit-wrap {
+  transform: translateZ(60px);
+  filter: drop-shadow(0 18px 30px rgba(109,93,246,.35));
+  animation: orbitSpin 26s linear infinite;
+}
+@keyframes orbitSpin { from{transform:translateZ(60px) rotate(0)} to{transform:translateZ(60px) rotate(360deg)} }
+
+.hero3d-wrap {
+  position: absolute; inset: 0; z-index: 0; pointer-events: auto;
+  mask-image: radial-gradient(ellipse 95% 95% at 68% 42%, #000 62%, transparent 98%);
+  -webkit-mask-image: radial-gradient(ellipse 95% 95% at 68% 42%, #000 62%, transparent 98%);
+}
+.hero3d-wrap canvas { display: block; width: 100%; height: 100%; }
+.hero > *:not(.hero3d-wrap) { z-index: 1; pointer-events: none; }
+.hero .hero-cta a, .hero .hero-cta .btn { pointer-events: auto; }
+.hero.dragging, .hero.dragging * { cursor: grabbing !important; }
+
+/* ---------- 3D reveal on scroll ---------- */
+.reveal-3d {
+  opacity: 0;
+  transform: perspective(900px) rotateX(12deg) translateY(34px);
+  transition: opacity .6s ease, transform .6s cubic-bezier(.22,.9,.3,1);
+}
+.reveal-3d.in { opacity: 1; transform: perspective(900px) rotateX(0) translateY(0); }
+
+/* ---------- depth on nav & topbar ---------- */
+.topbar {
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 8px 24px -18px rgba(0,0,0,.6);
+}
+
+/* ---------- floating chips in stats ---------- */
+.stat { transition: transform .25s ease, box-shadow .25s ease; }
+.stat:hover { transform: translateY(-6px); box-shadow: 0 18px 34px -20px rgba(109,93,246,.55); }
+
+/* ---------- lesson shell slight extrusion ---------- */
+@media (min-width: 981px) {
+  .lesson-content {
+    box-shadow: -14px 18px 44px -32px rgba(0,0,0,.75), 14px 18px 44px -32px rgba(0,0,0,.75);
+  }
+}
+
+/* ---------- hall of physicists ---------- */
+.sci-card{text-align:center}
+.sci-img{width:100%;aspect-ratio:1;object-fit:cover;object-position:center top;border-radius:12px;margin-bottom:.7rem;background:var(--panel2)}
+.sci-strip{display:flex;gap:.8rem;overflow-x:auto;padding:.4rem .2rem .8rem;scrollbar-width:thin}
+.sci-mini{flex:none;width:86px;height:86px;border-radius:50%;overflow:hidden;border:2px solid var(--card-brd);transition:transform .25s ease,border-color .25s ease;display:grid;place-items:center;background:var(--panel2)}
+.sci-mini:hover{transform:translateY(-6px) scale(1.05);border-color:var(--acc2)}
+.sci-mini img{width:100%;height:100%;object-fit:cover;object-position:center top}
+.sci-more{font-weight:700;font-size:.8rem;color:var(--acc2);text-align:center;padding:0 .8rem;width:auto}
+
+/* ---------- scroll cinema ---------- */
+#scrollbar-top{position:fixed;top:0;left:0;height:3px;width:0;background:var(--grad);z-index:400;border-radius:0 2px 2px 0}
+.cine{opacity:0;transform:perspective(1100px) translateY(46px) rotateX(7deg);
+  transition:opacity .7s ease var(--d,0s),transform .75s cubic-bezier(.22,.9,.3,1) var(--d,0s)}
+.cine.in{opacity:1;transform:perspective(1100px) translateY(0) rotateX(0)}
+@media (prefers-reduced-motion: reduce){
+  .cine{opacity:1;transform:none;transition:none}
+}
+
+/* ---------- reduced motion / touch ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .page-in { animation: none; }
+  .tiltable { transition: none; }
+  .orbit-wrap, .hero-kicker { animation: none; }
+  .reveal-3d { transform: none; transition: opacity .4s ease; }
+}
+@media (hover: none), (pointer: coarse) {
+  .tiltable { transform: none !important; }
+}
