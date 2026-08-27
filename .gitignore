@@ -10,3 +10,7 @@ PhysiX-Academy-site.zip
 
 # Editor
 .vscode/
+
+# Bexa local trial - never push, never deploy, never index
+bexa-trial.html
+
