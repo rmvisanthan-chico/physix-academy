@@ -35,6 +35,7 @@ function route() {
       case 'learn': viewLearn(); nav = 'learn'; break;
       case 'topics': viewTopics(); nav = 'topics'; break;
       case 'sims': viewSimsPage(parts[1]); nav = 'sims'; break;
+      case 'games': viewGames(parts[1]); nav = 'games'; break;
       case 'practice': viewPractice(); nav = 'practice'; break;
       case 'tutor': viewTutorPage(); nav = 'tutor'; break;
       case 'formulas': viewFormulas(parts[1]); nav = 'formulas'; break;
