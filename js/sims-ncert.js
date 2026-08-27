@@ -200,6 +200,76 @@ Sims.register('ncert11-venturi','Bernoulli Venturi (Class 11 Fluids)','A₁v₁=
   });
 });
 
+/* NS — Entire PHYSIX LAB site inside PhysiX (local trial) */
+Sims.register('ns','NS — PHYSIX LAB','Interactive Physics Simulations','🧪',frame=>{
+  frame.style.padding='0';
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`
+<iframe src="https://physics-lab.vercel.app/" title="PHYSIX LAB entire site" style="width:100%;height:620px;border:0;background:#fff" loading="lazy" referrerpolicy="no-referrer"></iframe>
+<style>
+.pl-hero{text-align:center;padding:1.4rem 1rem 1rem;background:var(--panel)}
+.pl-hero h1{margin:0;font-size:1.8rem;letter-spacing:-.02em}
+.pl-hero-sub{margin:.2rem 0 0;color:var(--acc);font-weight:600}
+.pl-hero-intro{margin:.4rem 0 0;color:var(--txt2);font-size:.9rem}
+.pl-topics,.pl-featured,.pl-games-promo,.pl-stats{padding:1rem;border-top:1px solid var(--card-brd)}
+.pl-section-sub{margin:.2rem 0 .9rem;color:var(--txt3);font-size:.84rem}
+.pl-topic-grid,.pl-featured-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.9rem}
+.pl-topic-card,.pl-featured-card{border:1px solid var(--card-brd);border-radius:12px;padding:.9rem;background:var(--panel2)}
+.pl-count{font-family:"DM Mono",monospace;font-size:.66rem;color:var(--acc);border:1px solid var(--card-brd);padding:.14rem .38rem;border-radius:999px}
+.pl-topic-card h3,.pl-featured-card h3{margin:.45rem 0 .28rem;font-size:1rem}
+.pl-topic-card p,.pl-featured-card p{margin:0;color:var(--txt2);font-size:.84rem}
+.pl-link{color:var(--acc);font-weight:600;font-size:.8rem;display:inline-block;margin-top:.4rem}
+.pl-games-promo{text-align:center;background:color-mix(in srgb,var(--acc) 6%,var(--panel))}
+.pl-games-sub{color:var(--txt3);font-size:.82rem}
+.pl-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:.8rem;text-align:center}
+@media(max-width:700px){.pl-stats{grid-template-columns:repeat(2,1fr)}}
+.pl-stat-num{display:block;font-size:1.4rem;font-weight:800;color:var(--acc)}
+.pl-stat-label{font-family:"DM Mono",monospace;font-size:.66rem;color:var(--txt3);text-transform:uppercase}
+</style>
+<header class="pl-hero">
+  <h1>PHYSIX LAB</h1>
+  <p class="pl-hero-sub">Interactive Physics Simulations</p>
+  <p class="pl-hero-intro">Explore the fundamental laws of nature through interactive simulations.</p>
+</header>
+<section class="pl-topics">
+  <h2>Physics Topics</h2>
+  <p class="pl-section-sub">Choose your area of exploration</p>
+  <div class="pl-topic-grid">
+    <article class="pl-topic-card"><span class="pl-count">6 sims</span><h3>Classical Mechanics</h3><p>Motion, forces, energy, and momentum</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity, and flow behavior</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Wave Physics</h3><p>Oscillations, interference, and wave propagation</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">0 sims</span><h3>Thermodynamics</h3><p>Heat transfer, the ideal gas law, and particle behaviour</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Electricity & Magnetism</h3><p>Electric fields, circuits, and electromagnetic effects</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Optics</h3><p>Light behavior, lenses, and optical instruments</p><a href="#" class="pl-link">Explore simulations</a></article>
+  </div>
+</section>
+<section class="pl-featured">
+  <h2>Featured Simulations</h2>
+  <p class="pl-section-sub">Popular physics concepts to get you started</p>
+  <div class="pl-featured-grid">
+    <article class="pl-featured-card"><h3>Pendulum Motion</h3><p>Explore simple harmonic motion with an interactive pendulum</p></article>
+    <article class="pl-featured-card"><h3>Projectile Motion</h3><p>Study the path of objects under gravity, and be able to predict the flight of objects</p></article>
+    <article class="pl-featured-card"><h3>Flow Rate Simulator</h3><p>Visualize how pipe width and fluid velocity affect flow rate</p></article>
+  </div>
+</section>
+<section class="pl-games-promo">
+  <h2>PHYSIX LAB Games</h2>
+  <h3>Ready to Play & Learn?</h3>
+  <p>Dive into our collection of physics-based games designed to make learning fun and engaging.</p>
+  <p class="pl-games-sub">Join thousands of students mastering physics through interactive gameplay</p>
+</section>
+<section class="pl-stats">
+  <div class="pl-stat"><span class="pl-stat-num">19</span><span class="pl-stat-label">Simulations</span></div>
+  <div class="pl-stat"><span class="pl-stat-num">6</span><span class="pl-stat-label">Topics</span></div>
+  <div class="pl-stat"><span class="pl-stat-num">2</span><span class="pl-stat-label">Games</span></div>
+  <div class="pl-stat"><span class="pl-stat-num">∞</span><span class="pl-stat-label">Possibilities</span></div>
+  <div class="pl-stat"><span class="pl-stat-num">100%</span><span class="pl-stat-label">Interactive</span></div>
+</section>
+`;
+  frame.appendChild(wrap);
+  wrap.querySelectorAll('.pl-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();location.hash='#/sims';}));
+});
+
 /* 11th — PV Diagram & Work */
 Sims.register('ncert11-pv','Thermodynamics PV Cycle (Class 11)','Work = area enclosed. Carnot η = 1−Tc/Th.','🔥',frame=>{
   const cv=SU.canvas(frame,300);const ctr=SU.el('div','sim-controls');frame.appendChild(ctr);const ro=SU.el('div','sim-readouts');frame.appendChild(ro);

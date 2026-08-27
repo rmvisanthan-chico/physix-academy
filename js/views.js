@@ -84,6 +84,38 @@ function viewHome() {
       <div class="card stat"><div class="sv" data-count="${simsN}">${simsN}</div><div class="sl">Simulations</div></div>
     </div>
 
+    <!-- TRIAL: Physics-Lab-inspired Topics (local only, not pushed) -->
+    <section class="sec px-topics">
+      <div class="sec-title"><h2>Physics Topics</h2><a class="more" href="#/sims">All sims →</a></div>
+      <p class="muted" style="margin:-.6rem 0 1.2rem">Choose your area of exploration — NCERT 9/10/11 mapped</p>
+      <div class="px-topic-grid">
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">8 sims</span><h3>Classical Mechanics</h3><p>Motion, forces, energy and momentum</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">2 sims</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity and flow behaviour</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">5 sims</span><h3>Wave Physics</h3><p>Oscillations, interference and propagation</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">2 sims</span><h3>Thermodynamics</h3><p>Heat transfer & ideal gas behaviour</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">6 sims</span><h3>Electricity & Magnetism</h3><p>Fields, circuits and electromagnetic effects</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="#/sims"><span class="px-count">4 sims</span><h3>Optics</h3><p>Light, mirrors, lenses & instruments</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+      </div>
+    </section>
+
+    <section class="sec px-featured">
+      <div class="sec-title"><h2>Featured Simulations</h2><a class="more" href="#/sims">All sims →</a></div>
+      <p class="muted" style="margin:-.6rem 0 1.2rem">Popular concepts to get you started</p>
+      <div class="px-featured-grid">
+        <article class="px-featured-card" data-href="#/sims"><h3>Pendulum Motion</h3><p>Explore SHM with an interactive pendulum</p><span class="px-link">Open →</span></article>
+        <article class="px-featured-card" data-href="#/sims"><h3>Projectile Motion</h3><p>Path under gravity — predict the flight</p><span class="px-link">Open →</span></article>
+        <article class="px-featured-card" data-href="#/sims"><h3>Flow Rate Simulator</h3><p>Pipe width vs velocity — Bernoulli in action</p><span class="px-link">Open →</span></article>
+      </div>
+    </section>
+
+    <section class="sec px-stats">
+      <div class="px-stat"><span class="px-stat-num">${simsN}</span><span class="px-stat-label">Simulations</span></div>
+      <div class="px-stat"><span class="px-stat-num">6</span><span class="px-stat-label">Topics</span></div>
+      <div class="px-stat"><span class="px-stat-num">${CURRICULUM.length}</span><span class="px-stat-label">Levels</span></div>
+      <div class="px-stat"><span class="px-stat-num">∞</span><span class="px-stat-label">Possibilities</span></div>
+      <div class="px-stat"><span class="px-stat-num">100%</span><span class="px-stat-label">Offline</span></div>
+    </section>
+
     <section class="sec">
       <div class="sec-title"><h2>Selected studies</h2><a class="more" href="#/topics">All topics →</a></div>
       <div class="st-grid">
@@ -149,6 +181,8 @@ function viewHome() {
 
   $$('.study', App.el).forEach(card =>
     card.addEventListener('click', () => location.hash = card.dataset.href));
+  $$('.px-topic-card, .px-featured-card', App.el).forEach(c =>
+    c.addEventListener('click', () => location.hash = c.dataset.href));
   afterRender();
 }
 
