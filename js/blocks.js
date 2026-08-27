@@ -58,7 +58,8 @@ const Blocks = {
     '</tbody></table></div>',
   svg: s => '<div class="svg-box" style="margin:1rem 0;text-align:center">' + s + '</div>',
   sim: id => '<div class="sim-slot" data-sim="' + esc(id) + '"></div>',
-  quiz: ids => '<div class="quiz-slot" data-quiz="' + ids.map(esc).join(',') + '"></div>'
+  quiz: ids => '<div class="quiz-slot" data-quiz="' + ids.map(esc).join(',') + '"></div>',
+  video: url => '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' + esc(url) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
 };
 
 function renderBlocks(content) {
