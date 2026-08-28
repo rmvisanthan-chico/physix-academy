@@ -658,7 +658,7 @@ input[type="range"]{width:100%;accent-color:var(--acc);cursor:pointer}
   #home-path .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 }
 
-/* === Scroll-reveal for Learn + Simulations (view() timeline) — approved === */
+/* === Scroll-reveal for Learn + Simulations + Formulas (view() timeline) — approved === */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
     /* Learn: chapter accordions */
@@ -672,6 +672,12 @@ input[type="range"]{width:100%;accent-color:var(--acc);cursor:pointer}
       animation: reveal linear both;
       animation-timeline: view();
       animation-range: entry 10% cover 32%;
+    }
+    /* Formulas: each formula card */
+    .formula-item {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 30%;
     }
     @keyframes reveal {
       from { opacity: 0; transform: translateY(40px) scale(.97); }
