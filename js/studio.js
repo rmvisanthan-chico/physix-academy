@@ -29,8 +29,10 @@ function mountStudioScene(host) {
   core.add(new THREE.Mesh(
     new THREE.IcosahedronGeometry(1.18, 5),
     new THREE.MeshPhysicalMaterial({
-      color: 0xc9ff38, transmission: 0.92, thickness: 0.65, roughness: 0.14,
-      metalness: 0.05, transparent: true, opacity: 0.96, clearcoat: 0.6
+      color: 0xc9ff38, transmission: 1, thickness: 1.2, roughness: 0.08,
+      ior: 1.5, dispersion: 0.4,
+      clearcoat: 1, clearcoatRoughness: 0.1,
+      envMapIntensity: 1.4
     })));
   core.add(new THREE.Mesh(
     new THREE.SphereGeometry(0.42, 32, 32),

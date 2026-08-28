@@ -56,8 +56,10 @@ const Hero3D = {
 
     /* --- Spline-grade glass shell + bloom --- */
     const shellMat = new THREE.MeshPhysicalMaterial({
-      color: cAcc, transmission: 0.96, thickness: 0.72, ior: 1.42,
-      roughness: 0.08, metalness: 0.04, clearcoat: 0.85, clearcoatRoughness: 0.18, transparent: true, opacity: 0.98
+      color: cAcc, transmission: 1, thickness: 1.2, roughness: 0.08,
+      ior: 1.5, dispersion: 0.4,
+      clearcoat: 1, clearcoatRoughness: 0.1,
+      envMapIntensity: 1.4
     });
     const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1.18, 5), shellMat);
     core.add(shell);
