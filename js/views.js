@@ -274,7 +274,7 @@ function viewLesson(id) {
 
     <article class="lesson-content">
       <div class="lesson-crumb">${level.icon} ${esc(level.name)} › ${chapter.icon} ${esc(chapter.title)}</div>
-      <h1>${esc(lesson.title)}</h1>
+      <h1>${esc(lesson.title)} <button class="btn btn-sm" id="btn-speak" aria-label="Listen aloud" title="Listen to this lesson" style="vertical-align:middle;margin-left:.5rem">🔊 <span id="speak-label">Listen</span></button></h1>
       <div class="topic-meta" style="margin-bottom:1rem">
         <span class="chip plain">${lesson.mins} min read</span>
         <span class="chip cyan">Lesson ${posInChapter} of ${chapter.lessons.length}</span>
@@ -322,6 +322,41 @@ function viewLesson(id) {
   }, 400));
 
   refreshDone();
+  // Speaker button — Web Speech API
+  const speakBtn=$('#btn-speak'), speakLabel=$('#speak-label');
+  let utter=null;
+  function lessonSpeakText(){
+    const parts=[lesson.title, chapter.title, level.name];
+    lesson.content.forEach(b=>{
+      if(!b) return;
+      const k=Object.keys(b)[0], v=b[k];
+      if(k==='p' && typeof v==='string') parts.push(v.replace(/\*\*/g,''));
+      else if(k==='why' && v) parts.push(v.q+' '+v.p);
+      else if(k==='intuition' && Array.isArray(v)) v.forEach(x=>parts.push(x.h+' '+x.p));
+      else if(k==='def' && Array.isArray(v)) v.forEach(x=>parts.push(x.term+': '+x.text));
+      else if(k==='h' && typeof v==='string') parts.push(v);
+      else if(k==='ul' && Array.isArray(v)) parts.push(v.join('. '));
+      else if(k==='revise' && Array.isArray(v)) parts.push(v.join('. '));
+    });
+    return parts.join('. ').replace(/<[^>]+>/g,'').replace(/\$/g,'').slice(0,4000);
+  }
+  speakBtn?.addEventListener('click',()=>{
+    if(window.speechSynthesis.speaking){
+      window.speechSynthesis.cancel();
+      speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 ';
+      return;
+    }
+    const text=lessonSpeakText();
+    utter=new SpeechSynthesisUtterance(text);
+    utter.rate=0.95; utter.lang='en-IN';
+    utter.onstart=()=>{ speakLabel.textContent='Stop'; speakBtn.firstChild.textContent='⏹️ '; };
+    utter.onend=()=>{ speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 '; };
+    utter.onerror=()=>{ speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 '; };
+    window.speechSynthesis.speak(utter);
+  });
+  // stop on navigate
+  window.addEventListener('hashchange',()=>{ try{window.speechSynthesis.cancel();}catch(e){} }, {once:true});
+
   afterRender();
 }
 
