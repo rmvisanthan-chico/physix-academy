@@ -24,30 +24,38 @@ const io = ('IntersectionObserver' in window)
   : { observe(el) { el.classList.add('in'); } };
 
 function route() {
-  const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
-  window.scrollTo(0, 0);
-  Store.touchToday();
-  let nav = 'home';
-  if (parts[0] === 'lesson') { viewLesson(decodeURIComponent(parts[1] || '')); nav = 'learn'; }
-  else {
-    switch (parts[0]) {
-      case undefined: viewHome(); break;
-      case 'learn': viewLearn(); nav = 'learn'; break;
-      case 'topics': viewTopics(); nav = 'topics'; break;
-      case 'sims': viewSimsPage(parts[1]); nav = 'sims'; break;
-      case 'games': viewGames(parts[1]); nav = 'games'; break;
-      case 'practice': viewPractice(); nav = 'practice'; break;
-      case 'tutor': viewTutorPage(); nav = 'tutor'; break;
-      case 'formulas': viewFormulas(parts[1]); nav = 'formulas'; break;
-      case 'calculators': viewCalculators(); nav = 'calculators'; break;
-      case 'graph': viewGraph(); nav = 'graph'; break;
-      case 'scientists': viewScientists(); nav = 'scientists'; break;
-      case 'progress': viewProgress(); nav = 'progress'; break;
-      case 'support': viewSupport(); nav = ''; break;
-      default: viewHome();
+  const doRoute = () => {
+    const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
+    window.scrollTo(0, 0);
+    Store.touchToday();
+    let nav = 'home';
+    if (parts[0] === 'lesson') { viewLesson(decodeURIComponent(parts[1] || '')); nav = 'learn'; }
+    else {
+      switch (parts[0]) {
+        case undefined: viewHome(); break;
+        case 'learn': viewLearn(); nav = 'learn'; break;
+        case 'topics': viewTopics(); nav = 'topics'; break;
+        case 'sims': viewSimsPage(parts[1]); nav = 'sims'; break;
+        case 'games': viewGames(parts[1]); nav = 'games'; break;
+        case 'practice': viewPractice(); nav = 'practice'; break;
+        case 'tutor': viewTutorPage(); nav = 'tutor'; break;
+        case 'formulas': viewFormulas(parts[1]); nav = 'formulas'; break;
+        case 'calculators': viewCalculators(); nav = 'calculators'; break;
+        case 'graph': viewGraph(); nav = 'graph'; break;
+        case 'scientists': viewScientists(); nav = 'scientists'; break;
+        case 'progress': viewProgress(); nav = 'progress'; break;
+        case 'support': viewSupport(); nav = ''; break;
+        default: viewHome();
+      }
     }
+    navActive(nav);
+  };
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!prefersReduced && document.startViewTransition) {
+    document.startViewTransition(() => doRoute());
+  } else {
+    doRoute();
   }
-  navActive(nav);
 }
 
 /* ---------------- Home ---------------- */

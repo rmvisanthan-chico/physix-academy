@@ -686,4 +686,12 @@ input[type="range"]{width:100%;accent-color:var(--acc);cursor:pointer}
   }
 }
 
+/* === View Transitions (cross-navigation fade) === */
+@view-transition { navigation: auto; }
+::view-transition-group(*) { animation-duration: .45s; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) { animation-duration: 0.01ms !important; }
+  ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 0.01ms !important; }
+}
+
 
