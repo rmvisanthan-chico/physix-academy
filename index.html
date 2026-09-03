@@ -19,13 +19,28 @@
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 
-<!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-8CL0WM6R4T"></script>
+<!-- Google Analytics (consent-gated) -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-8CL0WM6R4T');
+  gtag('consent', 'default', { 'analytics_storage': 'denied' });
+  function loadGA() {
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-8CL0WM6R4T';
+    document.head.appendChild(s);
+    gtag('config', 'G-8CL0WM6R4T');
+    gtag('consent', 'update', { 'analytics_storage': 'granted' });
+  }
+  this.PHYSIX_CONSENT = {
+    hasDecision: function(){ return localStorage.getItem('physix-consent') !== null; },
+    decide: function(ok){ localStorage.setItem('physix-consent', ok ? 'yes' : 'no'); this.apply(); },
+    apply: function(){
+      var c = localStorage.getItem('physix-consent');
+      if (c === 'yes' && !window.__gaLoaded) { window.__gaLoaded = true; loadGA(); }
+    }
+  };
 </script>
 
 <!-- KaTeX for beautiful math rendering -->
@@ -33,11 +48,11 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
-<link rel="stylesheet" href="css/style.css?v=72">
-<link rel="stylesheet" href="css/3d.css?v=72">
-<link rel="stylesheet" href="css/cinematic.css?v=72">
-<link rel="stylesheet" href="css/pages-premium.css?v=72">
-<link rel="stylesheet" href="css/trial-physics-lab.css?v=72">
+<link rel="stylesheet" href="css/style.css?v=73">
+<link rel="stylesheet" href="css/3d.css?v=73">
+<link rel="stylesheet" href="css/cinematic.css?v=73">
+<link rel="stylesheet" href="css/pages-premium.css?v=73">
+<link rel="stylesheet" href="css/trial-physics-lab.css?v=73">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Space+Grotesk:wght@500;700&family=Bricolage+Grotesque:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -130,8 +145,15 @@
       <a href="#/formulas">Formula Library</a>
       <a href="#/progress">Progress</a>
       <a href="#/support">Support</a>
+      <a href="#/about">About</a>
+      <a href="blog/index.html">Blog</a>
       <a href="privacy.html">Privacy Policy</a>
       <a href="terms.html">Terms and Conditions</a>
+    </div>
+    <div class="footer-social">
+      <a href="https://github.com/rmvisanthan-chico/physix-academy" target="_blank" rel="noopener" aria-label="GitHub">GitHub</a>
+      <a href="https://www.youtube.com/@physixacademy" target="_blank" rel="noopener" aria-label="YouTube">YouTube</a>
+      <a href="mailto:r.m.visanthan@gmail.com" aria-label="Email">Email</a>
     </div>
     <p class="footer-note">Built for students who want to truly understand physics — from zero to advanced. Progress is saved locally in your browser.<br>
     <span class="stamp">Last updated 23 Aug 2026 — v1.4 — works fully offline — mistakes are fixed, not hidden</span></p>
@@ -147,62 +169,71 @@
 <!-- Toast container -->
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/utils.js?v=72"></script>
+<!-- Cookie consent banner -->
+<div class="cookie-consent" id="cookie-consent" role="dialog" aria-live="polite" hidden>
+  <p class="cookie-text">We use cookies to understand how you use the site and improve it. Physics lessons and simulations work fully without them.</p>
+  <div class="cookie-actions">
+    <button class="btn btn-primary btn-sm" id="cookie-accept">Accept</button>
+    <button class="btn btn-sm" id="cookie-decline">Decline</button>
+  </div>
+</div>
+
+<script src="js/utils.js?v=73"></script>
 
 <!-- Curriculum data -->
-<script src="js/data-core.js?v=72"></script>
-<script src="js/data-ncert9.js?v=72"></script>
-<script src="js/data-ncert10.js?v=72"></script>
-<script src="js/data-ncert11.js?v=72"></script>
-<script src="js/data-ncert12.js?v=72"></script>
-<script src="js/data-jee.js?v=72"></script>
-<script src="js/data-slarora11.js?v=72"></script>
-<script src="js/videos.js?v=72"></script>
-<script src="js/data-l3a.js?v=72"></script>
-<script src="js/data-l3b.js?v=72"></script>
-<script src="js/data-l3c.js?v=72"></script>
-<script src="js/data-l3d.js?v=72"></script>
-<script src="js/data-l3e.js?v=72"></script>
-<script src="js/data-l4.js?v=72"></script>
+<script src="js/data-core.js?v=73"></script>
+<script src="js/data-ncert9.js?v=73"></script>
+<script src="js/data-ncert10.js?v=73"></script>
+<script src="js/data-ncert11.js?v=73"></script>
+<script src="js/data-ncert12.js?v=73"></script>
+<script src="js/data-jee.js?v=73"></script>
+<script src="js/data-slarora11.js?v=73"></script>
+<script src="js/videos.js?v=73"></script>
+<script src="js/data-l3a.js?v=73"></script>
+<script src="js/data-l3b.js?v=73"></script>
+<script src="js/data-l3c.js?v=73"></script>
+<script src="js/data-l3d.js?v=73"></script>
+<script src="js/data-l3e.js?v=73"></script>
+<script src="js/data-l4.js?v=73"></script>
 
 <!-- Quiz bank -->
-<script src="js/data-quiz-a.js?v=72"></script>
-<script src="js/data-quiz-b.js?v=72"></script>
-<script src="js/data-quiz-c.js?v=72"></script>
+<script src="js/data-quiz-a.js?v=73"></script>
+<script src="js/data-quiz-b.js?v=73"></script>
+<script src="js/data-quiz-c.js?v=73"></script>
 
 <!-- Simulations -->
-<script src="js/sims-a.js?v=72"></script>
-<script src="js/sims-b.js?v=72"></script>
-<script src="js/sims-c.js?v=72"></script>
-<script src="js/sims-d.js?v=72"></script>
-<script src="js/sims-e.js?v=72"></script>
-<script src="js/sims-ncert.js?v=72"></script>
-<script src="js/sims-realism.js?v=72"></script>
-<script src="js/sims-more.js?v=72"></script>
-<script src="js/games.js?v=72"></script>
+<script src="js/sims-a.js?v=73"></script>
+<script src="js/sims-b.js?v=73"></script>
+<script src="js/sims-c.js?v=73"></script>
+<script src="js/sims-d.js?v=73"></script>
+<script src="js/sims-e.js?v=73"></script>
+<script src="js/sims-ncert.js?v=73"></script>
+<script src="js/sims-realism.js?v=73"></script>
+<script src="js/sims-more.js?v=73"></script>
+<script src="js/games.js?v=73"></script>
 
 <!-- 3D layer + motion -->
-<script src="js/vendor/three.min.js?v=72"></script>
-<script src="js/vendor/qrcode.min.js?v=72"></script>
-<script src="js/vendor/motion.min.js?v=72"></script>
-<script src="js/vendor/anime.min.js?v=72"></script>
-<script src="js/sims3d-a.js?v=72"></script>
-<script src="js/sims3d-b.js?v=72"></script>
+<script src="js/vendor/three.min.js?v=73"></script>
+<script src="js/vendor/qrcode.min.js?v=73"></script>
+<script src="js/vendor/motion.min.js?v=73"></script>
+<script src="js/vendor/anime.min.js?v=73"></script>
+<script src="js/sims3d-a.js?v=73"></script>
+<script src="js/sims3d-b.js?v=73"></script>
 
 <!-- App layer -->
-<script src="js/blocks.js?v=72"></script>
-<script src="js/tutor.js?v=72"></script>
-<script src="js/views.js?v=72"></script>
-<script src="js/pages.js?v=72"></script>
-<script src="js/formulas.js?v=72"></script>
-<script src="js/calculators.js?v=72"></script>
-<script src="js/graph.js?v=72"></script>
-<script src="js/progress.js?v=72"></script>
-<script src="js/scientists.js?v=72"></script>
-<script src="js/cinematic.js?v=72"></script>
-<script src="js/anime-demo.js?v=72"></script>
-<script src="js/hero3d.js?v=72"></script>
-<script src="js/3d.js?v=72"></script>
+<script src="js/blocks.js?v=73"></script>
+<script src="js/tutor.js?v=73"></script>
+<script src="js/views.js?v=73"></script>
+<script src="js/pages.js?v=73"></script>
+<script src="js/formulas.js?v=73"></script>
+<script src="js/calculators.js?v=73"></script>
+<script src="js/graph.js?v=73"></script>
+<script src="js/progress.js?v=73"></script>
+<script src="js/scientists.js?v=73"></script>
+<script src="js/cinematic.js?v=73"></script>
+<script src="js/anime-demo.js?v=73"></script>
+<script src="js/hero3d.js?v=73"></script>
+<script src="js/3d.js?v=73"></script>
 <!-- Brand Studio Modal -->
 <div class="brand-studio" id="brand-studio" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="bs-title">
   <div class="brand-studio-backdrop" id="bs-backdrop"></div>
@@ -229,9 +260,9 @@
   </div>
 </div>
 
-<script src="js/hero-vector.js?v=72"></script>
-<script src="js/premium62.js?v=72"></script>
-<script src="js/scroll-cinema.js?v=72"></script>
-<script src="js/app.js?v=72"></script>
+<script src="js/hero-vector.js?v=73"></script>
+<script src="js/premium62.js?v=73"></script>
+<script src="js/scroll-cinema.js?v=73"></script>
+<script src="js/app.js?v=73"></script>
 </body>
 </html>

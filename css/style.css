@@ -695,3 +695,18 @@ input[type="range"]{width:100%;accent-color:var(--acc);cursor:pointer}
 }
 
 
+/* ---------- cookie consent ---------- */
+.cookie-consent{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:200;max-width:min(92vw,480px);background:var(--panel2);border:1px solid var(--card-brd);border-radius:14px;padding:1rem 1.2rem;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.cookie-text{font-size:.9rem;line-height:1.5;color:var(--txt2);margin:0 0 .8rem}
+.cookie-actions{display:flex;gap:.6rem}
+.cookie-actions .btn{padding:.45rem .9rem;font-size:.85rem}
+.cookie-consent[hidden]{display:none}
+
+/* ---------- footer social ---------- */
+.footer-social{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.6rem}
+.footer-social a{color:var(--txt2);text-decoration:none;font-size:.9rem}
+.footer-social a:hover{color:var(--acc2)}
+
+/* ---------- nav tooltips ---------- */
+.nav-tip{position:fixed;z-index:300;background:var(--panel2);border:1px solid var(--card-brd);color:var(--txt);font-size:.8rem;line-height:1.4;padding:.5rem .7rem;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:240px;pointer-events:none}
+.nav-tip[hidden]{display:none}

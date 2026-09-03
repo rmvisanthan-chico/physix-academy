@@ -184,5 +184,56 @@ function closeDrawer() {
   window.addEventListener('hashchange', route);
   route();
 
+  initConsent();
+  initTooltips();
+
   setTimeout(() => toast("Everything you do here saves itself in this browser. No account, nothing to log into."), 900);
 })();
+
+function initConsent() {
+  if (typeof PHYSIX_CONSENT === 'undefined') return;
+  const banner = $('#cookie-consent');
+  if (PHYSIX_CONSENT.hasDecision()) { PHYSIX_CONSENT.apply(); return; }
+  if (!banner) return;
+  setTimeout(() => { banner.hidden = false; }, 1500);
+  $('#cookie-accept').addEventListener('click', () => {
+    banner.hidden = true; PHYSIX_CONSENT.decide(true);
+    toast('Thanks! Analytics enabled.');
+  });
+  $('#cookie-decline').addEventListener('click', () => {
+    banner.hidden = true; PHYSIX_CONSENT.decide(false);
+    toast('No cookies, no analytics — your lessons still work.');
+  });
+}
+
+/* ---- rich tooltips on nav links ---- */
+const TP = {
+  learn: 'Browse the NCERT-aligned curriculum — lessons, Class 9 to 12.',
+  topics: 'Physics by subject area — mechanics, waves, electricity, optics.',
+  sims: '26+ live simulations you can drag, poke and break.',
+  games: 'Learn by playing — physics-based mini games.',
+  practice: 'Timed quiz sessions that explain every answer, right or wrong.',
+  tutor: 'Ask anything — the offline AI tutor solves problems step by step.',
+  formulas: 'Every formula with its derivation and notes, searchable.',
+  calculators: 'Quick physics calculators for common problems.',
+  people: 'The physicists behind the ideas.',
+  progress: 'Your saved progress, stats and weakest topics.',
+  support: 'Keep this project free — donate what you can.'
+};
+function initTooltips() {
+  const tip = document.createElement('div');
+  tip.className = 'nav-tip'; tip.setAttribute('role', 'tooltip');
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  $$('#mainnav a[data-nav]').forEach(a => {
+    if (!TP[a.dataset.nav]) return;
+    a.addEventListener('mouseenter', e => {
+      tip.textContent = TP[a.dataset.nav];
+      const r = a.getBoundingClientRect();
+      tip.hidden = false;
+      tip.style.top = (r.bottom + 8) + 'px';
+      tip.style.left = Math.max(10, Math.min(r.left + r.width / 2 - tip.offsetWidth / 2, window.innerWidth - 10 - tip.offsetWidth)) + 'px';
+    });
+    a.addEventListener('mouseleave', () => { tip.hidden = true; });
+  });
+}

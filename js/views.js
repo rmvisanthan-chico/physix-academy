@@ -45,6 +45,7 @@ function route() {
         case 'scientists': viewScientists(); nav = 'scientists'; break;
         case 'progress': viewProgress(); nav = 'progress'; break;
         case 'support': viewSupport(); nav = ''; break;
+        case 'about': viewAbout(); nav = ''; break;
         default: viewHome();
       }
     }
@@ -452,4 +453,41 @@ function fallbackCopy(done) {
   document.body.appendChild(ta); ta.select();
   try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed — the ID is ' + UPI_ID); }
   ta.remove();
+}
+
+/* ---------------- About ---------------- */
+function viewAbout() {
+  App.el.innerHTML = `
+  <div class="wrap wrap-narrow">
+    <div class="page-head"><h1>About PhysiX Academy</h1>
+      <p class="sub">Built start to finish by one student — no template, no framework, no shortcuts.</p></div>
+
+    <div class="card" style="line-height:1.8">
+      <h3>The story</h3>
+      <p>Most physics websites give you a wall of notes and call it teaching. I wanted something that actually works the way physics works — with things you can move, formulas you can see respond, and questions that explain themselves.</p>
+      <p>So I built it. Every lesson, every simulation, every equation on this site was hand-written. The simulations run live in your browser. The AI tutor solves problems offline. Nothing here is a template or a copied block of notes.</p>
+      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams, JEE, or NEET.</p>
+    </div>
+
+    <div class="card" style="line-height:1.8">
+      <h3>By the numbers</h3>
+      <div class="stat-grid" style="margin-top:1rem">
+        <div class="card stat"><div class="sv">${CURRICULUM.length}</div><div class="sl">Levels</div></div>
+        <div class="card stat"><div class="sv">${flatLessons().length}</div><div class="sl">Lessons</div></div>
+        <div class="card stat"><div class="sv">${Object.keys(Sims.reg).length}</div><div class="sl">Simulations</div></div>
+        <div class="card stat"><div class="sv">${QUIZ_BANK ? QUIZ_BANK.length : '87'}</div><div class="sl">Questions</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="line-height:1.8">
+      <h3>Author</h3>
+      <p><b>R.M. VISANTHAN</b> — the sole developer, designer and content writer behind every page of this site.</p>
+      <p>Questions, corrections, or just to say the site helped? Email <a href="mailto:r.m.visanthan@gmail.com">r.m.visanthan@gmail.com</a>.</p>
+    </div>
+
+    <div class="card" style="line-height:1.8">
+      <h3>Keeping it free</h3>
+      <p>PhysiX Academy has no ads, no subscriptions, and no hidden paywalls. It runs as a static site, so running costs are near zero — which means it can stay free forever. If it helped you, you can <a href="#/support">support the project</a> with a small donation.</p>
+    </div>
+  </div>`;
 }
