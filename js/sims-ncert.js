@@ -117,25 +117,104 @@ Sims.register('ncert10-heating','Joule Heating & Bill (Class 10 Electricity)','H
   });
 });
 
-/* 11th — Vernier / Screw Gauge */
-Sims.register('ncert11-measure','Vernier & Screw Gauge (Class 11 Units)','LC = 1 MSD − 1 VSD. Reading = MSR + VC×LC.','📏',frame=>{
-  const cv=SU.canvas(frame,300);const ctr=SU.el('div','sim-controls');frame.appendChild(ctr);const ro=SU.el('div','sim-readouts');frame.appendChild(ro);
-  const MS=SU.slider(ctr,'MSR (mm)',0,20,1,12);const VC=SU.slider(ctr,'VC (coinciding)',0,10,1,6);const T=SU.slider(ctr,'Type',0,1,1,0,v=>v?'Screw (LC 0.01)':'Vernier (LC 0.1)');
-  const rLC=SU.readout(ro,'Least count'),rR=SU.readout(ro,'Reading');
-  SU.loop(cv.c,()=>{
-    const screw=T.get()===1, lc=screw?0.01:0.1, ms=MS.get(), vc=VC.get(), reading=ms+vc*lc;
-    rLC.set(lc+' mm');rR.set(reading.toFixed(2)+' mm');
-    const g=cv.g;g.fillStyle='#05070d';g.fillRect(0,0,cv.W,cv.H);
-    const y0=90, x0=30, scaleW=cv.W-60;
-    g.strokeStyle='#33415c';g.lineWidth=2;g.beginPath();g.moveTo(x0,y0);g.lineTo(x0+scaleW,y0);g.stroke();
-    for(let i=0;i<=20;i++){const x=x0+i*scaleW/20;const major=i%5===0;g.beginPath();g.moveTo(x,y0);g.lineTo(x,y0+(major?18:10));g.strokeStyle=major?'#e2e8f0':'#64748b';g.stroke();if(major){g.fillStyle='#9aa8c3';g.font='9px JetBrains Mono';g.fillText(i+'',x-4,y0+28);}}
-    const vx=x0+ ms*scaleW/20 + vc*lc*scaleW/5;
-    g.fillStyle='rgba(56,189,248,.9)';g.fillRect(vx-1,y0-14,2,22);
-    g.strokeStyle='#38bdf8';g.lineWidth=2;g.strokeRect(vx-14,y0-16,28,26);
-    ncLabel(g,vx-10,y0-20,'VC','#38bdf8');
-    g.fillStyle='#6b7a99';g.font='11px Segoe UI';g.fillText((screw?'Screw gauge':'Vernier')+' — drag VC to coincide',12,18);
-    g.fillStyle='#e2e8f0';g.font='13px JetBrains Mono';g.fillText('MSR '+ms+' + VC '+vc+'×'+lc+' = '+reading.toFixed(2)+' mm',12,cv.H-18);
+/* 11th — Vernier Callipers (fully original rebuild) */
+Sims.register('ncert11-measure','Vernier Callipers (Class 11 Units)','Reading = MSR + VC × LC, where LC = 1 MSD − 1 VSD. Drag the object or the jaw.','📏',frame=>{
+  const cv=SU.canvas(frame,340);const ctr=SU.el('div','sim-controls');frame.appendChild(ctr);const ro=SU.el('div','sim-readouts');frame.appendChild(ro);
+  // 1 MSD = 1 mm. Vernier: 10 VSD = 9 mm, so LC = 1 − 0.9 = 0.1 mm.
+  const LC=0.1, MSD=1, VSD=0.9, NVS=10;
+  const rLC=SU.readout(ro,'Least count'),rMSR=SU.readout(ro,'MSR'),rVC=SU.readout(ro,'Coinciding div'),rR=SU.readout(ro,'Reading');
+  const rnd=(v,n)=>+(Math.round(v*Math.pow(10,n))/Math.pow(10,n));
+  // measured length in mm, clamped so vernier 0 stays within reach
+  let Lmm=rnd(23.7,1); // ~2 cm 3.7 mm
+  let dragging=null;
+
+  const W=cv.W,H=cv.H;
+  // world mapping: scale start x0, mm per px
+  const x0=64, pxPerMm=6.5, mmMax=36;
+  const toX=mm=>x0 + mm*pxPerMm;
+
+  cv.c.addEventListener('pointerdown',e=>{dragging='obj';cv.c.setPointerCapture(e.pointerId);});
+  cv.c.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const rect=cv.c.getBoundingClientRect();
+    const mm=(e.clientX-rect.left-x0)/pxPerMm;
+    Lmm=rnd(Math.min(mmMax-3,Math.max(0,mm)),1);
   });
+  const up=()=>dragging=null;
+  cv.c.addEventListener('pointerup',up);cv.c.addEventListener('pointercancel',up);
+
+  SU.loop(cv.c,()=>{
+    // split into integer MSR + fractional remainder
+    const MSR=Math.floor(Lmm);
+    const rem=Lmm-MSR;
+    // coinciding division = index n with (VSD line) nearest the (SCALE line)
+    let VC=0,best=1e9;
+    for(let n=0;n<NVS;n++){const d=Math.abs((n*VSD-rem)%1);const c=Math.min(d,1-d);if(c<best){best=c;VC=n;}}
+    const reading=rnd(MSR + VC*LC,1);
+    rLC.set(LC+' mm');rMSR.set(MSR+' mm');rVC.set(VC);rR.set(reading.toFixed(1)+' mm');
+
+    const g=cv.g;g.fillStyle='#05070d';g.fillRect(0,0,W,H);
+
+    // ---- object being measured (blue block) ----
+    const objH=46, objY=H/2-objH/2+4;
+    g.fillStyle='rgba(56,189,248,.25)';g.strokeStyle='#38bdf8';g.lineWidth=1.5;
+    g.fillRect(toX(0),objY,Lmm*pxPerMm,objH);g.strokeRect(toX(0),objY,Lmm*pxPerMm,objH);
+    g.fillStyle='#38bdf8';g.font='10px Segoe UI';g.fillText('L = '+(Lmm.toFixed(1))+' mm',toX(0)+4,objY+14);
+
+    // ---- upper jaw / main scale beam (fixed) ----
+    const beamY=objY+objH+16;
+    g.fillStyle='#1c2740';g.strokeStyle='#3a4a6a';g.lineWidth=1.5;
+    g.fillRect(x0-14,beamY,W-(x0-14)-10,30);g.stroke();
+    // main scale tick marks 0..mmMax (mm spacing)
+    for(let i=0;i<=mmMax;i++){
+      const x=toX(i),major=i%5===0;
+      g.strokeStyle=major?'#e2e8f0':'#64748b';g.lineWidth=major?1.6:1;
+      g.beginPath();g.moveTo(x,beamY);g.lineTo(x,beamY+(major?16:9));g.stroke();
+      if(major){g.fillStyle='#9aa8c3';g.font='9px JetBrains Mono';g.fillText(i,x-4,beamY+26);}
+    }
+    // main scale origin marker
+    g.fillStyle='#f87171';g.beginPath();g.moveTo(toX(0),beamY+16);g.lineTo(toX(0)-4,beamY+9);g.lineTo(toX(0)+4,beamY+9);g.fill();
+
+    // ---- sliding vernier block (fix zeroed to the measured face) ----
+    const vernX=toX(Lmm); // vernier 0 sits at the measured face
+    const vBlockW=48, vTop=beamY-6;
+    g.fillStyle='#2b3550';g.strokeStyle='#55658a';g.lineWidth=1.5;
+    g.fillRect(vernX-vBlockW/2,vTop,vBlockW,40);g.stroke();
+    // vernier scale ticks: 10 divisions spanning 9 mm
+    for(let n=0;n<=NVS;n++){
+      const vx=vernX + n*VSD*pxPerMm;
+      g.strokeStyle=n===VC?'#fbbf24':'#a5b4cb';g.lineWidth=n===VC?2:1;
+      g.beginPath();g.moveTo(vx,vTop);g.lineTo(vx,vTop+12);g.stroke();
+    }
+    // coinciding division highlight
+    const cxp=vernX+VC*VSD*pxPerMm;
+    g.fillStyle='#fbbf24';g.fillRect(cxp-1,vTop+12,2,8);
+
+    // label for the coinciding line
+    g.fillStyle='#fbbf24';g.font='11px JetBrains Mono';
+    g.fillText('n='+VC,cxp-16,vTop+34);
+
+    // ---- bottom jaw area ----
+    g.strokeStyle='#3a4a6a';g.lineWidth=20;g.beginPath();
+    g.moveTo(toX(0),objY);g.lineTo(toX(0),H-18);g.stroke();
+    g.strokeStyle='#e2e8f0';g.lineWidth=2;g.beginPath();
+    g.moveTo(toX(Lmm),objY);g.lineTo(toX(Lmm),H-18);g.stroke();
+
+    // ---- annotations ----
+    g.fillStyle='#f87171';g.font='12px JetBrains Mono';
+    g.fillText('0 (main)',toX(0)-14,H-6);
+    g.fillStyle='#fbbf24';g.font='12px JetBrains Mono';
+    g.fillText('vernier 0',toX(Lmm)-22,H-6);
+
+    g.fillStyle='#6b7a99';g.font='11px Segoe UI';
+    g.fillText('Drag the blue object (or the jaw) to change L — the vernier 0 rides the measured face.',12,16);
+    g.fillStyle='#e2e8f0';g.font='12px JetBrains Mono';
+    g.fillText('LC = '+LC+' mm · MSR '+MSR+' + VC '+VC+'×'+LC+' = '+reading.toFixed(1)+' mm',12,H-42);
+  });
+
+  // teaching note helper
+  const note=SU.el('div','sim-note','Vernier callipers: 10 vernier divisions (VSD) span 9 mm, so 1 VSD = 0.9 mm. Least count LC = 1 MSD − 1 VSD = 1 − 0.9 = <b>0.1 mm</b>. Measurement = MSR + coinciding VC × LC.');
+  frame.appendChild(note);
 });
 
 /* 11th — Spinning Skater (Conservation of L) */
