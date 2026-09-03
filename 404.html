@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Page not found | PhysiX Academy</title>
+<meta name="description" content="This page doesn't exist. Back to the physics.">
+<style>
+  :root{ --bg:#070b16; --txt:#e8edf7; --txt2:#9aa8c3; --acc:#6d5df6; --acc2:#22d3ee; }
+  *{ box-sizing:border-box; margin:0; }
+  body{ background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2rem; }
+  .big{ font-size:clamp(4rem,16vw,8rem); font-weight:800; background:linear-gradient(135deg,var(--acc),var(--acc2));
+        -webkit-background-clip:text; background-clip:text; color:transparent; line-height:1; }
+  .sup{ font-size:.4em; vertical-align:super; }
+  h1{ margin:1rem 0 .4rem; font-size:clamp(1.4rem,4vw,1.8rem); }
+  p{ color:var(--txt2); max-width:38rem; line-height:1.6; margin-bottom:1.8rem; }
+  a.cta{ display:inline-block; padding:.7rem 1.4rem; border-radius:10px; background:linear-gradient(135deg,var(--acc),var(--acc2));
+        color:#fff; text-decoration:none; font-weight:600; }
+  a.cta:hover{ opacity:.9; }
+  .links{ margin-top:1.5rem; }
+  .links a{ color:var(--acc2); text-decoration:none; margin:0 .6rem; font-size:.9rem; }
+</style>
+</head>
+<body>
+  <div class="big">404<sup class="sup">physics</sup></div>
+  <h1>This page doesn't exist — yet</h1>
+  <p>Either the link is broken, or this page hasn't been written. Either way, it's not you — it's the universe being uncooperative. Let's get you back to something real.</p>
+  <a class="cta" href="/">Back to home</a>
+  <div class="links">
+    <a href="/#/learn">Learn</a>
+    <a href="/#/sims">Simulations</a>
+    <a href="/#/tutor">Tutor</a>
+    <a href="/blog/">Blog</a>
+  </div>
+</body>
+</html>
