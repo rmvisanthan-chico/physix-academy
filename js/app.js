@@ -103,7 +103,11 @@ function buildDrawer() {
   const d = $('#drawer');
   d.innerHTML = '<a class="brand" href="#/" style="margin-bottom:.6rem">' +
     $('.topbar .brand').innerHTML + '</a>' + $('#mainnav').innerHTML +
-    '<button class="btn btn-primary" id="drawer-tutor" style="margin-top:auto">Ask the tutor</button>';
+    '<div style="margin-top:auto;border-top:1px solid var(--card-brd);padding-top:.8rem;display:flex;flex-direction:column;gap:.3rem">' +
+    '<a href="privacy.html" style="font-size:.82rem;color:var(--txt3)">Privacy Policy</a>' +
+    '<a href="terms.html" style="font-size:.82rem;color:var(--txt3)">Terms and Conditions</a>' +
+    '</div>' +
+    '<button class="btn btn-primary" id="drawer-tutor" style="margin-top:.8rem">Ask the tutor</button>';
   $$('a', d).forEach(a => a.addEventListener('click', closeDrawer));
   $('#drawer-tutor').addEventListener('click', () => { closeDrawer(); location.hash = '#/tutor'; });
 }
