@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Physics Motion Graphs — PhysiX Academy</title>
+<meta name="description" content="Interactive physics motion graphs: position-time, velocity-time, projectile motion. Adjust sliders, animate, and explore.">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Space+Grotesk:wght@500;700&family=Bricolage+Grotesque:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="icon" href="assets/logo.png" type="image/png">
+<style>
+:root{
+  --bg:#070b16; --bg2:#0a1020; --panel:#0e1526; --panel2:#131c31;
+  --card:rgba(255,255,255,.045); --card-brd:rgba(255,255,255,.09);
+  --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+  --acc:#6d5df6; --acc2:#22d3ee; --acc-soft:rgba(109,93,246,.16);
+  --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+  --grad:linear-gradient(135deg,#6d5df6 0%,#22d3ee 100%);
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --r:14px; --topbar-h:60px;
+  --ff-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --ff-head:"Bricolage Grotesque","Space Grotesk","Segoe UI",sans-serif;
+}
+[data-theme="light"]{
+  --bg:#f4f6fc; --bg2:#eef1fa; --panel:#ffffff; --panel2:#f4f6fd;
+  --card:rgba(15,23,42,.03); --card-brd:rgba(15,23,42,.10);
+  --txt:#111a2e; --txt2:#48566f; --txt3:#71809b;
+  --acc:#5b4df0; --acc2:#0891b2; --acc-soft:rgba(91,77,240,.12);
+  --shadow:0 10px 30px rgba(30,40,90,.10);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  margin:0;font-family:var(--ff-body);
+  background:
+    radial-gradient(1200px 600px at 85% -10%,rgba(109,93,246,.14),transparent 55%),
+    radial-gradient(900px 500px at -10% 25%,rgba(34,211,238,.10),transparent 50%),
+    var(--bg);
+  color:var(--txt);line-height:1.6;min-height:100vh;
+}
+h1,h2,h3,h4{font-family:var(--ff-head);letter-spacing:-.015em;font-weight:700;line-height:1.25;margin:.2em 0 .45em}
+h1{font-size:clamp(1.7rem,3.4vw,2.6rem)}
+h2{font-size:clamp(1.35rem,2.6vw,1.9rem)}
+a{color:var(--acc2);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:rgba(109,93,246,.4)}
+
+.topbar{position:sticky;top:0;z-index:100;height:var(--topbar-h);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--card-brd)}
+.topbar-inner{max-width:1440px;margin:0 auto;height:100%;display:flex;align-items:center;gap:1rem;padding:0 1.1rem}
+.brand{display:flex;align-items:center;gap:.55rem;color:var(--txt);font-weight:800;font-size:1.06rem;letter-spacing:.02em;white-space:nowrap}
+.brand:hover{text-decoration:none}
+.brand-accent{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-left:.28em}
+.mainnav{display:flex;gap:.15rem;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.mainnav::-webkit-scrollbar{display:none}
+.mainnav a{padding:.44rem .72rem;border-radius:9px;color:var(--txt2);font-size:.88rem;font-weight:600;white-space:nowrap;transition:background .2s,color .2s}
+.mainnav a:hover{color:var(--txt);background:var(--card);text-decoration:none}
+.mainnav a.active{color:#fff;background:var(--acc);box-shadow:0 3px 14px rgba(109,93,246,.4)}
+.top-actions{display:flex;gap:.3rem;margin-left:.2rem}
+.icon-btn{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;color:var(--txt2);border:1px solid transparent;transition:.2s}
+.icon-btn:hover{color:var(--txt);background:var(--card);border-color:var(--card-brd)}
+#btn-theme .ic-sun{display:none}
+[data-theme="light"] #btn-theme .ic-sun{display:block}
+[data-theme="light"] #btn-theme .ic-moon{display:none}
+#btn-menu{display:none}
+
+main{min-height:calc(100vh - 220px);position:relative;z-index:2}
+.wrap{max-width:1100px;margin:0 auto;padding:2rem 1.2rem 3.5rem}
+.page-head{margin-bottom:1.6rem}
+.page-head .sub{color:var(--txt2);max-width:70ch;font-size:1rem}
+
+.card{background:linear-gradient(160deg,var(--card),transparent 130%);border:1px solid var(--card-brd);border-radius:var(--r);padding:1.1rem 1.2rem;transition:transform .22s ease,border-color .22s,box-shadow .22s;position:relative;overflow:hidden}
+.card h3{margin-top:0}
+.chip{display:inline-flex;align-items:center;gap:.35em;padding:.18rem .62rem;border-radius:99px;font-size:.74rem;font-weight:700;letter-spacing:.03em;background:var(--acc-soft);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+.chip.cyan{background:rgba(34,211,238,.13);color:var(--acc2);border-color:rgba(34,211,238,.35)}
+.chip.green{background:rgba(52,211,153,.13);color:var(--ok);border-color:rgba(52,211,153,.35)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;padding:.62rem 1.25rem;border-radius:11px;font-weight:700;font-size:.92rem;border:1px solid var(--card-brd);color:var(--txt);background:var(--card);transition:.2s;text-decoration:none;cursor:pointer}
+.btn:hover{border-color:var(--acc);transform:translateY(-1px);text-decoration:none}
+.btn-primary{background:var(--grad);border:none;color:#fff;box-shadow:0 6px 20px rgba(109,93,246,.4)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-sm{padding:.38rem .8rem;font-size:.82rem;border-radius:9px}
+.btn-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+
+.graph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr));gap:1.2rem;margin-top:1.4rem}
+.graph-card{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 88%,transparent),var(--panel));
+  border:1px solid color-mix(in srgb,var(--card-brd) 92%,transparent);
+  border-radius:var(--r);overflow:hidden;
+  box-shadow:0 14px 40px -22px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.04) inset;
+}
+.graph-head{display:flex;align-items:center;gap:.6rem;padding:.85rem 1.1rem;border-bottom:1px solid var(--card-brd)}
+.graph-head .dot{width:8px;height:8px;border-radius:50%;background:var(--acc2);box-shadow:0 0 10px var(--acc2)}
+.graph-head h3{margin:0;font-size:1rem}
+.graph-illust{height:60px;background:#030509;position:relative;overflow:hidden;border-bottom:1px solid var(--card-brd)}
+[data-theme="light"] .graph-illust{background:#0a0f1e}
+.graph-body{padding:1rem;background:#05070d;position:relative}
+[data-theme="light"] .graph-body{background:#0b1120}
+.graph-body canvas{display:block;width:100%!important;height:auto!important}
+
+.graph-controls{padding:.7rem 1.1rem;border-top:1px solid var(--card-brd);display:flex;flex-direction:column;gap:.6rem}
+.slider-row{display:flex;align-items:center;gap:.7rem}
+.slider-row label{font-size:.78rem;color:var(--txt2);font-weight:600;min-width:80px;white-space:nowrap}
+.slider-row input[type="range"]{flex:1;accent-color:var(--acc);cursor:pointer;height:6px}
+.slider-row .val{font-size:.78rem;font-weight:700;color:var(--acc2);min-width:48px;text-align:right;font-variant-numeric:tabular-nums}
+.anim-row{display:flex;align-items:center;gap:.5rem}
+.play-btn{
+  width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+  background:var(--acc);color:#fff;border:none;cursor:pointer;
+  box-shadow:0 3px 12px rgba(109,93,246,.4);transition:transform .15s,filter .15s;flex-shrink:0;
+}
+.play-btn:hover{transform:scale(1.08);filter:brightness(1.1)}
+.play-btn svg{width:14px;height:14px}
+.progress-track{flex:1;height:6px;border-radius:99px;background:var(--card);border:1px solid var(--card-brd);overflow:hidden;position:relative;cursor:pointer}
+.progress-fill{height:100%;border-radius:99px;background:var(--grad);width:0%;transition:width 30ms linear}
+.time-label{font-size:.72rem;color:var(--txt3);font-variant-numeric:tabular-nums;min-width:50px;text-align:right}
+.reset-btn{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--card);border:1px solid var(--card-brd);color:var(--txt2);cursor:pointer;transition:.15s;flex-shrink:0}
+.reset-btn:hover{color:var(--txt);border-color:var(--acc)}
+
+.graph-foot{padding:.7rem 1.1rem;border-top:1px solid var(--card-brd);display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.graph-foot .note{font-size:.82rem;color:var(--txt3)}
+.graph-full{grid-column:1/-1}
+
+.compare-toggle{display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--txt2);cursor:pointer;user-select:none}
+.compare-toggle input{accent-color:var(--acc);cursor:pointer}
+.compare-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.compare-wrap .graph-body canvas{width:100%!important;height:auto!important}
+
+.footer{border-top:1px solid var(--card-brd);background:var(--bg2);position:relative;z-index:2}
+.footer-inner{max-width:1200px;margin:0 auto;padding:2rem 1.2rem;display:grid;gap:1rem;grid-template-columns:1fr auto;font-size:.9rem}
+.footer-links{display:flex;gap:1.1rem;flex-wrap:wrap}
+.footer-links a{color:var(--txt2)}
+.footer-links a:hover{color:var(--txt)}
+.footer-note{grid-column:1/-1;color:var(--txt3);font-size:.8rem;margin:0}
+
+@media(max-width:900px){
+  .graph-grid{grid-template-columns:1fr}
+  .compare-wrap{grid-template-columns:1fr}
+  .mainnav{display:none}
+  #btn-menu{display:grid}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="#/" class="brand" aria-label="PhysiX Academy home">
+      <img src="assets/logo.png" alt="" style="width:34px;height:34px;border-radius:10px;object-fit:cover;">
+      <span>PhysiX<span class="brand-accent">Academy</span></span>
+    </a>
+    <nav class="mainnav" aria-label="Primary">
+      <a href="#/">Home</a>
+      <a href="#/learn">Learn</a>
+      <a href="#/sims">Sims</a>
+      <a href="#/practice">Practice</a>
+      <a href="#/formulas">Formulas</a>
+      <a href="#/calculators">Calc</a>
+    </nav>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-theme" title="Toggle dark / light mode" aria-label="Toggle theme">
+        <svg class="ic-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="ic-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-menu" title="Menu" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <div class="page-head">
+    <div class="btn-row" style="margin-bottom:.6rem">
+      <span class="chip">Interactive</span>
+      <span class="chip cyan">Animated</span>
+      <span class="chip green">Adjustable</span>
+    </div>
+    <h1>Physics Motion Graphs</h1>
+    <p class="sub">Explore how position, velocity, and acceleration relate. Adjust sliders to change parameters, hit play to watch the motion unfold, and hover over points for exact values.</p>
+  </div>
+
+  <div class="graph-grid">
+
+    <!-- g1: Position-Time Constant Velocity -->
+    <div class="graph-card" id="card-g1">
+      <div class="graph-head"><span class="dot"></span><h3>Position–Time: Constant Velocity</h3></div>
+      <div class="graph-illust"><canvas id="illust-g1" width="800" height="60"></canvas></div>
+      <div class="graph-body"><canvas id="g1"></canvas></div>
+      <div class="graph-controls">
+        <div class="slider-row">
+          <label>Velocity</label>
+          <input type="range" id="sl-g1-v" min="0" max="10" step="0.5" value="2">
+          <span class="val" id="val-g1-v">2.0 m/s</span>
+        </div>
+        <div class="anim-row">
+          <button class="play-btn" id="play-g1" title="Play animation"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg></button>
+          <div class="progress-track" id="track-g1"><div class="progress-fill" id="fill-g1"></div></div>
+          <span class="time-label" id="time-g1">0.0 s / 5.0 s</span>
+          <button class="reset-btn" id="reset-g1" title="Reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+        </div>
+      </div>
+      <div class="graph-foot"><span class="note">Slope = velocity. Steeper line = faster motion.</span></div>
+    </div>
+
+    <!-- g2: Position-Time Acceleration -->
+    <div class="graph-card" id="card-g2">
+      <div class="graph-head"><span class="dot" style="background:#34d399;box-shadow:0 0 10px #34d399"></span><h3>Position–Time: Acceleration vs Backwards</h3></div>
+      <div class="graph-illust"><canvas id="illust-g2" width="800" height="60"></canvas></div>
+      <div class="graph-body"><canvas id="g2"></canvas></div>
+      <div class="graph-controls">
+        <div class="slider-row">
+          <label>Accel.</label>
+          <input type="range" id="sl-g2-a" min="0.5" max="5" step="0.5" value="1">
+          <span class="val" id="val-g2-a">1.0 m/s²</span>
+        </div>
+        <div class="slider-row">
+          <label>Return v</label>
+          <input type="range" id="sl-g2-rv" min="1" max="12" step="1" value="5">
+          <span class="val" id="val-g2-rv">5 m/s</span>
+        </div>
+        <div class="anim-row">
+          <button class="play-btn" id="play-g2" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg></button>
+          <div class="progress-track" id="track-g2"><div class="progress-fill" id="fill-g2"></div></div>
+          <span class="time-label" id="time-g2">0.0 s / 5.0 s</span>
+          <button class="reset-btn" id="reset-g2" title="Reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+        </div>
+      </div>
+      <div class="graph-foot"><span class="note">Curved = accelerating. Negative slope = moving backwards.</span></div>
+    </div>
+
+    <!-- g3: Velocity-Time Constant -->
+    <div class="graph-card" id="card-g3">
+      <div class="graph-head"><span class="dot" style="background:#38bdf8;box-shadow:0 0 10px #38bdf8"></span><h3>Velocity–Time: Constant Velocity</h3></div>
+      <div class="graph-illust"><canvas id="illust-g3" width="800" height="60"></canvas></div>
+      <div class="graph-body"><canvas id="g3"></canvas></div>
+      <div class="graph-controls">
+        <div class="slider-row">
+          <label>Velocity</label>
+          <input type="range" id="sl-g3-v" min="2" max="20" step="1" value="10">
+          <span class="val" id="val-g3-v">10 m/s</span>
+        </div>
+        <div class="anim-row">
+          <button class="play-btn" id="play-g3" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg></button>
+          <div class="progress-track" id="track-g3"><div class="progress-fill" id="fill-g3"></div></div>
+          <span class="time-label" id="time-g3">0.0 s / 5.0 s</span>
+          <button class="reset-btn" id="reset-g3" title="Reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+        </div>
+      </div>
+      <div class="graph-foot"><span class="note">Shaded area = total distance. Hover to see values.</span></div>
+    </div>
+
+    <!-- g4: Velocity-Time Accel -->
+    <div class="graph-card" id="card-g4">
+      <div class="graph-head"><span class="dot" style="background:#fbbf24;box-shadow:0 0 10px #fbbf24"></span><h3>Velocity–Time: Speeding Up vs Slowing Down</h3></div>
+      <div class="graph-illust"><canvas id="illust-g4" width="800" height="60"></canvas></div>
+      <div class="graph-body"><canvas id="g4"></canvas></div>
+      <div class="graph-controls">
+        <div class="slider-row">
+          <label>Accel.</label>
+          <input type="range" id="sl-g4-a" min="0.5" max="5" step="0.5" value="2">
+          <span class="val" id="val-g4-a">2.0 m/s²</span>
+        </div>
+        <div class="anim-row">
+          <button class="play-btn" id="play-g4" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg></button>
+          <div class="progress-track" id="track-g4"><div class="progress-fill" id="fill-g4"></div></div>
+          <span class="time-label" id="time-g4">0.0 s / 5.0 s</span>
+          <button class="reset-btn" id="reset-g4" title="Reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+        </div>
+      </div>
+      <div class="graph-foot"><span class="note">Slope = acceleration. Positive = speeding up, negative = slowing down.</span></div>
+    </div>
+
+    <!-- g5: Projectile (full width) -->
+    <div class="graph-card graph-full" id="card-g5">
+      <div class="graph-head"><span class="dot" style="background:#a78bfa;box-shadow:0 0 10px #a78bfa"></span><h3>Projectile Path (Parabola)</h3></div>
+      <div class="graph-illust"><canvas id="illust-g5" width="1600" height="60"></canvas></div>
+      <div class="graph-body"><canvas id="g5"></canvas></div>
+      <div class="graph-controls">
+        <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+          <div class="slider-row" style="flex:1;min-width:180px">
+            <label>Speed</label>
+            <input type="range" id="sl-g5-u" min="5" max="40" step="1" value="20">
+            <span class="val" id="val-g5-u">20 m/s</span>
+          </div>
+          <div class="slider-row" style="flex:1;min-width:180px">
+            <label>Angle</label>
+            <input type="range" id="sl-g5-ang" min="10" max="80" step="1" value="30">
+            <span class="val" id="val-g5-ang">30°</span>
+          </div>
+        </div>
+        <div class="anim-row">
+          <button class="play-btn" id="play-g5" title="Play"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg></button>
+          <div class="progress-track" id="track-g5"><div class="progress-fill" id="fill-g5"></div></div>
+          <span class="time-label" id="time-g5">0.0 s / 2.0 s</span>
+          <button class="reset-btn" id="reset-g5" title="Reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button>
+        </div>
+      </div>
+      <div class="graph-foot">
+        <span class="note" id="g5-info">u = 20 m/s, angle = 30°, g = 10 m/s² | Range = 34.6 m, Max height = 5.0 m, Flight time = 2.0 s</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Side-by-Side Comparison -->
+  <div style="margin-top:2rem">
+    <div class="card" style="border-left:3px solid var(--acc)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <h3 style="margin:0">Side-by-Side Comparison</h3>
+        <label class="compare-toggle"><input type="checkbox" id="compare-cb"> Show position + velocity together</label>
+      </div>
+      <div id="compare-panel" style="display:none;margin-top:1rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem">
+          <div class="slider-row" style="flex:1">
+            <label>Velocity</label>
+            <input type="range" id="sl-cmp-v" min="1" max="10" step="0.5" value="3">
+            <span class="val" id="val-cmp-v">3.0 m/s</span>
+          </div>
+          <button class="play-btn" id="play-cmp" title="Play both" style="width:36px;height:36px"><svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="6,3 20,12 6,21"/></svg></button>
+        </div>
+        <div class="compare-wrap">
+          <div>
+            <div style="font-size:.72rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:.4rem;text-align:center">Position–Time</div>
+            <div class="graph-body" style="border-radius:10px"><canvas id="cmp-pt"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:.4rem;text-align:center">Velocity–Time</div>
+            <div class="graph-body" style="border-radius:10px"><canvas id="cmp-vt"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top:.6rem;padding:.5rem .8rem;background:var(--card);border:1px solid var(--card-brd);border-radius:9px;font-size:.82rem;color:var(--txt2)">
+          Notice: constant velocity gives a <b style="color:var(--txt)">straight line</b> on position-time and a <b style="color:var(--txt)">horizontal line</b> on velocity-time. The slope of position-time equals the height of velocity-time.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Relationships -->
+  <div style="margin-top:1.2rem">
+    <div class="card" style="border-left:3px solid var(--acc2)">
+      <h3 style="margin-top:0">Key Relationships</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin-top:.5rem">
+        <div style="padding:.6rem .8rem;background:var(--card);border:1px solid var(--card-brd);border-radius:10px">
+          <div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:.2rem">Position–Time</div>
+          <div style="font-size:.95rem"><b>Slope</b> = velocity</div>
+        </div>
+        <div style="padding:.6rem .8rem;background:var(--card);border:1px solid var(--card-brd);border-radius:10px">
+          <div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:.2rem">Velocity–Time</div>
+          <div style="font-size:.95rem"><b>Slope</b> = acceleration, <b>Area</b> = distance</div>
+        </div>
+        <div style="padding:.6rem .8rem;background:var(--card);border:1px solid var(--card-brd);border-radius:10px">
+          <div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:.2rem">Projectile</div>
+          <div style="font-size:.95rem">Trajectory is a <b>parabola</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <strong>PhysiX Academy</strong>
+      <p style="color:var(--txt2);margin:.3em 0 0">Understand Physics. Don't Just Memorize It.</p>
+    </div>
+    <div class="footer-links">
+      <a href="#/learn">Learn</a>
+      <a href="#/sims">Simulations</a>
+      <a href="#/formulas">Formulas</a>
+      <a href="#/about">About</a>
+    </div>
+    <p class="footer-note">Built for students who want to truly understand physics.</p>
+  </div>
+</footer>
+
+<script>
+// ── Theme ──
+document.getElementById('btn-theme').addEventListener('click', function(){
+  const h = document.documentElement;
+  h.setAttribute('data-theme', h.getAttribute('data-theme')==='dark'?'light':'dark');
+  localStorage.setItem('physix-theme', h.getAttribute('data-theme'));
+  updateThemes();
+});
+(function(){ var s=localStorage.getItem('physix-theme'); if(s) document.documentElement.setAttribute('data-theme',s); })();
+
+function isDark(){ return document.documentElement.getAttribute('data-theme')!=='light'; }
+function themeC(){ return { grid: isDark()?'rgba(255,255,255,.07)':'rgba(0,0,0,.07)', tick: isDark()?'#9aa8c3':'#48566f', bg: isDark()?'#05070d':'#0b1120' }; }
+
+const FONT = '"Atkinson Hyperlegible",sans-serif';
+
+// ── Chart defaults ──
+Chart.defaults.font.family = FONT;
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.tooltip.backgroundColor = isDark()?'rgba(14,21,38,.92)':'rgba(255,255,255,.95)';
+Chart.defaults.plugins.tooltip.titleColor = isDark()?'#e8edf7':'#111a2e';
+Chart.defaults.plugins.tooltip.bodyColor = isDark()?'#9aa8c3':'#48566f';
+Chart.defaults.plugins.tooltip.borderColor = isDark()?'rgba(255,255,255,.12)':'rgba(0,0,0,.1)';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+Chart.defaults.plugins.tooltip.cornerRadius = 10;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.displayColors = true;
+Chart.defaults.plugins.tooltip.boxPadding = 4;
+
+function chartOpts(xlabel, ylabel, extra){
+  const c = themeC();
+  return Object.assign({
+    responsive: true, maintainAspectRatio: true,
+    animation: { duration: 400 },
+    plugins: {
+      legend: { labels: { color: c.tick, font: { family: FONT, size: 12 }, usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+    scales: {
+      x: { title: { display: true, text: xlabel, color: c.tick }, ticks: { color: c.tick }, grid: { color: c.grid } },
+      y: { title: { display: true, text: ylabel, color: c.tick }, ticks: { color: c.tick }, grid: { color: c.grid }, beginAtZero: true }
+    }
+  }, extra || {});
+}
+
+// ── All charts registry ──
+const allCharts = [];
+
+// ── Animation engine ──
+class AnimEngine {
+  constructor(id, dur, getData, chartRef, markerDatasetIdx) {
+    this.id = id;
+    this.dur = dur;
+    this.getData = getData;
+    this.chart = chartRef;
+    this.markerIdx = markerDatasetIdx || 0;
+    this.playing = false;
+    this.t = 0;
+    this.raf = null;
+    this.lastTs = 0;
+
+    this.playBtn = document.getElementById('play-'+id);
+    this.fill = document.getElementById('fill-'+id);
+    this.timeLabel = document.getElementById('time-'+id);
+    this.track = document.getElementById('track-'+id);
+    this.resetBtn = document.getElementById('reset-'+id);
+
+    this.playBtn.addEventListener('click', () => this.toggle());
+    this.resetBtn.addEventListener('click', () => this.reset());
+    this.track.addEventListener('click', (e) => {
+      const rect = this.track.getBoundingClientRect();
+      this.t = ((e.clientX - rect.left) / rect.width) * this.dur;
+      this.updateUI();
+      this.plotMarker();
+    });
+  }
+  toggle(){
+    if(this.playing){ this.pause(); } else { this.play(); }
+  }
+  play(){
+    this.playing = true;
+    this.playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    this.lastTs = performance.now();
+    this.tick();
+  }
+  pause(){
+    this.playing = false;
+    this.playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>';
+    cancelAnimationFrame(this.raf);
+  }
+  reset(){
+    this.pause();
+    this.t = 0;
+    this.updateUI();
+    this.plotMarker();
+  }
+  tick(){
+    if(!this.playing) return;
+    const now = performance.now();
+    const dt = (now - this.lastTs) / 1000;
+    this.lastTs = now;
+    this.t = Math.min(this.t + dt, this.dur);
+    this.updateUI();
+    this.plotMarker();
+    if(this.t >= this.dur){ this.pause(); return; }
+    this.raf = requestAnimationFrame(() => this.tick());
+  }
+  updateUI(){
+    const pct = (this.t / this.dur) * 100;
+    this.fill.style.width = pct + '%';
+    this.timeLabel.textContent = this.t.toFixed(1) + ' s / ' + this.dur.toFixed(1) + ' s';
+  }
+  plotMarker(){
+    const d = this.getData(this.t);
+    const ch = this.chart;
+    if(!ch) return;
+    // Remove old marker datasets (keep first N original datasets)
+    const origLen = ch.data.datasets.length;
+    while(ch.data.datasets.length > origLen) ch.data.datasets.pop();
+    // Add marker
+    ch.data.datasets.push({
+      data: d, pointRadius: 8, pointBackgroundColor: '#fff',
+      pointBorderColor: '#6d5df6', pointBorderWidth: 3,
+      pointHoverRadius: 0, showLine: false, label: '_marker',
+      order: -1
+    });
+    ch.update('none');
+  }
+}
+
+// ── g1: Position-Time, Constant Velocity ──
+const T = [0,1,2,3,4,5];
+let g1Chart;
+function buildG1(v){
+  return T.map(t => v * t);
+}
+function initG1(){
+  const v = parseFloat(document.getElementById('sl-g1-v').value);
+  document.getElementById('val-g1-v').textContent = v.toFixed(1) + ' m/s';
+  if(g1Chart) g1Chart.destroy();
+  const c = themeC();
+  g1Chart = new Chart(document.getElementById('g1'), {
+    type: 'line',
+    data: {
+      labels: T,
+      datasets: [{
+        label: 'Position (m)', data: buildG1(v),
+        borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.12)', fill: true,
+        borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#38bdf8', tension: 0
+      }]
+    },
+    options: chartOpts('Time (s)', 'Position (m)')
+  });
+  allCharts.push(g1Chart);
+  return g1Chart;
+}
+initG1();
+document.getElementById('sl-g1-v').addEventListener('input', () => {
+  const v = parseFloat(document.getElementById('sl-g1-v').value);
+  document.getElementById('val-g1-v').textContent = v.toFixed(1) + ' m/s';
+  g1Chart.data.datasets[0].data = buildG1(v);
+  g1Chart.update();
+  eng1.plotMarker();
+});
+const eng1 = new AnimEngine('g1', 5, (t) => {
+  const v = parseFloat(document.getElementById('sl-g1-v').value);
+  return [{x: t, y: v * t}];
+}, g1Chart);
+
+// ── g2: Position-Time, Acceleration vs Backwards ──
+let g2Chart;
+function buildG2(a, rv){
+  return { acc: T.map(t => 0.5 * a * t * t), back: T.map(t => 25 - rv * t) };
+}
+function initG2(){
+  const a = parseFloat(document.getElementById('sl-g2-a').value);
+  const rv = parseFloat(document.getElementById('sl-g2-rv').value);
+  document.getElementById('val-g2-a').textContent = a.toFixed(1) + ' m/s²';
+  document.getElementById('val-g2-rv').textContent = rv + ' m/s';
+  const d = buildG2(a, rv);
+  if(g2Chart) g2Chart.destroy();
+  g2Chart = new Chart(document.getElementById('g2'), {
+    type: 'line',
+    data: {
+      labels: T,
+      datasets: [
+        { label: 'Accelerating', data: d.acc, borderColor: '#34d399', fill: false, borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#34d399' },
+        { label: 'Moving back', data: d.back, borderColor: '#fbbf24', fill: false, borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#fbbf24' }
+      ]
+    },
+    options: chartOpts('Time (s)', 'Position (m)')
+  });
+  allCharts.push(g2Chart);
+  return g2Chart;
+}
+initG2();
+document.getElementById('sl-g2-a').addEventListener('input', () => {
+  const a = parseFloat(document.getElementById('sl-g2-a').value);
+  const rv = parseFloat(document.getElementById('sl-g2-rv').value);
+  document.getElementById('val-g2-a').textContent = a.toFixed(1) + ' m/s²';
+  const d = buildG2(a, rv);
+  g2Chart.data.datasets[0].data = d.acc;
+  g2Chart.data.datasets[1].data = d.back;
+  g2Chart.update();
+});
+document.getElementById('sl-g2-rv').addEventListener('input', () => {
+  const a = parseFloat(document.getElementById('sl-g2-a').value);
+  const rv = parseFloat(document.getElementById('sl-g2-rv').value);
+  document.getElementById('val-g2-rv').textContent = rv + ' m/s';
+  const d = buildG2(a, rv);
+  g2Chart.data.datasets[0].data = d.acc;
+  g2Chart.data.datasets[1].data = d.back;
+  g2Chart.update();
+});
+const eng2 = new AnimEngine('g2', 5, (t) => {
+  const a = parseFloat(document.getElementById('sl-g2-a').value);
+  const rv = parseFloat(document.getElementById('sl-g2-rv').value);
+  return [{x: t, y: 0.5 * a * t * t}, {x: t, y: 25 - rv * t}];
+}, g2Chart);
+
+// ── g3: Velocity-Time, Constant Velocity ──
+let g3Chart;
+function initG3(){
+  const v = parseFloat(document.getElementById('sl-g3-v').value);
+  document.getElementById('val-g3-v').textContent = v + ' m/s';
+  if(g3Chart) g3Chart.destroy();
+  g3Chart = new Chart(document.getElementById('g3'), {
+    type: 'line',
+    data: {
+      labels: T,
+      datasets: [{
+        label: 'Velocity (m/s)', data: T.map(() => v),
+        borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.22)', fill: true,
+        borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#38bdf8'
+      }]
+    },
+    options: chartOpts('Time (s)', 'Velocity (m/s)')
+  });
+  allCharts.push(g3Chart);
+  return g3Chart;
+}
+initG3();
+document.getElementById('sl-g3-v').addEventListener('input', () => {
+  const v = parseFloat(document.getElementById('sl-g3-v').value);
+  document.getElementById('val-g3-v').textContent = v + ' m/s';
+  g3Chart.data.datasets[0].data = T.map(() => v);
+  g3Chart.update();
+});
+const eng3 = new AnimEngine('g3', 5, (t) => {
+  const v = parseFloat(document.getElementById('sl-g3-v').value);
+  return [{x: t, y: v}];
+}, g3Chart);
+
+// ── g4: Velocity-Time, Speeding Up vs Slowing Down ──
+let g4Chart;
+function buildG4(a){
+  return { up: T.map(t => a * t), down: T.map(t => 10 - a * t) };
+}
+function initG4(){
+  const a = parseFloat(document.getElementById('sl-g4-a').value);
+  document.getElementById('val-g4-a').textContent = a.toFixed(1) + ' m/s²';
+  const d = buildG4(a);
+  if(g4Chart) g4Chart.destroy();
+  g4Chart = new Chart(document.getElementById('g4'), {
+    type: 'line',
+    data: {
+      labels: T,
+      datasets: [
+        { label: 'a = +'+a+' m/s²', data: d.up, borderColor: '#34d399', fill: false, borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#34d399' },
+        { label: 'a = −'+a+' m/s²', data: d.down, borderColor: '#f87171', fill: false, borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#f87171' }
+      ]
+    },
+    options: chartOpts('Time (s)', 'Velocity (m/s)')
+  });
+  allCharts.push(g4Chart);
+  return g4Chart;
+}
+initG4();
+document.getElementById('sl-g4-a').addEventListener('input', () => {
+  const a = parseFloat(document.getElementById('sl-g4-a').value);
+  document.getElementById('val-g4-a').textContent = a.toFixed(1) + ' m/s²';
+  const d = buildG4(a);
+  g4Chart.data.datasets[0].data = d.up;
+  g4Chart.data.datasets[0].label = 'a = +'+a+' m/s²';
+  g4Chart.data.datasets[1].data = d.down;
+  g4Chart.data.datasets[1].label = 'a = −'+a+' m/s²';
+  g4Chart.update();
+});
+const eng4 = new AnimEngine('g4', 5, (t) => {
+  const a = parseFloat(document.getElementById('sl-g4-a').value);
+  return [{x: t, y: a * t}, {x: t, y: 10 - a * t}];
+}, g4Chart);
+
+// ── g5: Projectile ──
+let g5Chart;
+const GRAV = 10;
+function buildG5(u, angleDeg){
+  const ang = angleDeg * Math.PI / 180;
+  const tFlight = 2 * u * Math.sin(ang) / GRAV;
+  const range = u * Math.cos(ang) * tFlight;
+  const maxH = (u * Math.sin(ang)) ** 2 / (2 * GRAV);
+  const px = [], py = [];
+  for(let s = 0; s <= tFlight + 0.01; s += tFlight / 50){
+    px.push(+(u * Math.cos(ang) * s).toFixed(2));
+    py.push(+(u * Math.sin(ang) * s - 0.5 * GRAV * s * s).toFixed(2));
+  }
+  return { px, py, tFlight, range, maxH };
+}
+function initG5(){
+  const u = parseFloat(document.getElementById('sl-g5-u').value);
+  const ang = parseFloat(document.getElementById('sl-g5-ang').value);
+  document.getElementById('val-g5-u').textContent = u + ' m/s';
+  document.getElementById('val-g5-ang').textContent = ang + '°';
+  const d = buildG5(u, ang);
+  document.getElementById('g5-info').textContent = 'u = '+u+' m/s, angle = '+ang+'°, g = 10 m/s² | Range = '+d.range.toFixed(1)+' m, Max height = '+d.maxH.toFixed(1)+' m, Flight time = '+d.tFlight.toFixed(2)+' s';
+  if(g5Chart) g5Chart.destroy();
+  g5Chart = new Chart(document.getElementById('g5'), {
+    type: 'line',
+    data: {
+      labels: d.px,
+      datasets: [{
+        label: 'Height (m)', data: d.py,
+        borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.18)', fill: true,
+        borderWidth: 2.5, pointRadius: 0, tension: 0.3
+      }]
+    },
+    options: chartOpts('Horizontal distance (m)', 'Height (m)')
+  });
+  allCharts.push(g5Chart);
+  return g5Chart;
+}
+initG5();
+document.getElementById('sl-g5-u').addEventListener('input', () => { initG5(); });
+document.getElementById('sl-g5-ang').addEventListener('input', () => { initG5(); });
+const eng5 = new AnimEngine('g5', 2, (t) => {
+  const u = parseFloat(document.getElementById('sl-g5-u').value);
+  const ang = parseFloat(document.getElementById('sl-g5-ang').value) * Math.PI / 180;
+  return [{x: u * Math.cos(ang) * t, y: u * Math.sin(ang) * t - 0.5 * GRAV * t * t}];
+}, g5Chart);
+
+// ── Illustrations (simple canvas animations) ──
+function drawIllust(id, drawFn){
+  const cvs = document.getElementById(id);
+  if(!cvs) return;
+  const ctx = cvs.getContext('2d');
+  let frame = 0;
+  function loop(){
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    drawFn(ctx, cvs.width, cvs.height, frame);
+    frame++;
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// Illust g1: sliding dot on a line
+drawIllust('illust-g1', (ctx, w, h, f) => {
+  ctx.strokeStyle = 'rgba(56,189,248,.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(40, h-12); ctx.lineTo(w-40, h-12); ctx.stroke();
+  const x = 40 + ((f * 1.5) % (w-80));
+  ctx.fillStyle = '#38bdf8';
+  ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(x, h-12, 5, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // velocity arrows
+  ctx.strokeStyle = 'rgba(56,189,248,.5)'; ctx.lineWidth = 1.5;
+  for(let i=0;i<3;i++){
+    const ax = x + 10 + i*14;
+    ctx.beginPath(); ctx.moveTo(ax, h-12); ctx.lineTo(ax+8, h-12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ax+6, h-16); ctx.lineTo(ax+8, h-12); ctx.lineTo(ax+6, h-8); ctx.stroke();
+  }
+});
+
+// Illust g2: two dots, one accelerating, one returning
+drawIllust('illust-g2', (ctx, w, h, f) => {
+  const cx = w/2;
+  ctx.strokeStyle = 'rgba(52,211,153,.2)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(40, h-14); ctx.lineTo(w-40, h-14); ctx.stroke();
+  // accelerating dot (moves right, speeding up)
+  const t = (f % 200) / 200;
+  const x1 = 40 + (w-80) * t * t;
+  ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(x1, h-24, 4, 0, Math.PI*2); ctx.fill();
+  // returning dot (moves right to left at constant speed)
+  const x2 = w - 40 - ((f * 1.2) % (w-80));
+  ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#fbbf24';
+  ctx.beginPath(); ctx.arc(x2, h-14, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+});
+
+// Illust g3: filled area under constant velocity
+drawIllust('illust-g3', (ctx, w, h, f) => {
+  const progress = Math.min(((f % 300) / 300), 1);
+  const endX = 40 + (w-80) * progress;
+  ctx.fillStyle = 'rgba(56,189,248,.12)';
+  ctx.fillRect(40, 8, endX-40, h-20);
+  ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(40, h/2); ctx.lineTo(w-40, h/2); ctx.stroke();
+  ctx.fillStyle = '#38bdf8'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(endX, h/2, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+});
+
+// Illust g4: two dots speeding up and slowing down
+drawIllust('illust-g4', (ctx, w, h, f) => {
+  ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(40, h-14); ctx.lineTo(w-40, h-14); ctx.stroke();
+  const t = (f % 180) / 180;
+  // speeding up
+  const x1 = 40 + (w-80) * t * t;
+  ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(x1, h-26, 4, 0, Math.PI*2); ctx.fill();
+  // slowing down
+  const x2 = 40 + (w-80) * (1 - (1-t)*(1-t));
+  ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171';
+  ctx.beginPath(); ctx.arc(x2, h-14, 4, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+});
+
+// Illust g5: parabolic arc
+drawIllust('illust-g5', (ctx, w, h, f) => {
+  const progress = (f % 240) / 240;
+  ctx.strokeStyle = 'rgba(167,139,250,.25)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for(let i=0;i<=60;i++){
+    const t = i/60;
+    const x = 60 + (w-120) * t;
+    const y = (h-8) - Math.sin(Math.PI * t) * (h-16) * 0.8;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // moving ball
+  const bx = 60 + (w-120) * progress;
+  const by = (h-8) - Math.sin(Math.PI * progress) * (h-16) * 0.8;
+  ctx.fillStyle = '#a78bfa'; ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+});
+
+// ── Comparison Panel ──
+let cmpPtChart, cmpVtChart;
+document.getElementById('compare-cb').addEventListener('change', function(){
+  document.getElementById('compare-panel').style.display = this.checked ? 'block' : 'none';
+  if(this.checked) initCompare();
+});
+function initCompare(){
+  const v = parseFloat(document.getElementById('sl-cmp-v').value);
+  document.getElementById('val-cmp-v').textContent = v.toFixed(1) + ' m/s';
+  const c = themeC();
+  if(cmpPtChart) cmpPtChart.destroy();
+  if(cmpVtChart) cmpVtChart.destroy();
+  cmpPtChart = new Chart(document.getElementById('cmp-pt'), {
+    type: 'line',
+    data: { labels: T, datasets: [{ label: 'Position (m)', data: T.map(t=>v*t), borderColor: '#38bdf8', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#38bdf8', fill: false }] },
+    options: chartOpts('Time (s)', 'Position (m)')
+  });
+  cmpVtChart = new Chart(document.getElementById('cmp-vt'), {
+    type: 'line',
+    data: { labels: T, datasets: [{ label: 'Velocity (m/s)', data: T.map(()=>v), borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.18)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#a78bfa', fill: true }] },
+    options: chartOpts('Time (s)', 'Velocity (m/s)')
+  });
+}
+document.getElementById('sl-cmp-v').addEventListener('input', () => {
+  if(!document.getElementById('compare-cb').checked) return;
+  const v = parseFloat(document.getElementById('sl-cmp-v').value);
+  document.getElementById('val-cmp-v').textContent = v.toFixed(1) + ' m/s';
+  cmpPtChart.data.datasets[0].data = T.map(t => v*t);
+  cmpVtChart.data.datasets[0].data = T.map(() => v);
+  cmpPtChart.update(); cmpVtChart.update();
+});
+let cmpPlaying = false, cmpT = 0, cmpRaf;
+document.getElementById('play-cmp').addEventListener('click', function(){
+  if(cmpPlaying){ cmpPlaying=false; this.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="6,3 20,12 6,21"/></svg>'; cancelAnimationFrame(cmpRaf); return; }
+  cmpPlaying = true;
+  cmpT = 0;
+  this.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+  let last = performance.now();
+  function tick(){
+    if(!cmpPlaying) return;
+    const now = performance.now();
+    cmpT = Math.min(cmpT + (now-last)/1000, 5);
+    last = now;
+    const v = parseFloat(document.getElementById('sl-cmp-v').value);
+    // Update marker on both charts
+    [cmpPtChart, cmpVtChart].forEach(ch => {
+      while(ch.data.datasets.length > 1) ch.data.datasets.pop();
+    });
+    cmpPtChart.data.datasets.push({ data: [{x:cmpT,y:v*cmpT}], pointRadius: 8, pointBackgroundColor: '#fff', pointBorderColor: '#6d5df6', pointBorderWidth: 3, showLine: false, order: -1 });
+    cmpVtChart.data.datasets.push({ data: [{x:cmpT,y:v}], pointRadius: 8, pointBackgroundColor: '#fff', pointBorderColor: '#6d5df6', pointBorderWidth: 3, showLine: false, order: -1 });
+    cmpPtChart.update('none'); cmpVtChart.update('none');
+    if(cmpT >= 5){ cmpPlaying = false; document.getElementById('play-cmp').innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="6,3 20,12 6,21"/></svg>'; return; }
+    cmpRaf = requestAnimationFrame(tick);
+  }
+  tick();
+});
+
+// ── Theme update for all charts ──
+function updateThemes(){
+  const c = themeC();
+  allCharts.forEach(ch => {
+    if(ch.options.scales && ch.options.scales.x){
+      ch.options.scales.x.title.color = c.tick;
+      ch.options.scales.x.ticks.color = c.tick;
+      ch.options.scales.x.grid.color = c.grid;
+      ch.options.scales.y.title.color = c.tick;
+      ch.options.scales.y.ticks.color = c.tick;
+      ch.options.scales.y.grid.color = c.grid;
+    }
+    if(ch.options.plugins && ch.options.plugins.legend) ch.options.plugins.legend.labels.color = c.tick;
+    ch.update();
+  });
+  if(cmpPtChart) initCompare();
+}
+</script>
+
+</body>
+</html>
