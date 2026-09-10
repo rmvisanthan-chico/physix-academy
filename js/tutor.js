@@ -4,6 +4,7 @@
 const Tutor = {
   docs: null,
   STOP: null,
+  history: [], // conversation history for context
 
   build() {
     // stopwords — killed during tokenize so long questions don't drown the signal
@@ -144,57 +145,136 @@ const Tutor = {
     return scored.slice(0, limit).map(x => x[2]);
   },
 
+  // Check for follow-up context from conversation history
+  getContext() {
+    if (this.history.length === 0) return null;
+    const lastExchange = this.history[this.history.length - 1];
+    return lastExchange;
+  },
+
+  // Add to conversation history
+  addToHistory(question, answer) {
+    this.history.push({
+      q: question,
+      a: answer,
+      time: Date.now()
+    });
+    // Keep last 10 exchanges for context
+    if (this.history.length > 10) {
+      this.history.shift();
+    }
+    // Save to localStorage
+    try {
+      localStorage.setItem('physix-tutor-history', JSON.stringify(this.history));
+    } catch (e) { /* quota exceeded */ }
+  },
+
+  // Load conversation history from localStorage
+  loadHistory() {
+    try {
+      const saved = localStorage.getItem('physix-tutor-history');
+      if (saved) {
+        this.history = JSON.parse(saved);
+      }
+    } catch (e) {
+      this.history = [];
+    }
+  },
+
+  // Clear conversation history
+  clearHistory() {
+    this.history = [];
+    try {
+      localStorage.removeItem('physix-tutor-history');
+    } catch (e) { /* ignore */ }
+  },
+
+  // Export conversation as text
+  exportHistory() {
+    if (!this.history.length) return 'No conversation history.';
+    let output = 'PhysiX Academy — Tutor Conversation Export\n';
+    output += '=' .repeat(50) + '\n\n';
+    this.history.forEach((ex, i) => {
+      output += `Q${i + 1}: ${ex.q}\n`;
+      // Strip HTML tags for plain text export
+      const plainAnswer = ex.a.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      output += `A${i + 1}: ${plainAnswer}\n\n`;
+    });
+    return output;
+  },
+
   answer(input) {
     if (!this.docs) this.build();
     const q = String(input || '').trim();
     const low = q.toLowerCase();
     const words = this.tokenize(q);
 
+    // Check for follow-up keywords
+    const isFollowUp = /^(and|also|what about|how about|explain more|tell me more|but why)/.test(low) ||
+                       /(that|this|it|above|previous|earlier)/.test(low);
+    const context = isFollowUp ? this.getContext() : null;
+
     if (/^(hi|hello|hey|namaste|hola)\b/.test(low)) {
-      return {
-        html: '<p>Hello. I\'m the tutor built into this site — I was written alongside the curriculum, so I know where everything lives.</p>' +
-          '<ul><li>Ask <i>why</i> questions: “Why does friction happen?”</li>' +
-          '<li>Ask for formulas: “What is the lens equation?”</li>' +
+      const result = {
+        html: '<p>Hello! I\'m the tutor built into this site — I was written alongside the curriculum, so I know where everything lives.</p>' +
+          '<ul><li>Ask <i>why</i> questions: "Why does friction happen?"</li>' +
+          '<li>Ask for formulas: "What is the lens equation?"</li>' +
           '<li>Say <b>quiz me</b> to head to Practice.</li></ul>',
         href: null
       };
+      this.addToHistory(q, result);
+      return result;
     }
     if (/(who|what) are you|your name/.test(low)) {
-      return {
+      const result = {
         html: '<p>I\'m PhysiX Academy\'s built-in tutor. I read every lesson on this site so I can point you to exactly the right explanation — no internet required.</p>',
         href: null
       };
+      this.addToHistory(q, result);
+      return result;
     }
     if (/(quiz|test me|practice|questions)/.test(low)) {
-      return {
+      const result = {
         html: '<p>Head to <a href="#/practice">Practice</a> — pick a level and difficulty. It keeps score and explains every answer, including the ones you get wrong.</p>',
         href: '#/practice'
       };
+      this.addToHistory(q, result);
+      return result;
     }
     if (/^(thanks|thank you|thx)/.test(low)) {
-      return { html: '<p>Any time. Keep asking “why” — that habit is worth more than any formula on this site.</p>', href: null };
+      const result = { html: '<p>Any time. Keep asking "why" — that habit is worth more than any formula on this site.</p>', href: null };
+      this.addToHistory(q, result);
+      return result;
     }
     if (!words.length) {
-      return {
+      const result = {
         html: '<p>Type a physics question — even a rough one — and I\'ll dig through the lessons for you.</p>',
         href: null
       };
+      this.addToHistory(q, result);
+      return result;
     }
 
     if(this.isProblem(q)){
       const solved=this.trySolve(q);
-      if(solved) return {html: solved, href: null};
+      if(solved) {
+        const result = {html: solved, href: null};
+        this.addToHistory(q, result);
+        return result;
+      }
     }
 
     const hits = this.search(q, 4);
     if (!hits.length) {
       const longHint = words.length > 6
-        ? '<p class="small muted">Your question has a lot in it — try splitting it: ask the main thing first (<i>“why does X happen?”</i>), then the follow-up.</p>'
-        : '<p class="small muted">Try rephrasing around a concept — e.g. <i>“Why does a rocket work?”</i>, <i>“momentum conservation”</i>, <i>“Ohm&#39;s law”</i> — or browse the <a href="#/learn">Learn</a> page.</p>';
-      return {
+        ? '<p class="small muted">Your question has a lot in it — try splitting it: ask the main thing first (<i>"why does X happen?"</i>), then the follow-up.</p>'
+        : '<p class="small muted">Try rephrasing around a concept — e.g. <i>"Why does a rocket work?"</i>, <i>"momentum conservation"</i>, <i>"Ohm&#39;s law"</i> — or browse the <a href="#/learn">Learn</a> page.</p>';
+      const result = {
         html: '<p>I couldn\'t find that one in my notes yet.</p>' + longHint,
         href: null
       };
+      this.addToHistory(q, result);
+      return result;
     }
 
     const best = hits[0];
@@ -220,7 +300,9 @@ const Tutor = {
         related.map(h => '<li><a href="' + h.href + '">' + esc(h.q.replace(/^Q: /, '').slice(0, 80)) + '</a></li>').join('') +
         '</ul>';
     }
-    return { html, href: best.href };
+    const result = { html, href: best.href };
+    this.addToHistory(q, result);
+    return result;
   },
 
   suggestions(n = 5) {

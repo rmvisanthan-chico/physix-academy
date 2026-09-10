@@ -133,14 +133,26 @@ function viewSimsPage(id) {
 
 /* ---------------- Tutor page ---------------- */
 function viewTutorPage() {
+  // Load conversation history
+  Tutor.loadHistory();
+  
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>PhysiX Tutor</h1>
       <p class="sub">Ask anything about the lessons — it searches the whole curriculum for you. Works fully offline.</p></div>
     <div class="tutor-layout">
       <div class="chat-panel">
-        <div class="chat-head"><span class="ai-avatar" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><ellipse cx="32" cy="32" rx="26" ry="9.5" transform="rotate(-30 32 32)"/><ellipse cx="32" cy="32" rx="26" ry="9.5" transform="rotate(60 32 32)"/><circle cx="32" cy="32" r="7" fill="currentColor" stroke="none"/></svg></span>
+        <div class="chat-head">
+          <span class="ai-avatar" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><ellipse cx="32" cy="32" rx="26" ry="9.5" transform="rotate(-30 32 32)"/><ellipse cx="32" cy="32" rx="26" ry="9.5" transform="rotate(60 32 32)"/><circle cx="32" cy="32" r="7" fill="currentColor" stroke="none"/></svg></span>
           <div><b>PhysiX Tutor</b><br><span class="small muted">built from all ${flatLessons().length} lessons on this site</span></div>
+          <div class="chat-controls">
+            <button class="icon-btn" id="export-chat" title="Export conversation" aria-label="Export conversation">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            </button>
+            <button class="icon-btn" id="clear-chat" title="Clear conversation" aria-label="Clear conversation">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
         </div>
         <div class="chat-log" id="chat-log"></div>
         <div class="chat-input">
@@ -151,37 +163,88 @@ function viewTutorPage() {
       <aside class="tutor-side">
         <div class="side-card"><h4>Try asking</h4><div class="tutor-btns" id="tutor-sugs"></div></div>
         <div class="side-card"><h4>I can find</h4>
-          <p class="small muted mb0">“Why…” explanations · formulas with notes · quick-revision bullets · lesson links</p>
+          <p class="small muted mb0">"Why…" explanations · formulas with notes · quick-revision bullets · lesson links</p>
         </div>
       </aside>
     </div>
   </div>`;
 
   const log = $('#chat-log');
-  const push = (cls, html, tag) => {
+  const push = (cls, html, tag, addActions = false) => {
     const m = document.createElement('div');
     m.className = 'msg ' + cls;
-    m.innerHTML = (tag ? '<span class="msg-tag">' + tag + '</span>' : '') + html;
+    let content = (tag ? '<span class="msg-tag">' + tag + '</span>' : '') + html;
+    
+    // Add action buttons to AI messages
+    if (addActions && cls === 'ai') {
+      content += `<div class="msg-actions">
+        <button class="msg-action-btn" data-action="copy" title="Copy response">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="msg-action-btn" data-action="regenerate" title="Regenerate response">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+      </div>`;
+    }
+    
+    m.innerHTML = content;
     log.appendChild(m);
     log.scrollTop = log.scrollHeight;
     Tex.render(m);
+    
+    // Attach event listeners to action buttons
+    if (addActions && cls === 'ai') {
+      const copyBtn = m.querySelector('[data-action="copy"]');
+      const regenBtn = m.querySelector('[data-action="regenerate"]');
+      
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          const textContent = m.innerText.replace(/Copy response.*Regenerate response/s, '').trim();
+          navigator.clipboard.writeText(textContent).then(() => {
+            Toast.show('Response copied to clipboard');
+          }).catch(() => {
+            Toast.show('Failed to copy');
+          });
+        });
+      }
+      
+      if (regenBtn) {
+        regenBtn.addEventListener('click', () => {
+          // Find the last user message before this AI message
+          const msgs = Array.from(log.querySelectorAll('.msg'));
+          const idx = msgs.indexOf(m);
+          if (idx > 0 && msgs[idx - 1].classList.contains('user')) {
+            const lastQuestion = msgs[idx - 1].innerText;
+            ask(lastQuestion, true);
+          }
+        });
+      }
+    }
+    
     return m;
   };
 
   push('ai', '<p>Ask me <i>why</i> something happens, or name a formula and I\'ll take it apart. For example:</p>' +
-    '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>');
+    '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>', null, false);
 
-  const ask = text => {
+  const ask = (text, isRegenerate = false) => {
     if (!text.trim()) return;
-    push('user', mdInline(text));
+    
+    // Only push user message if not regenerating
+    if (!isRegenerate) {
+      push('user', mdInline(text), null, false);
+    }
+    
     const typing = document.createElement('div');
-    typing.className = 'msg ai';
-    typing.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
-    log.appendChild(typing); log.scrollTop = log.scrollHeight;
+    typing.className = 'msg ai typing-indicator';
+    typing.innerHTML = '<span class="typing"><i></i><i></i><i></i></span><span class="typing-text">Thinking...</span>';
+    log.appendChild(typing); 
+    log.scrollTop = log.scrollHeight;
+    
     setTimeout(() => {
       typing.remove();
       const ans = Tutor.answer(text);
-      push('ai', ans.html, 'PhysiX Tutor');
+      push('ai', ans.html, 'PhysiX Tutor', true);
     }, 450 + Math.random() * 400);
   };
 
@@ -191,6 +254,30 @@ function viewTutorPage() {
   });
   $('#chat-in').addEventListener('keydown', e => {
     if (e.key === 'Enter') { ask($('#chat-in').value); $('#chat-in').value = ''; }
+  });
+
+  // Export conversation
+  $('#export-chat').addEventListener('click', () => {
+    const exported = Tutor.exportHistory();
+    const blob = new Blob([exported], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `physix-tutor-${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    Toast.show('Conversation exported');
+  });
+
+  // Clear conversation
+  $('#clear-chat').addEventListener('click', () => {
+    if (confirm('Clear all conversation history? This cannot be undone.')) {
+      Tutor.clearHistory();
+      log.innerHTML = '';
+      push('ai', '<p>Ask me <i>why</i> something happens, or name a formula and I\'ll take it apart. For example:</p>' +
+        '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>', null, false);
+      Toast.show('Conversation cleared');
+    }
   });
 
   const sugs = $('#tutor-sugs');
