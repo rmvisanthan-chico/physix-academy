@@ -120,6 +120,21 @@ function closeDrawer() {
   $('#btn-menu').setAttribute('aria-expanded', 'false');
 }
 
+/* ---------------- Nav tooltips ---------------- */
+const TP = {
+  learn: 'Browse the NCERT-aligned curriculum — lessons, Class 9 to 12.',
+  topics: 'Physics by subject area — mechanics, waves, electricity, optics.',
+  sims: '26+ live simulations you can drag, poke and break.',
+  games: 'Learn by playing — physics-based mini games.',
+  practice: 'Timed quiz sessions that explain every answer, right or wrong.',
+  tutor: 'Ask anything — the offline AI tutor solves problems step by step.',
+  formulas: 'Every formula with its derivation and notes, searchable.',
+  calculators: 'Quick physics calculators for common problems.',
+  people: 'The physicists behind the ideas.',
+  progress: 'Your saved progress, stats and weakest topics.',
+  support: 'Keep this project free — donate what you can.'
+};
+
 /* ---------------- Bootstrap ---------------- */
 (function initApp() {
   App.el = $('#main');
@@ -207,19 +222,6 @@ function initConsent() {
 }
 
 /* ---- rich tooltips on nav links ---- */
-const TP = {
-  learn: 'Browse the NCERT-aligned curriculum — lessons, Class 9 to 12.',
-  topics: 'Physics by subject area — mechanics, waves, electricity, optics.',
-  sims: '26+ live simulations you can drag, poke and break.',
-  games: 'Learn by playing — physics-based mini games.',
-  practice: 'Timed quiz sessions that explain every answer, right or wrong.',
-  tutor: 'Ask anything — the offline AI tutor solves problems step by step.',
-  formulas: 'Every formula with its derivation and notes, searchable.',
-  calculators: 'Quick physics calculators for common problems.',
-  people: 'The physicists behind the ideas.',
-  progress: 'Your saved progress, stats and weakest topics.',
-  support: 'Keep this project free — donate what you can.'
-};
 function initTooltips() {
   const tip = document.createElement('div');
   tip.className = 'nav-tip'; tip.setAttribute('role', 'tooltip');

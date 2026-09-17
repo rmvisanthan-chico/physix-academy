@@ -15,6 +15,11 @@
 <meta property="og:image" content="/assets/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/logo.png" type="image/png">
+<!-- Login gate DISABLED for now - enable later after login alterations
+<script>
+(function(){try{var u=JSON.parse(localStorage.getItem('physix-user'));if(!u||!u.name||!u.class){window.location.replace('login.html');}}catch(e){window.location.replace('login.html');}})();
+</script>
+-->
 <!-- Vercel Analytics + Speed Insights (polish) -->
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
@@ -152,7 +157,6 @@
     </div>
     <div class="footer-social">
       <a href="https://github.com/rmvisanthan-chico/physix-academy" target="_blank" rel="noopener" aria-label="GitHub">GitHub</a>
-      <a href="https://www.youtube.com/@physixacademy" target="_blank" rel="noopener" aria-label="YouTube">YouTube</a>
       <a href="mailto:r.m.visanthan@gmail.com" aria-label="Email">Email</a>
     </div>
     <p class="footer-note">Built for students who want to truly understand physics — from zero to advanced. Progress is saved locally in your browser.<br>
@@ -260,8 +264,6 @@
   </div>
 </div>
 
-<script src="js/hero-vector.js?v=74"></script>
-<script src="js/premium62.js?v=74"></script>
 <script src="js/scroll-cinema.js?v=74"></script>
 <script src="js/app.js?v=74"></script>
 </body>
