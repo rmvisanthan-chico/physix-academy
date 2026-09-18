@@ -122,8 +122,9 @@ function viewSimsPage(id) {
     <div class="page-head"><h1>Simulations</h1>
     <p class="sub">Physics you can poke. Every simulation runs live in your browser — drag the sliders and watch the equations respond.</p></div>
     ${items.length ? '<div class="grid g3">' + items.map(d => `
-      <div class="card hover topic-card">
-        <h3>${d.icon} ${esc(d.title)}</h3>
+      <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
+        ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">🚀 Official PhET</em></div>' : ''}
+        <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
         <p class="muted">${esc(d.desc)}</p>
         <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open ▸</a></div>
       </div>`).join('') + '</div>'

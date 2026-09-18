@@ -289,6 +289,21 @@ ol.sol-steps li{margin:.45rem 0}
 [data-theme="light"] .sim-canvas-wrap{background:#0b1120}
 .sim-frame canvas{display:block;width:100%;height:auto}
 .sim-controls{display:flex;flex-wrap:wrap;gap:1rem 1.6rem;padding:.9rem 1rem;border-top:1px solid var(--card-brd)}
+.phet-launch{display:flex;align-items:center;justify-content:center;padding:3rem 1.5rem;text-align:center;border-radius:14px;margin:1.2rem 0;background:radial-gradient(1200px 600px at 20% 0%,rgba(56,189,248,.16),transparent 55%),radial-gradient(900px 500px at 90% 100%,rgba(244,63,94,.14),transparent 55%),linear-gradient(135deg,#0a1120,#0d1a2e);border:1px solid var(--card-brd)}
+.phet-launch .phet-launch-inner{max-width:520px}
+.phet-launch-icon{font-size:3.5rem;margin-bottom:.6rem}
+.phet-launch-title{font-size:1.35rem;font-weight:800;color:var(--txt1)}
+.phet-launch-sub{margin:.5rem 0 1.4rem;color:var(--txt2);font-size:.92rem}
+.phet-launch-sub a{color:var(--acc2)}
+.phet-embed{position:relative;width:100%;padding:1rem;background:#05070d;box-sizing:border-box;margin:1.2rem 0;border:1px solid var(--card-brd);border-radius:14px}
+[data-theme="light"] .phet-embed{background:#0b1120}
+.phet-loader{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:.6rem;font-weight:700;color:var(--acc2);background:#05070d;font-size:.95rem;transition:opacity .5s}
+[data-theme="light"] .phet-loader{background:#0b1120}
+.phet-loader.hide{opacity:0;pointer-events:none}
+.phet-frame{display:block;width:100%;height:540px;max-width:960px;margin:0 auto;border:1px solid var(--card-brd);border-radius:10px;background:#fff}
+.phet-card{border-top:3px solid #38bdf8;position:relative;overflow:hidden}
+.phet-thumb{position:relative;display:flex;align-items:center;justify-content:center;height:96px;border-radius:10px;margin-bottom:.7rem;font-size:2.6rem;background:linear-gradient(135deg,#0a1120,#1e293b);border:1px solid var(--card-brd)}
+.phet-thumb .phet-badge{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:.3rem;font-size:.66rem;font-weight:800;letter-spacing:.04em;color:#020617;background:linear-gradient(135deg,#7dd3fc,#38bdf8);padding:.22rem .55rem;border-radius:999px;font-style:normal}
 .ctl{min-width:170px;flex:1}
 .ctl label{display:flex;justify-content:space-between;font-size:.8rem;color:var(--txt2);font-weight:600;margin-bottom:.25rem}
 .ctl label output{color:var(--acc2);font-variant-numeric:tabular-nums}
