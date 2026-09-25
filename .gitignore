@@ -10,12 +10,3 @@ PhysiX-Academy-site.zip
 
 # Editor
 .vscode/
-# Local artifacts
-*.lnk
-*.docx
-*.py
-opencode.json
-scroll-reveal-demo.html
-# Env
-.env
-.env.*

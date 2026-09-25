@@ -70,9 +70,9 @@ const SCIENTISTS = [
 function chFirstLesson(chId) {
   for (const l of CURRICULUM) {
     const c = l.chapters.find(x => x.id === chId);
-    if (c && c.lessons.length) return '/learn/' + c.lessons[0].id;
+    if (c && c.lessons.length) return '#/lesson/' + c.lessons[0].id;
   }
-  return '/learn';
+  return '#/learn';
 }
 
 function viewScientists() {

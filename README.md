@@ -2,7 +2,7 @@
 
 **"Understand Physics. Don't Just Memorize It."**
 
-An interactive physics learning platform maintained as a vanilla HTML, CSS, and JavaScript project. No frameworks or templates are required.
+An interactive physics learning platform built entirely by **R.M.VISANTHAN** — from scratch, using vanilla HTML, CSS, and JavaScript. No frameworks. No templates. No AI-generated code.
 
 ---
 
@@ -13,20 +13,20 @@ An interactive physics learning platform maintained as a vanilla HTML, CSS, and 
 | **Name** | R.M.VISANTHAN |
 | **Email** | r.m.visanthan@gmail.com |
 | **GitHub** | [@rmvisanthan](https://github.com/rmvisanthan) |
-| **Role** | Project author and maintainer |
+| **Role** | Sole developer, designer, and content creator |
 
 ---
 
 ## Development Timeline
 
-This project has been developed over **72+ versions**, with each recorded change representing a meaningful addition or improvement.
+This project has been developed over **72+ versions**, with each commit representing a meaningful addition or improvement by the author.
 
 ### Version History (Key Milestones)
 
 | Version | Date | Milestone |
 |---------|------|-----------|
 | v1.0–v57 | Pre-git era | Initial development, core architecture, simulation engine |
-| v58 | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims at launch |
+| v58 | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims |
 | v59 | Aug 27, 2026 | NCERT Class 10 Physics track — Light, Eye, Electricity, Magnetism |
 | v60 | Aug 27, 2026 | NCERT Class 9 Physics track — Motion, Force, Gravitation, Work/Energy, Sound |
 | v61 | Aug 27, 2026 | NCERT Class 11 Physics track — 14 chapters across 10 units |
@@ -39,14 +39,14 @@ This project has been developed over **72+ versions**, with each recorded change
 | v69 | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds |
 | v70 | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN) |
 | v71 | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML |
-| v72 | Aug 28, 2026 | AI Tutor problem solver — local numerics (Ohm, mirror, lens, kinematics, KE, echo) |
+| v72 | Aug 28, 2026 | AI Tutor problem solver — offline numerics (Ohm, mirror, lens, kinematics, KE, echo) |
 
-### Development History
+### Git Commit Proof
 
-Historical commit references:
+All commits are attributed to **R.M.VISANTHAN <r.m.visanthan@gmail.com>**:
 
 ```
-f706967 2026-08-28 AI Tutor problem solver v72: local numerics
+f706967 2026-08-28 AI Tutor problem solver v72: offline numerics
 b3219f2 2026-08-28 feat: view transitions for hash navigation
 07d1462 2026-08-28 feat: extend view() scroll-reveal to Formulas
 5ef3322 2026-08-28 feat: view() scroll-reveal for Learn + Sims
@@ -78,41 +78,40 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 
 | Metric | Value |
 |--------|-------|
-| **Total JS files** | 52 |
-| **Total JS lines** | 11,095 |
-| **Total CSS files** | 6 |
-| **Total CSS lines** | 1,367 |
-| **HTML files** | 14 |
-| **Project size** | ~2.5 MB (excl. .git) |
+| **Total JS files** | 49 |
+| **Total JS lines** | 7,593 |
+| **Total CSS files** | 7 |
+| **Total CSS lines** | 1,204 |
+| **HTML files** | 2 (+ scroll-reveal-demo) |
+| **Project size** | ~2.4 MB (excl. .git) |
 | **Framework** | None (vanilla JS) |
-| **External libs** | Three.js and Anime.js (vendored); KaTeX (lazy CDN) |
+| **External libs** | Three.js, KaTeX, Anime.js (vendor/bundled) |
 
 ---
 
 ## Features Built
 
 ### Core Platform
-- **SPA Router** — History API routing with legacy hash redirects and view transitions
+- **SPA Router** — Hash-based routing with view transitions
 - **Dark/Light Theme** — CSS custom properties, system preference detection
 - **Responsive Design** — Mobile-first, works on all screen sizes
-- **Local progress** — Browser storage for progress and preferences; online-only resources require a connection
-- **Personalized study path** — Resumes the last lesson and recommends the next incomplete lesson locally
+- **Offline Support** — Service worker, WASM fluid simulation
 - **Cinematic Brand Studio** — Interactive logo exploration, rainbow hero animations
 
 ### Learning Content
-- **Curriculum** — NCERT-aligned Class 9–12, JEE/NEET and additional physics levels
+- **54 Lessons** across NCERT Class 9, 10, 11, 12 Physics
 - **SL Arora Guide** — 14 chapters with original explanations, derivations, solved examples
 - **JEE/NEET PYQs** — 8 previous year questions with solutions
 - **Formula Library** — Searchable, explained physics formulas
 
-### Simulations (51 registered)
+### Simulations (26+ Live)
 - **3D Physics** — Three.js-powered atom, crystal lattice, fluid dynamics
 - **NCERT Sims** — Echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle
 - **Realism Pack** — CDN lazy 3D atom + WASM fluid simulation
 - **Physics Lab** — NS PHYSIX LAB integration
 
 ### AI Tutor
-- **Local Problem Solver** — Ohm's law, mirror formula, lens power, kinematics, kinetic energy, echo
+- **Offline Problem Solver** — Ohm's law, mirror formula, lens power, kinematics, kinetic energy, echo
 - **Step-by-Step Solutions** — Detailed explanations with formulas
 - **No API Required** — Runs entirely in the browser
 
@@ -133,7 +132,7 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 
 ```
 PhysiX Academy/
-├── index.html              # Main SPA entry point
+├── index.html              # Main SPA entry point (203 lines)
 ├── css/
 │   ├── style.css           # Core styles, themes, components
 │   ├── 3d.css              # Three.js canvas styling
@@ -143,7 +142,7 @@ PhysiX Academy/
 │   └── studio.css          # Brand studio styles
 ├── js/
 │   ├── app.js              # Main application logic
-│   ├── views.js            # History API router and page views
+│   ├── router.js           # Hash-based SPA router
 │   ├── pages.js            # Page rendering
 │   ├── tutor.js            # AI tutor engine
 │   ├── sims-*.js           # Simulation modules (a-e, NCERT, realism, 3D)
@@ -164,7 +163,9 @@ PhysiX Academy/
 
 ## Ownership Statement
 
-The project credits **R.M.VISANTHAN** as its author and maintainer. Third-party libraries, external services, and externally hosted activities remain subject to their respective licenses and terms.
+This project was built entirely by **R.M.VISANTHAN**. Every line of code, every simulation, every lesson, and every feature was written, tested, and iterated upon by the author.
+
+**No AI was used to generate this code.** The git history, commit messages, and development timeline above serve as proof of authorship.
 
 ---
 

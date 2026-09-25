@@ -97,7 +97,7 @@ function viewStudio() {
         <button class="circle-link" id="st-scroll">↓<span>See the studies</span></button>
       </div>
       <div class="st-scene" id="st-scene"><div class="scene-label">Live study / 001 <span>Drag to explore</span></div></div>
-      <div class="st-hero-bottom"><span>Scroll to enter</span><i class="rule"></i><span>Learn anywhere · online or local tutor</span></div>
+      <div class="st-hero-bottom"><span>Scroll to enter</span><i class="rule"></i><span>Learn anywhere · works offline</span></div>
     </section>
 
     <section class="st-statement">
@@ -142,9 +142,9 @@ function viewStudio() {
     <section class="st-cta">
       <h2>Ready to make<br><span>something move?</span></h2>
       <div class="st-cta-row">
-        <a class="pill-btn" href="/learn">▶ Start learning</a>
-        <a class="pill-btn alt" href="/practice">🎯 Test yourself</a>
-        <a class="pill-btn" href="/tutor">🤖 Ask the AI tutor</a>
+        <a class="pill-btn" href="#/learn">▶ Start learning</a>
+        <a class="pill-btn alt" href="#/practice">🎯 Test yourself</a>
+        <a class="pill-btn" href="#/tutor">🤖 Ask the AI tutor</a>
       </div>
     </section>
   </main>`;
@@ -153,5 +153,5 @@ function viewStudio() {
   $('#st-scroll').addEventListener('click', () =>
     $('#st-work').scrollIntoView({ behavior: 'smooth' }));
   $$('.study', App.el).forEach(card =>
-    card.addEventListener('click', () => navigate(card.dataset.href)));
+    card.addEventListener('click', () => location.hash = card.dataset.href));
 }

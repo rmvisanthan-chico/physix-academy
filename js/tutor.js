@@ -1,4 +1,4 @@
-/* PhysiX Academy — Local AI Tutor (local heuristic engine, v2: long-question aware) */
+/* PhysiX Academy — Local AI Tutor (offline heuristic engine, v2: long-question aware) */
 'use strict';
 
 const Tutor = {
@@ -11,7 +11,7 @@ const Tutor = {
     this.STOP = new Set(('the a an is are was were do does did what why how when where who which of in on for to with and or if it its this that these those can could would will shall should i you your me my we our am be been being have has had not no yes very just about into over under again then once here there all any both each few more most other some such only own same so than too'.split(' ')));
     this.docs = [];
     CURRICULUM.forEach(level => level.chapters.forEach(ch => ch.lessons.forEach(ls => {
-      const href = '/learn/' + ls.id;
+      const href = '#/lesson/' + ls.id;
       const where = level.name + ' › ' + ch.title;
       ls.content.forEach(b => {
         if (!b) return;
@@ -227,7 +227,7 @@ const Tutor = {
     }
     if (/(who|what) are you|your name/.test(low)) {
       const result = {
-        html: '<p>I\'m PhysiX Academy\'s built-in tutor. I read every lesson on this site so I can point you to exactly the right explanation — using local curriculum data.</p>',
+        html: '<p>I\'m PhysiX Academy\'s built-in tutor. I read every lesson on this site so I can point you to exactly the right explanation — no internet required.</p>',
         href: null
       };
       this.addToHistory(q, result);
@@ -235,8 +235,8 @@ const Tutor = {
     }
     if (/(quiz|test me|practice|questions)/.test(low)) {
       const result = {
-        html: '<p>Head to <a href="/practice">Practice</a> — pick a level and difficulty. It keeps score and explains every answer, including the ones you get wrong.</p>',
-        href: '/practice'
+        html: '<p>Head to <a href="#/practice">Practice</a> — pick a level and difficulty. It keeps score and explains every answer, including the ones you get wrong.</p>',
+        href: '#/practice'
       };
       this.addToHistory(q, result);
       return result;
@@ -268,7 +268,7 @@ const Tutor = {
     if (!hits.length) {
       const longHint = words.length > 6
         ? '<p class="small muted">Your question has a lot in it — try splitting it: ask the main thing first (<i>"why does X happen?"</i>), then the follow-up.</p>'
-        : '<p class="small muted">Try rephrasing around a concept — e.g. <i>"Why does a rocket work?"</i>, <i>"momentum conservation"</i>, <i>"Ohm&#39;s law"</i> — or browse the <a href="/learn">Learn</a> page.</p>';
+        : '<p class="small muted">Try rephrasing around a concept — e.g. <i>"Why does a rocket work?"</i>, <i>"momentum conservation"</i>, <i>"Ohm&#39;s law"</i> — or browse the <a href="#/learn">Learn</a> page.</p>';
       const result = {
         html: '<p>I couldn\'t find that one in my notes yet.</p>' + longHint,
         href: null
@@ -338,13 +338,13 @@ const Tutor = {
     if(/voltage|potential|volt|current|ampere|resistance|ohm|power/.test(low) && nums.length>=2){
       if(/power.*voltage|p\s*=\s*vi/.test(low) && nums.length>=2){
         const V=nums[0], I=nums[1], P=V*I;
-        return `<p><b>Problem solver — P=VI</b></p><p>Given: V=${V} V, I=${I} A</p><p>Solution: P = V·I = ${V}×${I} = <b>${P} W</b></p><p>Also: R=V/I=${(V/I).toFixed(2)} Ω</p><p class="small muted">From Electricity — V=IR, P=VI. <a href="/learn/ncert10.elec.ohm">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — P=VI</b></p><p>Given: V=${V} V, I=${I} A</p><p>Solution: P = V·I = ${V}×${I} = <b>${P} W</b></p><p>Also: R=V/I=${(V/I).toFixed(2)} Ω</p><p class="small muted">From Electricity — V=IR, P=VI. <a href="#/lesson/ncert10.elec.ohm">Open lesson →</a></p>`;
       }
       if(/resistance|ohm/.test(low)){
         const V=nums[0], I=nums[1]||nums[0];
         if(/v\s*=\s*\d/.test(low) || nums.length>=2){
           const R=(V/I).toFixed(2);
-          return `<p><b>Problem solver — Ohm: V=IR</b></p><p>Given: V=${V}, I=${I}</p><p>R = V/I = ${V}/${I} = <b>${R} Ω</b></p><p class="small muted"><a href="/learn/ncert10.elec.ohm">Open lesson →</a></p>`;
+          return `<p><b>Problem solver — Ohm: V=IR</b></p><p>Given: V=${V}, I=${I}</p><p>R = V/I = ${V}/${I} = <b>${R} Ω</b></p><p class="small muted"><a href="#/lesson/ncert10.elec.ohm">Open lesson →</a></p>`;
         }
       }
     }
@@ -354,14 +354,14 @@ const Tutor = {
       const v=1/(1/f - 1/u);
       if(isFinite(v)){
         const m=(-v/u).toFixed(2);
-        return `<p><b>Problem solver — Mirror: 1/f=1/v+1/u</b></p><p>Given: f=${f} cm, u=${u} cm</p><p>1/v = 1/f − 1/u = 1/${f} − 1/${u} → v = <b>${v.toFixed(1)} cm</b></p><p>m = −v/u = <b>${m}</b> (${v<0?'real, inverted':'virtual, erect'})</p><p class="small muted"><a href="/learn/ncert10.light.mirrors">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — Mirror: 1/f=1/v+1/u</b></p><p>Given: f=${f} cm, u=${u} cm</p><p>1/v = 1/f − 1/u = 1/${f} − 1/${u} → v = <b>${v.toFixed(1)} cm</b></p><p>m = −v/u = <b>${m}</b> (${v<0?'real, inverted':'virtual, erect'})</p><p class="small muted"><a href="#/lesson/ncert10.light.mirrors">Open lesson →</a></p>`;
       }
     }
     // 3) Lens: 1/f=1/v−1/u
     if(/lens|power|dioptre/.test(low) && nums.length>=1){
       if(/power|dioptre|D/.test(low) && nums.length>=1){
         const P=nums[0], f=100/P;
-        return `<p><b>Problem solver — Power P=1/f(m)</b></p><p>Given: P=${P} D → f = 100/P = <b>${f.toFixed(1)} cm</b></p><p class="small muted"><a href="/learn/ncert10.light.refraction">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — Power P=1/f(m)</b></p><p>Given: P=${P} D → f = 100/P = <b>${f.toFixed(1)} cm</b></p><p class="small muted"><a href="#/lesson/ncert10.light.refraction">Open lesson →</a></p>`;
       }
     }
     // 4) Kinematics: v=u+at etc.
@@ -369,24 +369,24 @@ const Tutor = {
       // try v=u+at if u, a, t present
       if(/accelerat/.test(low) && nums.length>=3){
         const u=nums[0], a=nums[1], t=nums[2], v=u+a*t;
-        return `<p><b>Problem solver — v=u+at</b></p><p>Given: u=${u}, a=${a}, t=${t}</p><p>v = ${u}+${a}×${t} = <b>${v}</b></p><p class="small muted"><a href="/learn/ncert9.motion.equations">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — v=u+at</b></p><p>Given: u=${u}, a=${a}, t=${t}</p><p>v = ${u}+${a}×${t} = <b>${v}</b></p><p class="small muted"><a href="#/lesson/ncert9.motion.equations">Open lesson →</a></p>`;
       }
       if(/km\/h/.test(low) && nums.length>=1){
         const kmh=nums[0]; const ms=(kmh/3.6).toFixed(2);
-        return `<p><b>Problem solver — km/h → m/s ÷3.6</b></p><p>${kmh} km/h = ${kmh}/3.6 = <b>${ms} m/s</b></p><p class="small muted">Water analogy. <a href="/learn/ncert10.light.mirrors">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — km/h → m/s ÷3.6</b></p><p>${kmh} km/h = ${kmh}/3.6 = <b>${ms} m/s</b></p><p class="small muted">Water analogy. <a href="#/lesson/ncert10.light.mirrors">Open lesson →</a></p>`;
       }
     }
     // 5) Work/Energy: KE, PE
     if(/kinetic|work|energy|power/.test(low) && nums.length>=2){
       if(/kinetic/.test(low)){
         const m=nums[0], v=nums[1], ke=0.5*m*v*v;
-        return `<p><b>Problem solver — KE=½mv²</b></p><p>m=${m} kg, v=${v} m/s → KE=0.5×${m}×${v}² = <b>${ke} J</b></p><p class="small muted"><a href="/learn/ncert9.work.energy">Open lesson →</a></p>`;
+        return `<p><b>Problem solver — KE=½mv²</b></p><p>m=${m} kg, v=${v} m/s → KE=0.5×${m}×${v}² = <b>${ke} J</b></p><p class="small muted"><a href="#/lesson/ncert9.work.energy">Open lesson →</a></p>`;
       }
     }
     // 6) Echo: d=vt/2
     if(/echo|sonar|distance/.test(low) && nums.length>=2){
       const v=nums[0], t=nums[1], d=v*t/2;
-      return `<p><b>Problem solver — Echo d=vt/2</b></p><p>v=${v} m/s, t=${t} s → d=${v}×${t}/2 = <b>${d} m</b></p><p>Heard as ${t>=0.1?'distinct echo':'reverberation'}</p><p class="small muted"><a href="/learn/ncert9.sound.waves">Open lesson →</a></p>`;
+      return `<p><b>Problem solver — Echo d=vt/2</b></p><p>v=${v} m/s, t=${t} s → d=${v}×${t}/2 = <b>${d} m</b></p><p>Heard as ${t>=0.1?'distinct echo':'reverberation'}</p><p class="small muted"><a href="#/lesson/ncert9.sound.waves">Open lesson →</a></p>`;
     }
     return null;
   }

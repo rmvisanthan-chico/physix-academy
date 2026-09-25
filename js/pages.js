@@ -5,7 +5,6 @@
 const Session = { qs: [], i: 0, correct: 0, misses: [] };
 
 function viewPractice() {
-  const routeToken = App.routeToken;
   const diffs = ['any', ...Object.keys(DIFFS)];
   App.el.innerHTML = `
   <div class="wrap">
@@ -43,23 +42,20 @@ function viewPractice() {
   const activeVal = zone => { const a = $('.pill.active', zone); return a ? a.dataset.v : 'all'; };
 
   $('#p-start').addEventListener('click', () => {
-    ensureQuizData().then(() => {
-      if (routeToken !== App.routeToken || !$('#p-start')) return;
-      const lvl = activeVal($('#p-lvl')), diff = activeVal($('#p-diff'));
-      let pool = QUIZ_BANK.slice();
-      if (lvl !== 'all') {
-        const level = CURRICULUM.find(l => l.id === lvl);
-        const ids = new Set(level.chapters.flatMap(c => c.lessons.flatMap(ls =>
-          ls.content.filter(b => b.quiz).flatMap(b => b.quiz))));
-        pool = pool.filter(q => ids.has(q.id));
-      }
-      if (diff !== 'any') pool = pool.filter(q => q.difficulty === diff);
-      if (!pool.length) { toast('No questions match that filter — widen it a little.', 'bad'); return; }
-      Session.qs = pool.sort(() => Math.random() - 0.5).slice(0, +$('#p-count').value);
-      Session.i = 0; Session.correct = 0; Session.misses = [];
-      renderQ();
-      $('#session-zone').scrollIntoView({ behavior: 'smooth' });
-    }).catch(() => toast('Practice questions could not load. Check your connection and try again.', 'bad'));
+    const lvl = activeVal($('#p-lvl')), diff = activeVal($('#p-diff'));
+    let pool = QUIZ_BANK.slice();
+    if (lvl !== 'all') {
+      const level = CURRICULUM.find(l => l.id === lvl);
+      const ids = new Set(level.chapters.flatMap(c => c.lessons.flatMap(ls =>
+        ls.content.filter(b => b.quiz).flatMap(b => b.quiz))));
+      pool = pool.filter(q => ids.has(q.id));
+    }
+    if (diff !== 'any') pool = pool.filter(q => q.difficulty === diff);
+    if (!pool.length) { toast('No questions match that filter — widen it a little.', 'bad'); return; }
+    Session.qs = pool.sort(() => Math.random() - 0.5).slice(0, +$('#p-count').value);
+    Session.i = 0; Session.correct = 0; Session.misses = [];
+    renderQ();
+    $('#session-zone').scrollIntoView({ behavior: 'smooth' });
   });
 
   function renderQ() {
@@ -96,8 +92,8 @@ function viewPractice() {
         <p>${Session.correct} of ${Session.qs.length} correct.</p>
         ${worst ? '<p class="small muted">Weakest topic this round: <span class="chip amber">' + esc(worst) + '</span> — try its lesson again?</p>' : '<p class="small muted">Flawless round. It gets harder from here.</p>'}
         <div class="btn-row" style="justify-content:center;margin-top:1rem">
-          <a class="btn btn-primary" href="/practice">↻ New session</a>
-          <a class="btn" href="/progress">View progress</a>
+          <a class="btn btn-primary" href="#/practice">↻ New session</a>
+          <a class="btn" href="#/progress">View progress</a>
         </div>
       </div>`;
     toast('Session complete: ' + pct + '%');
@@ -106,29 +102,18 @@ function viewPractice() {
 
 /* ---------------- Simulations ---------------- */
 function viewSimsPage(id) {
-  const routeToken = App.routeToken;
-  ensureSimulations().then(() => {
-    if (routeToken !== App.routeToken || !App.el.isConnected) return;
-    renderSimsPage(id);
-  }).catch(err => {
-    console.error('Simulation gallery load failed', err);
-    if (routeToken === App.routeToken && App.el.isConnected) App.el.innerHTML = '<div class="wrap"><div class="empty-state"><h2>Simulations could not load</h2><p>Check your connection and try again.</p></div></div>';
-  });
-}
-
-function renderSimsPage(id) {
   if (id && Sims.reg[id]) {
     const d = Sims.reg[id];
     const usedIn = flatLessons().filter(e => e.lesson.content.some(b => b.sim === id));
     App.el.innerHTML = `
     <div class="wrap">
-      <div class="page-head"><a class="small" href="/simulations">‹ All simulations</a>
+      <div class="page-head"><a class="small" href="#/sims">‹ All simulations</a>
         <h1>${d.icon} ${esc(d.title)}</h1><p class="sub">${esc(d.desc)}</p></div>
       <div class="sim-slot-lg"></div>
       ${usedIn.length ? '<p class="small muted">Used in: ' + usedIn.map(e =>
-        '<a href="/learn/' + e.lesson.id + '">' + esc(e.chapter.title) + '</a>').join(' · ') + '</p>' : ''}
+        '<a href="#/lesson/' + e.lesson.id + '">' + esc(e.chapter.title) + '</a>').join(' · ') + '</p>' : ''}
     </div>`;
-    mountSimulation(id, $('.sim-slot-lg', App.el));
+    Sims.mount(id, $('.sim-slot-lg', App.el));
     return;
   }
   const items = Object.values(Sims.reg);
@@ -141,7 +126,7 @@ function renderSimsPage(id) {
         ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">🚀 Official PhET</em></div>' : ''}
         <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
         <p class="muted">${esc(d.desc)}</p>
-        <div class="topic-meta"><a class="btn btn-sm btn-primary" href="/simulations/${d.id}">Open ▸</a></div>
+        <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open ▸</a></div>
       </div>`).join('') + '</div>'
       : '<div class="empty-state"><div class="big">🔧</div><p>No simulations registered yet.</p></div>'}
   </div>`;
@@ -155,7 +140,7 @@ function viewTutorPage() {
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>PhysiX Tutor</h1>
-      <p class="sub">Ask anything about the lessons — it searches the whole curriculum for you. Responses use the local browser-based tutor and curriculum data.</p></div>
+      <p class="sub">Ask anything about the lessons — it searches the whole curriculum for you. Works fully offline.</p></div>
     <div class="tutor-layout">
       <div class="chat-panel">
         <div class="chat-head">

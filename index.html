@@ -2,28 +2,29 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<base href="/">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PhysiX Academy — Free Physics Learning Platform | Lessons, Simulations, AI Tutor</title>
-<meta name="description" content="PhysiX Academy is an interactive physics learning platform for Classes 9–12, JEE and NEET, with lessons, simulations, practice and clear explanations.">
+<meta name="description" content="PhysiX Academy: Free interactive physics learning platform for Class 9-12, JEE & NEET. 54 lessons, 26 simulations, AI tutor, formula library, calculators and quizzes. NCERT aligned.">
 <meta name="keywords" content="physics academy, physics learning, free physics, NCERT physics, JEE physics, NEET physics, physics simulations, physics tutor, learn physics online, physics class 11, physics class 12, physics formulas, interactive physics">
 <meta name="author" content="R.M.VISANTHAN">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://physix-academy.vercel.app/">
 <meta property="og:title" content="PhysiX Academy — Understand Physics. Don't Just Memorize It.">
-<meta property="og:description" content="Understand physics through interactive lessons, simulations, practice and clear explanations.">
+<meta property="og:description" content="54 lessons, 26 live simulations, an AI tutor and 87 explained questions. Free, ad-free, works offline.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/assets/og-image.png">
-<meta property="og:url" content="https://physix-academy.vercel.app/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PhysiX Academy — Understand Physics. Don't Just Memorize It.">
-<meta name="twitter:description" content="Understand physics through interactive lessons, simulations, practice and clear explanations.">
 <link rel="icon" href="assets/logo.png" type="image/png">
 <!-- Login gate DISABLED for now - enable later after login alterations
 <script>
 (function(){try{var u=JSON.parse(localStorage.getItem('physix-user'));if(!u||!u.name||!u.class){window.location.replace('login.html');}}catch(e){window.location.replace('login.html');}})();
 </script>
 -->
+<!-- Vercel Analytics + Speed Insights (polish) -->
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
+
+<!-- Google Analytics (consent-gated) -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -42,21 +43,15 @@
     decide: function(ok){ localStorage.setItem('physix-consent', ok ? 'yes' : 'no'); this.apply(); },
     apply: function(){
       var c = localStorage.getItem('physix-consent');
-      if (c === 'yes' && !window.__analyticsLoaded) {
-        window.__analyticsLoaded = true;
-        if (!window.__gaLoaded) { window.__gaLoaded = true; loadGA(); }
-        var vi = document.createElement('script');
-        vi.async = true;
-        vi.src = '/_vercel/insights/script.js';
-        document.head.appendChild(vi);
-        var vs = document.createElement('script');
-        vs.async = true;
-        vs.src = '/_vercel/speed-insights/script.js';
-        document.head.appendChild(vs);
-      }
+      if (c === 'yes' && !window.__gaLoaded) { window.__gaLoaded = true; loadGA(); }
     }
   };
 </script>
+
+<!-- KaTeX for beautiful math rendering -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
 <link rel="stylesheet" href="css/style.css?v=74">
 <link rel="stylesheet" href="css/3d.css?v=74">
@@ -77,24 +72,24 @@
       <button id="brand-trigger" class="brand-trigger" aria-label="Open brand studio" title="Click to explore brand identity" style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;">
         <img src="assets/logo.png" alt="PhysiX Academy Logo" class="brand-img" style="width:36px;height:36px;border-radius:8px;object-fit:cover;box-shadow:0 0 12px rgba(56,189,248,0.25);transition:transform .2s, box-shadow .2s;">
       </button>
-      <a href="/" class="brand" aria-label="PhysiX Academy home" style="display:flex; align-items:center;">
+      <a href="#/" class="brand" aria-label="PhysiX Academy home" style="display:flex; align-items:center;">
         <span class="brand-name">PhysiX<span class="brand-accent">Academy</span></span>
       </a>
     </div>
 
     <nav class="mainnav" id="mainnav" aria-label="Primary">
-      <a href="/" data-nav="home">Home</a>
-      <a href="/learn" data-nav="learn">Learn</a>
-      <a href="/topics" data-nav="topics">Topics</a>
-      <a href="/simulations" data-nav="sims">Simulations</a>
-      <a href="/games" data-nav="games">Games</a>
-      <a href="/practice" data-nav="practice">Practice</a>
-      <a href="/tutor" data-nav="tutor">Tutor</a>
-      <a href="/formulas" data-nav="formulas">Formulas</a>
-      <a href="/calculators" data-nav="calculators">Calculators</a>
-      <a href="/scientists" data-nav="scientists">Physicists</a>
-      <a href="/progress" data-nav="progress" class="nav-progress">Progress</a>
-      <a href="/support" data-nav="support" class="nav-support">Support</a>
+      <a href="#/" data-nav="home">Home</a>
+      <a href="#/learn" data-nav="learn">Learn</a>
+      <a href="#/topics" data-nav="topics">Topics</a>
+      <a href="#/sims" data-nav="sims">Sims</a>
+      <a href="#/games" data-nav="games">Games</a>
+      <a href="#/practice" data-nav="practice">Practice</a>
+      <a href="#/tutor" data-nav="tutor">Tutor</a>
+      <a href="#/formulas" data-nav="formulas">Formulas</a>
+      <a href="#/calculators" data-nav="calculators">Calc</a>
+      <a href="#/scientists" data-nav="scientists">People</a>
+      <a href="#/progress" data-nav="progress" class="nav-progress">Progress</a>
+      <a href="#/support" data-nav="support" class="nav-support">Support</a>
     </nav>
 
     <div class="top-actions">
@@ -149,13 +144,13 @@
       <p>Understand Physics. Don't Just Memorize It.</p>
     </div>
     <div class="footer-links">
-      <a href="/learn">Learn</a>
-      <a href="/simulations">Simulations</a>
-      <a href="/practice">Practice</a>
-      <a href="/formulas">Formula Library</a>
-      <a href="/progress">Progress</a>
-      <a href="/support">Support</a>
-      <a href="/about">About</a>
+      <a href="#/learn">Learn</a>
+      <a href="#/sims">Simulations</a>
+      <a href="#/practice">Practice</a>
+      <a href="#/formulas">Formula Library</a>
+      <a href="#/progress">Progress</a>
+      <a href="#/support">Support</a>
+      <a href="#/about">About</a>
       <a href="blog/index.html">Blog</a>
       <a href="privacy.html">Privacy Policy</a>
       <a href="terms.html">Terms and Conditions</a>
@@ -165,7 +160,7 @@
       <a href="mailto:r.m.visanthan@gmail.com" aria-label="Email">Email</a>
     </div>
     <p class="footer-note">Built for students who want to truly understand physics — from zero to advanced. Progress is saved locally in your browser.<br>
-         <span class="stamp">Progress is saved locally in your browser. Online features require an internet connection.</span></p>
+    <span class="stamp">Last updated 23 Aug 2026 — v1.4 — works fully offline — mistakes are fixed, not hidden</span></p>
   </div>
 </footer>
 
@@ -179,9 +174,8 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <!-- Cookie consent banner -->
-<div class="cookie-consent" id="cookie-consent" role="dialog" aria-modal="false" aria-labelledby="cookie-consent-title" aria-live="polite" hidden>
-  <h2 id="cookie-consent-title">Privacy choices</h2>
-  <p class="cookie-text">We use cookies to understand how you use the site and improve it. Physics lessons and simulations work without them.</p>
+<div class="cookie-consent" id="cookie-consent" role="dialog" aria-live="polite" hidden>
+  <p class="cookie-text">We use cookies to understand how you use the site and improve it. Physics lessons and simulations work fully without them.</p>
   <div class="cookie-actions">
     <button class="btn btn-primary btn-sm" id="cookie-accept">Accept</button>
     <button class="btn btn-sm" id="cookie-decline">Decline</button>
@@ -189,7 +183,6 @@
 </div>
 
 <script src="js/utils.js?v=74"></script>
-<script src="js/sims-core.js?v=74"></script>
 
 <!-- Curriculum data -->
 <script src="js/data-core.js?v=74"></script>
@@ -207,10 +200,30 @@
 <script src="js/data-l3e.js?v=74"></script>
 <script src="js/data-l4.js?v=74"></script>
 
+<!-- Quiz bank -->
+<script src="js/data-quiz-a.js?v=74"></script>
+<script src="js/data-quiz-b.js?v=74"></script>
+<script src="js/data-quiz-c.js?v=74"></script>
+
+<!-- Simulations -->
+<script src="js/sims-a.js?v=74"></script>
+<script src="js/sims-b.js?v=74"></script>
+<script src="js/sims-c.js?v=74"></script>
+<script src="js/sims-d.js?v=74"></script>
+<script src="js/sims-e.js?v=74"></script>
+<script src="js/sims-ncert.js?v=74"></script>
+<script src="js/sims-realism.js?v=74"></script>
+<script src="js/sims-more.js?v=74"></script>
+<script src="js/sims-phet.js?v=74"></script>
 <script src="js/games.js?v=74"></script>
+
+<!-- 3D layer + motion -->
+<script src="js/vendor/three.min.js?v=74"></script>
 <script src="js/vendor/qrcode.min.js?v=74"></script>
 <script src="js/vendor/motion.min.js?v=74"></script>
 <script src="js/vendor/anime.min.js?v=74"></script>
+<script src="js/sims3d-a.js?v=74"></script>
+<script src="js/sims3d-b.js?v=74"></script>
 
 <!-- App layer -->
 <script src="js/blocks.js?v=74"></script>
@@ -246,7 +259,7 @@
       </div>
 
       <div class="brand-studio-actions">
-        <a href="/" class="btn btn-primary" id="bs-home">Back to Home</a>
+        <a href="#/" class="btn btn-primary" id="bs-home">Back to Home</a>
       </div>
     </div>
   </div>

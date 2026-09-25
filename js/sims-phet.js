@@ -22,9 +22,7 @@
         const iframe = document.createElement('iframe');
         iframe.className = 'phet-frame';
         iframe.src = url;
-        iframe.setAttribute('allow', 'fullscreen; autoplay; clipboard-write');
-        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-presentation allow-pointer-lock');
-        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        iframe.setAttribute('allow', 'fullscreen');
         iframe.setAttribute('loading', 'lazy');
         iframe.setAttribute('allowfullscreen', '');
         const loader = SU.el('div', 'phet-loader', '🚀 Starting simulation — by PhET Interactive Simulations…');

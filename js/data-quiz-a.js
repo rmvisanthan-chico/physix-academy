@@ -2,6 +2,8 @@
 'use strict';
 
 /* Question shape: {id, topic, difficulty, q, choices[4], answer(index), why} */
+const QUIZ_BANK = [];
+
 QUIZ_BANK.push(
   { id:'q-v1', topic:'vectors', difficulty:'beginner',
     q:'Which of these is a vector quantity?',

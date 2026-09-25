@@ -8,47 +8,6 @@
 const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-const _scriptPromises = new Map();
-const _stylePromises = new Map();
-
-function loadScriptOnce(src) {
-  const url = new URL(src, document.baseURI).href;
-  if (_scriptPromises.has(url)) return _scriptPromises.get(url);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = url;
-    script.async = true;
-    script.onload = resolve;
-    script.onerror = () => {
-      _scriptPromises.delete(url);
-      reject(new Error('Unable to load ' + url));
-    };
-    document.head.appendChild(script);
-  });
-  _scriptPromises.set(url, promise);
-  return promise;
-}
-
-function loadStyleOnce(href) {
-  const url = new URL(href, document.baseURI).href;
-  if (_stylePromises.has(url)) return _stylePromises.get(url);
-  const promise = new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    link.onload = resolve;
-    link.onerror = () => {
-      _stylePromises.delete(url);
-      reject(new Error('Unable to load ' + url));
-    };
-    document.head.appendChild(link);
-  });
-  _stylePromises.set(url, promise);
-  return promise;
-}
-
-const QUIZ_BANK = [];
-
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -157,41 +116,21 @@ const Theme = {
   }
 };
 
+/* ---------- KaTeX rendering ---------- */
 const Tex = {
   ready: false,
-  loading: null,
-  load() {
-    if (window.renderMathInElement) { this.ready = true; return Promise.resolve(true); }
-    if (this.loading) return this.loading;
-    this.loading = loadStyleOnce('https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css')
-      .then(() => Promise.all([
-        loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js'),
-        loadScriptOnce('https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/contrib/auto-render.min.js')
-      ]))
-      .then(() => {
-        this.ready = !!window.renderMathInElement;
-        return this.ready;
-      })
-      .catch(() => {
-        this.loading = null;
-        return false;
-      });
-    return this.loading;
+  init() {
+    const tryInit = () => {
+      if (window.renderMathInElement) { this.ready = true; return true; }
+      return false;
+    };
+    tryInit();
+    window.addEventListener('load', () => tryInit());
   },
   render(root) {
-    const host = root || document.body;
-    const routeToken = typeof App === 'undefined' ? null : App.routeToken;
-    const hasMath = host.textContent.includes('$') || !!host.querySelector('.formula-card, .f-eq, .derivation, .math-block');
-    if (!hasMath) return;
-    if (window.renderMathInElement) this.paint(host);
-    else this.load().then(ready => {
-      if (ready && host.isConnected !== false && (routeToken === null || routeToken === App.routeToken)) this.paint(host);
-    });
-  },
-  paint(host) {
-    if (!window.renderMathInElement || host.dataset.texRendered === '1') return;
+    if (!window.renderMathInElement) return;
     try {
-      window.renderMathInElement(host, {
+      renderMathInElement(root, {
         delimiters: [
           { left: '$$', right: '$$', display: true },
           { left: '\\[', right: '\\]', display: true },
@@ -199,12 +138,12 @@ const Tex = {
           { left: '\\(', right: '\\)', display: false }
         ],
         throwOnError: false,
-        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option']
+        strict: 'ignore'
       });
-      host.dataset.texRendered = '1';
-    } catch (e) {}
+    } catch (e) { /* silent */ }
   }
 };
+Tex.init();
 
 /* ---------- toasts ---------- */
 function toast(msg, kind = 'ok', ms = 3200) {
@@ -228,60 +167,6 @@ const DIFFS = {
   advanced:     { label: 'Advanced',     dot: '🟠', cls: 'd-advanced' },
   expert:       { label: 'Expert',       dot: '🔴', cls: 'd-expert' }
 };
-
-let _threeLoading = null;
-let _simsLoading = null;
-let _quizLoading = null;
-
-function ensureThree() {
-  if (window.THREE) return Promise.resolve(window.THREE);
-  if (!_threeLoading) {
-    _threeLoading = loadScriptOnce('js/vendor/three.min.js').then(() => window.THREE).catch(err => {
-      _threeLoading = null;
-      throw err;
-    });
-  }
-  return _threeLoading;
-}
-
-function ensureSimulations() {
-  if (Object.keys(Sims.reg).length >= SIMULATION_COUNT) return Promise.resolve(Sims.reg);
-  if (_simsLoading) return _simsLoading;
-  const sources = [
-    'js/sims-a.js', 'js/sims-b.js', 'js/sims-c.js', 'js/sims-d.js', 'js/sims-e.js',
-    'js/sims-ncert.js',
-    'js/sims-more.js', 'js/sims-realism.js', 'js/sims-phet.js', 'js/sims3d-a.js', 'js/sims3d-b.js'
-  ].map(src => loadScriptOnce(src));
-  _simsLoading = Promise.all(sources).then(() => Sims.reg).catch(err => {
-    _simsLoading = null;
-    throw err;
-  });
-  return _simsLoading;
-}
-
-function mountSimulation(id, host) {
-  const ready = THREE_SIM_IDS.has(id) ? ensureThree() : Promise.resolve();
-  return ready.then(() => {
-    if (host.isConnected !== false) Sims.mount(id, host);
-  });
-}
-
-function ensureQuizData() {
-  if (_quizLoading) return _quizLoading;
-  _quizLoading = Promise.all([
-    loadScriptOnce('js/data-quiz-a.js'),
-    loadScriptOnce('js/data-quiz-b.js'),
-    loadScriptOnce('js/data-quiz-c.js'),
-    loadScriptOnce('js/data-quiz-jee.js')
-  ]).then(() => {
-    if (typeof Quiz !== 'undefined' && typeof Quiz.init === 'function') Quiz.init();
-    return QUIZ_BANK;
-  }).catch(err => {
-    _quizLoading = null;
-    throw err;
-  });
-  return _quizLoading;
-}
 
 /* load immediately */
 Store.load();

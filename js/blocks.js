@@ -8,7 +8,7 @@ function mdInline(s) {
 function formulaCard(f) {
   let h = '<div class="formula-card">';
   if (f.name) h += '<div class="f-name"><b>' + mdInline(f.name) + '</b></div>';
-  h += '<div class="f-eq">$$' + esc(f.tex || '') + '$$</div>';
+  h += '<div class="f-eq">$$' + (f.tex || '') + '$$</div>';
   if (f.vars && f.vars.length) h += '<div class="f-vars">' + f.vars.map(v => '<b>' + mdInline(v[0]) + '</b> = ' + mdInline(v[1])).join(' &nbsp;·&nbsp; ') + '</div>';
   if (f.note) h += '<div class="f-note">ℹ️ ' + mdInline(f.note) + '</div>';
   return h + '</div>';
@@ -59,7 +59,7 @@ const Blocks = {
   svg: s => '<div class="svg-box" style="margin:1rem 0;text-align:center">' + s + '</div>',
   sim: id => '<div class="sim-slot" data-sim="' + esc(id) + '"></div>',
   quiz: ids => '<div class="quiz-slot" data-quiz="' + ids.map(esc).join(',') + '"></div>',
-  video: url => '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' + esc(url) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
+  video: url => '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' + esc(url) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
 };
 
 function renderBlocks(content) {
@@ -77,12 +77,7 @@ function renderBlocks(content) {
 const Quiz = {
   byId: null,
   init() {
-    this.byId = new Map(QUIZ_BANK.map(raw => {
-      const q = Object.assign({}, raw);
-      if (q.answer === undefined && q.ans !== undefined) q.answer = q.ans;
-      if (q.why === undefined && q.exp !== undefined) q.why = q.exp;
-      return [q.id, q];
-    }));
+    this.byId = new Map(QUIZ_BANK.map(q => [q.id, q]));
   },
   get(id) { return this.byId.get(id); },
 
@@ -146,16 +141,6 @@ function flatLessons() {
   return flatLessons._c;
 }
 function findLesson(id) { return flatLessons().find(e => e.lesson.id === id); }
-function nextStudyLesson() {
-  const all = flatLessons();
-  const last = Store.data.lastLesson ? all.findIndex(e => e.lesson.id === Store.data.lastLesson) : -1;
-  if (last >= 0 && !Store.isComplete(all[last].lesson.id)) return all[last];
-  for (let i = Math.max(0, last + 1); i < all.length; i++) {
-    if (!Store.isComplete(all[i].lesson.id)) return all[i];
-  }
-  for (const entry of all) if (!Store.isComplete(entry.lesson.id)) return entry;
-  return null;
-}
 function levelDoneCount(level) {
   return level.chapters.reduce((n, ch) => n + ch.lessons.filter(ls => Store.isComplete(ls.id)).length, 0);
 }

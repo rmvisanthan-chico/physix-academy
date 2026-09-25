@@ -52,18 +52,13 @@ body { perspective: 1400px; overflow-x: hidden; }
 @keyframes orbitSpin { from{transform:translateZ(60px) rotate(0)} to{transform:translateZ(60px) rotate(360deg)} }
 
 .hero3d-wrap {
-  position: absolute; inset: 0 0 0 auto; width: min(58%, 820px); z-index: 0; pointer-events: auto; opacity: .38;
-  mask-image: radial-gradient(ellipse 82% 88% at 68% 45%, #000 48%, transparent 98%);
-  -webkit-mask-image: radial-gradient(ellipse 82% 88% at 68% 45%, #000 48%, transparent 98%);
+  position: absolute; inset: 0; z-index: 0; pointer-events: auto;
+  mask-image: radial-gradient(ellipse 95% 95% at 68% 42%, #000 62%, transparent 98%);
+  -webkit-mask-image: radial-gradient(ellipse 95% 95% at 68% 42%, #000 62%, transparent 98%);
 }
 .hero3d-wrap canvas { display: block; width: 100%; height: 100%; }
-.hero > *:not(.hero3d-wrap) { z-index: 2; pointer-events: none; }
+.hero > *:not(.hero3d-wrap) { z-index: 1; pointer-events: none; }
 .hero .hero-cta a, .hero .hero-cta .btn { pointer-events: auto; }
-.hero h1, .hero .lede, .hero .hero-kicker { text-shadow: 0 2px 18px var(--bg); }
-.hero-3d-fallback .hero3d-wrap { display: none; }
-@media (max-width: 700px) {
-  .hero3d-wrap { width: 100%; opacity: .2; }
-}
 .hero.dragging, .hero.dragging * { cursor: grabbing !important; }
 
 /* ---------- 3D reveal on scroll ---------- */

@@ -22,4 +22,4 @@ function injectVideos(){
   return added;
 }
 injectVideos();
-setTimeout(()=>{ if(injectVideos()) { if(location.pathname.indexOf('/learn/') === 0) route(); } }, 500);
+setTimeout(()=>{ if(injectVideos()) { if(location.hash.includes('#/lesson/')) route(); } }, 500);

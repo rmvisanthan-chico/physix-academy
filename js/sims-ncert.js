@@ -284,7 +284,7 @@ Sims.register('ns','NS — PHYSIX LAB','Interactive Physics Simulations','🧪',
   frame.style.padding='0';
   const wrap=document.createElement('div');
   wrap.innerHTML=`
-<iframe src="https://physics-lab.vercel.app/" title="PHYSIX LAB entire site" style="width:100%;height:620px;border:0;background:#fff" sandbox="allow-scripts allow-same-origin allow-popups allow-presentation" loading="lazy" referrerpolicy="no-referrer"></iframe>
+<iframe src="https://physics-lab.vercel.app/" title="PHYSIX LAB entire site" style="width:100%;height:620px;border:0;background:#fff" loading="lazy" referrerpolicy="no-referrer"></iframe>
 <style>
 .pl-hero{text-align:center;padding:1.4rem 1rem 1rem;background:var(--panel)}
 .pl-hero h1{margin:0;font-size:1.8rem;letter-spacing:-.02em}
@@ -314,12 +314,12 @@ Sims.register('ns','NS — PHYSIX LAB','Interactive Physics Simulations','🧪',
   <h2>Physics Topics</h2>
   <p class="pl-section-sub">Choose your area of exploration</p>
   <div class="pl-topic-grid">
-    <article class="pl-topic-card"><span class="pl-count">6 sims</span><h3>Classical Mechanics</h3><p>Motion, forces, energy, and momentum</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
-    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity, and flow behavior</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
-    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Wave Physics</h3><p>Oscillations, interference, and wave propagation</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
-    <article class="pl-topic-card"><span class="pl-count">0 sims</span><h3>Thermodynamics</h3><p>Heat transfer, the ideal gas law, and particle behaviour</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
-    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Electricity & Magnetism</h3><p>Electric fields, circuits, and electromagnetic effects</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
-    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Optics</h3><p>Light behavior, lenses, and optical instruments</p><a href="/simulations" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">6 sims</span><h3>Classical Mechanics</h3><p>Motion, forces, energy, and momentum</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity, and flow behavior</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">3 sims</span><h3>Wave Physics</h3><p>Oscillations, interference, and wave propagation</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">0 sims</span><h3>Thermodynamics</h3><p>Heat transfer, the ideal gas law, and particle behaviour</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Electricity & Magnetism</h3><p>Electric fields, circuits, and electromagnetic effects</p><a href="#" class="pl-link">Explore simulations</a></article>
+    <article class="pl-topic-card"><span class="pl-count">2 sims</span><h3>Optics</h3><p>Light behavior, lenses, and optical instruments</p><a href="#" class="pl-link">Explore simulations</a></article>
   </div>
 </section>
 <section class="pl-featured">
@@ -346,7 +346,7 @@ Sims.register('ns','NS — PHYSIX LAB','Interactive Physics Simulations','🧪',
 </section>
 `;
   frame.appendChild(wrap);
-  wrap.querySelectorAll('.pl-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();navigate('/simulations');}));
+  wrap.querySelectorAll('.pl-link').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();location.hash='#/sims';}));
 });
 
 /* 11th — PV Diagram & Work */

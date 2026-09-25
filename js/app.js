@@ -16,7 +16,7 @@ function searchIndex() {
     });
     ix.push({
       type: 'Lesson', icon: '📖', title: ls.title,
-      sub: level.name + ' › ' + ch.title, href: '/learn/' + ls.id,
+      sub: level.name + ' › ' + ch.title, href: '#/lesson/' + ls.id,
       hay: hay.toLowerCase()
     });
   })));
@@ -30,7 +30,7 @@ function searchIndex() {
   QUIZ_BANK.forEach(q => {
     ix.push({
       type: 'Question', icon: '❓', title: q.q.replace(/<[^>]+>/g, '').slice(0, 80),
-      sub: q.topic, href: '/practice',
+      sub: q.topic, href: '#/practice',
       hay: (q.q + ' ' + q.topic + ' ' + q.choices.join(' ')).toLowerCase().replace(/<[^>]+>/g, '')
     });
   });
@@ -92,12 +92,6 @@ function openSearch() {
   $('#search-overlay').classList.add('open');
   const inp = $('#search-input');
   inp.value = ''; renderSearchResults('');
-  ensureQuizData().then(() => {
-    _searchIndex = null;
-    if ($('#search-overlay').classList.contains('open')) renderSearchResults(inp.value);
-  }).catch(() => {
-    if ($('#search-overlay').classList.contains('open')) renderSearchResults(inp.value);
-  });
   setTimeout(() => inp.focus(), 30);
 }
 function closeSearch() {
@@ -107,7 +101,7 @@ function closeSearch() {
 /* ---------------- Mobile drawer ---------------- */
 function buildDrawer() {
   const d = $('#drawer');
-  d.innerHTML = '<a class="brand" href="/" style="margin-bottom:.6rem">' +
+  d.innerHTML = '<a class="brand" href="#/" style="margin-bottom:.6rem">' +
     $('.topbar .brand').innerHTML + '</a>' + $('#mainnav').innerHTML +
     '<div style="margin-top:auto;border-top:1px solid var(--card-brd);padding-top:.8rem;display:flex;flex-direction:column;gap:.3rem">' +
     '<a href="privacy.html" style="font-size:.82rem;color:var(--txt3)">Privacy Policy</a>' +
@@ -115,7 +109,7 @@ function buildDrawer() {
     '</div>' +
     '<button class="btn btn-primary" id="drawer-tutor" style="margin-top:.8rem">Ask the tutor</button>';
   $$('a', d).forEach(a => a.addEventListener('click', closeDrawer));
-  $('#drawer-tutor').addEventListener('click', () => { closeDrawer(); navigate('/tutor'); });
+  $('#drawer-tutor').addEventListener('click', () => { closeDrawer(); location.hash = '#/tutor'; });
 }
 const openDrawer = () => {
   $('#drawer').classList.add('open'); $('#scrim').classList.add('show');
@@ -130,10 +124,10 @@ function closeDrawer() {
 const TP = {
   learn: 'Browse the NCERT-aligned curriculum — lessons, Class 9 to 12.',
   topics: 'Physics by subject area — mechanics, waves, electricity, optics.',
-  sims: 'Interactive simulations you can drag, poke and explore.',
+  sims: '26+ live simulations you can drag, poke and break.',
   games: 'Learn by playing — physics-based mini games.',
   practice: 'Timed quiz sessions that explain every answer, right or wrong.',
-  tutor: 'Ask anything — a browser-based tutor searches the local curriculum step by step.',
+  tutor: 'Ask anything — the offline AI tutor solves problems step by step.',
   formulas: 'Every formula with its derivation and notes, searchable.',
   calculators: 'Quick physics calculators for common problems.',
   people: 'The physicists behind the ideas.',
@@ -144,12 +138,8 @@ const TP = {
 /* ---------------- Bootstrap ---------------- */
 (function initApp() {
   App.el = $('#main');
-  $('.skip-link')?.addEventListener('click', e => {
-    e.preventDefault();
-    App.el.focus();
-    App.el.scrollIntoView();
-  });
 
+  Quiz.init();
   if (!Tutor.docs) Tutor.build();
   buildDrawer();
 
@@ -162,7 +152,7 @@ const TP = {
     if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
     else if (e.key === 'Enter' && _srItems.length) {
-      navigate(_srItems[Math.max(0, _srActive)].href);
+      location.hash = _srItems[Math.max(0, _srActive)].href;
       closeSearch();
     }
   });
@@ -190,7 +180,7 @@ const TP = {
   $('#btn-menu').addEventListener('click', () =>
     $('#drawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#scrim').addEventListener('click', closeDrawer);
-  $('#fab-tutor').addEventListener('click', () => { navigate('/tutor'); });
+  $('#fab-tutor').addEventListener('click', () => { location.hash = '#/tutor'; });
 
   /* Brand Studio Modal wiring */
   const bs = $('#brand-studio');
@@ -200,33 +190,13 @@ const TP = {
   $('#brand-trigger')?.addEventListener('click', openBS);
   $('#bs-backdrop')?.addEventListener('click', closeBS);
   $('#bs-close')?.addEventListener('click', closeBS);
-  $('#bs-home')?.addEventListener('click', () => { closeBS(); navigate('/'); });
+  $('#bs-home')?.addEventListener('click', () => { closeBS(); location.hash = '#/'; });
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeBS();
   });
 
-  const appPaths = ['/', '/learn', '/topics', '/simulations', '/games', '/practice', '/tutor', '/formulas', '/calculators', '/graph', '/scientists', '/progress', '/support', '/about', '/people', '/calc'];
-  document.addEventListener('click', e => {
-    if (e.defaultPrevented) return;
-    const link = e.target.closest('a');
-    if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-    let url;
-    try { url = new URL(link.href, location.href); } catch (err) { return; }
-    if (url.origin !== location.origin) return;
-    if (url.hash && url.hash.indexOf('#/') !== 0) return;
-    if (!appPaths.some(path => url.pathname === path || url.pathname.indexOf(path + '/') === 0)) return;
-    e.preventDefault();
-    closeSearch();
-    closeDrawer();
-    const legacyPath = url.hash.indexOf('#/') === 0 ? url.hash.slice(1) : '';
-    const appHref = legacyPath
-      ? legacyPath + (url.search && !legacyPath.includes('?') ? url.search : '')
-      : url.pathname + url.search;
-    navigate(appHref);
-  });
-  window.addEventListener('popstate', route);
-  window.addEventListener('hashchange', () => { if (location.hash.indexOf('#/') === 0) route(); });
+  window.addEventListener('hashchange', route);
   route();
 
   initConsent();
