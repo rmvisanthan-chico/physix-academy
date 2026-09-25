@@ -98,11 +98,11 @@ Games.register('balance','Torque Balance','Place weights to balance the beam. To
 function viewGames(id){
   if(id){
     const g=Games.list.find(x=>x.id===id);
-    if(!g){App.el.innerHTML='<div class="wrap"><p>Game not found.</p><a href="#/games">← All games</a></div>'; return;}
-    App.el.innerHTML=`<div class="wrap"><a href="#/games" class="more">← All games</a><h1>${esc(g.title)}</h1><p class="muted">${esc(g.desc)}</p><div id="game-frame" class="sim-frame"></div></div>`;
+    if(!g){App.el.innerHTML='<div class="wrap"><p>Game not found.</p><a href="/games"">← All games</a></div>'; return;}
+    App.el.innerHTML=`<div class="wrap"><a href="/games"" class="more">← All games</a><h1>${esc(g.title)}</h1><p class="muted">${esc(g.desc)}</p><div id="game-frame" class="sim-frame"></div></div>`;
     g.run(document.getElementById('game-frame'));
   } else {
-    App.el.innerHTML=`<div class="wrap"><div class="page-head"><h1>Games</h1><p class="sub">2 physics-based games — learn by playing. Like PhysicsLab.</p></div><div class="grid g2">${Games.list.map(g=>`<a class="card hover" href="#/games/${g.id}"><div class="lv-num">${esc(g.icon)}</div><h3>${esc(g.title)}</h3><p class="muted">${esc(g.desc)}</p><span class="chip plain">Play →</span></a>`).join('')}</div></div>`;
+    App.el.innerHTML=`<div class="wrap"><div class="page-head"><h1>Games</h1><p class="sub">2 physics-based games — learn by playing. Like PhysicsLab.</p></div><div class="grid g2">${Games.list.map(g=>`<a class="card hover" href="/games"/${g.id}"><div class="lv-num">${esc(g.icon)}</div><h3>${esc(g.title)}</h3><p class="muted">${esc(g.desc)}</p><span class="chip plain">Play →</span></a>`).join('')}</div></div>`;
   }
   afterRender();
 }

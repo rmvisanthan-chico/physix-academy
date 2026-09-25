@@ -123,5 +123,45 @@ QUIZ_BANK.push(
   { id:'q-qm1', topic:'quantum', difficulty:'expert',
     q:"Heisenberg's uncertainty principle states:",
     choices:['All measurements are wrong','Position and momentum cannot BOTH be known precisely','Particles have no mass','Energy disappears'], answer:1,
-    why:'$\\Delta x\\Delta p\\ge\\hbar/2$ \u2014 a fundamental wave property of nature, not clumsy instruments.' }
+    why:'$\\Delta x\\Delta p\\ge \\hbar/2$ — a fundamental wave property of nature, not clumsy instruments.' },
+
+  { id:'q-nc9-motion1', topic:'ncert9-motion', difficulty:'intermediate',
+    q:'A car starts from rest with acceleration 2 m/s². Distance travelled in 5 s is:',
+    choices:['5 m','10 m','25 m','50 m'], answer:2,
+    why:'$s=ut+\\tfrac12at^2=0+\\tfrac12(2)(5^2)=25$ m.' },
+
+  { id:'q-nc-light1', topic:'ncert10-light', difficulty:'intermediate',
+    q:'When light enters glass from air, its frequency:',
+    choices:['Increases','Decreases','Stays the same','Becomes zero'], answer:2,
+    why:'Frequency is fixed by the source. The wave slows down because glass has a higher refractive index.' },
+
+  { id:'q-nc-light2', topic:'ncert10-light', difficulty:'beginner',
+    q:'A concave lens is used to correct:',
+    choices:['Myopia','Hypermetropia','Presbyopia only','Astigmatism only'], answer:0,
+    why:'Myopic eyes focus distant light before the retina; a diverging concave lens moves the focus back.' },
+
+  { id:'q-nc-eye1', topic:'ncert10-eye', difficulty:'beginner',
+    q:'A person cannot read a nearby book clearly but sees distant objects well. This defect is:',
+    choices:['Myopia','Hypermetropia','Presbyopia','Cataract'], answer:0,
+    why:'Myopia is near-sightedness; a concave lens corrects the excessively converging eye.' },
+
+  { id:'q-nc-elec1', topic:'ncert10-electricity', difficulty:'intermediate',
+    q:'If a wire is twice as long and has half the original area, its resistance becomes:',
+    choices:['Same','Twice','Four times','One-fourth'], answer:2,
+    why:'$R=\\rho l/A$: doubling l doubles R and halving A doubles it again, for a factor of four.' },
+
+  { id:'q-nc-elec2', topic:'ncert10-electricity', difficulty:'beginner',
+    q:'One kilowatt-hour is equal to:',
+    choices:['3.6 J','3.6×10³ J','3.6×10⁶ J','3.6×10⁹ J'], answer:2,
+    why:'$1\\,\\text{kWh}=1000\\times3600=3.6\\times10^6$ J.' },
+
+  { id:'q-nc-mag1', topic:'ncert10-magnetism', difficulty:'intermediate',
+    q:'Magnetic field lines:',
+    choices:['Intersect at any point','Never intersect','Always begin at an isolated north pole','Are always straight'], answer:1,
+    why:'At any point the field has one direction, so two field lines cannot cross there.' },
+
+  { id:'q-nc-mag2', topic:'ncert10-magnetism', difficulty:'advanced',
+    q:'An electric generator uses which hand rule to find the direction of induced current?',
+    choices:["Fleming's left-hand rule",'Fleming’s right-hand rule','Right-hand thumb rule for field alone','No hand rule is needed'], answer:1,
+    why:'The right-hand rule links motion, magnetic field and induced current in a generator.' }
 );

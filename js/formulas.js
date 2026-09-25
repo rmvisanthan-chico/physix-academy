@@ -7,7 +7,7 @@ function formulaIndex() {
     ls.content.forEach(b => {
       const push = f => {
         if (f && f.tex && !out.some(x => x.tex === f.tex))
-          out.push(Object.assign({}, f, { href: '#/lesson/' + ls.id }));
+           out.push(Object.assign({}, f, { href: '/learn/' + ls.id }));
       };
       if (b.formula) push(b.formula);
       if (b.formulas) b.formulas.forEach(push);
@@ -22,7 +22,7 @@ function renderFormulaGrid() {
   const q = (App.fq || '').toLowerCase();
   const lvl = App.flvl || 'all';
   const list = getFormulaIndex().filter(f => {
-    if (lvl !== 'all' && f.href.indexOf('#/lesson/' + lvl + '.') !== 0) return false;
+    if (lvl !== 'all' && f.href.indexOf('/learn/' + lvl + '.') !== 0) return false;
     if (!q) return true;
     return ((f.name || '') + ' ' + (f.note || '')).toLowerCase().includes(q);
   });

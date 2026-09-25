@@ -1,7 +1,7 @@
 /* PhysiX Academy — Router + Home/Learn/Lesson/Topics views */
 'use strict';
 
-const App = { el: null, levelFilter: 'all' };
+const App = { el: null, levelFilter: 'all', routeToken: 0 };
 
 function navActive(name) {
   $$('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
@@ -9,8 +9,33 @@ function navActive(name) {
 
 function afterRender(root) {
   const host = root || App.el;
-  $$('.sim-slot', host).forEach(slot => Sims.mount(slot.dataset.sim, slot));
-  $$('.quiz-slot', host).forEach(slot => Quiz.renderList(slot, slot.dataset.quiz.split(',')));
+  const simSlots = $$('.sim-slot', host);
+  if (simSlots.length) {
+    ensureSimulations().then(() => {
+      if (!simSlots.every(slot => slot.isConnected && App.el.contains(slot))) return;
+      simSlots.forEach(slot => mountSimulation(slot.dataset.sim, slot));
+    }).catch(err => {
+      console.error('Simulation load failed', err);
+      if (simSlots.every(slot => slot.isConnected && App.el.contains(slot))) simSlots.forEach(slot => {
+        slot.innerHTML = '<div class="empty-state"><p>Simulations could not load. Check your connection and try again.</p></div>';
+      });
+    });
+  }
+  const quizSlots = $$('.quiz-slot', host);
+  if (quizSlots.length) {
+    ensureQuizData().then(() => {
+      if (!quizSlots.every(slot => slot.isConnected && App.el.contains(slot))) return;
+      quizSlots.forEach(slot => {
+        Quiz.renderList(slot, slot.dataset.quiz.split(','));
+        Tex.render(slot);
+      });
+    }).catch(err => {
+      console.error('Quiz load failed', err);
+      if (quizSlots.every(slot => slot.isConnected && App.el.contains(slot))) quizSlots.forEach(slot => {
+        slot.innerHTML = '<div class="empty-state"><p>Practice questions could not load. Check your connection and try again.</p></div>';
+      });
+    });
+  }
   $$('.acc-head', host).forEach(h =>
     h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
   $$('.reveal', host).forEach(el => io.observe(el));
@@ -23,19 +48,103 @@ const io = ('IntersectionObserver' in window)
     }), { threshold: 0.06 })
   : { observe(el) { el.classList.add('in'); } };
 
+const ROUTE_META = {
+  home: { title: 'PhysiX Academy — Free Physics Learning Platform', description: 'Understand physics through interactive lessons, simulations, practice and clear explanations.' },
+  learn: { title: 'Learn Physics — PhysiX Academy', description: 'Explore NCERT-aligned physics lessons for Classes 9–12, JEE and NEET.' },
+  topics: { title: 'Physics Topics — PhysiX Academy', description: 'Explore physics by topic, from mechanics and waves to electricity and optics.' },
+  simulations: { title: 'Physics Simulations — PhysiX Academy', description: 'Experiment with interactive physics simulations and build intuition through motion.' },
+  games: { title: 'Physics Games — PhysiX Academy', description: 'Practise physics concepts through interactive games and challenges.' },
+  practice: { title: 'Physics Practice — PhysiX Academy', description: 'Test your understanding with explained physics questions and immediate feedback.' },
+  tutor: { title: 'Physics Tutor — PhysiX Academy', description: 'Ask the PhysiX Academy tutor for guided physics explanations.' },
+  formulas: { title: 'Physics Formula Library — PhysiX Academy', description: 'Search important physics formulas with variables, notes and derivations.' },
+  calculators: { title: 'Physics Calculators — PhysiX Academy', description: 'Use quick physics calculators for common mechanics, electricity and optics problems.' },
+  graph: { title: 'Physics Motion Graphs — PhysiX Academy', description: 'Explore motion graphs and the relationships between position, velocity and acceleration.' },
+  scientists: { title: 'Physicists — PhysiX Academy', description: 'Meet the physicists whose work shaped how we understand the universe.' },
+  progress: { title: 'Your Progress — PhysiX Academy', description: 'Review your saved learning progress, streaks and physics practice history.' },
+  support: { title: 'Support PhysiX Academy', description: 'Learn how to support free physics learning resources.' },
+  about: { title: 'About PhysiX Academy', description: 'Learn why PhysiX Academy focuses on understanding physics rather than memorisation.' }
+};
+
+function normalizePath(path) {
+  let clean = '/' + String(path || '').replace(/^\/+|\/+$/g, '');
+  if (clean === '/' || clean === '/index.html') return '/';
+  clean = clean.replace(/^\/sims(?=\/|$)/, '/simulations');
+  clean = clean.replace(/^\/lesson(?=\/|$)/, '/learn');
+  clean = clean.replace(/^\/people(?=\/|$)/, '/scientists');
+  clean = clean.replace(/^\/calc(?=\/|$)/, '/calculators');
+  return clean || '/';
+}
+
+function routeParts() {
+  let path = location.pathname;
+  if (location.hash && location.hash.indexOf('#/') === 0) {
+    const legacy = location.hash.slice(1);
+    const queryStart = legacy.indexOf('?');
+    path = queryStart === -1 ? legacy : legacy.slice(0, queryStart);
+    const query = queryStart === -1 ? '' : legacy.slice(queryStart);
+    history.replaceState({}, '', normalizePath(path) + query);
+  }
+  path = normalizePath(path);
+  let decoded = path;
+  try { decoded = decodeURI(path); } catch (e) {}
+  return decoded.split('/').filter(Boolean);
+}
+
+function navigate(href) {
+  const target = new URL(href, location.href);
+  if (target.origin !== location.origin) { location.href = href; return; }
+  const hashPath = target.hash && target.hash.indexOf('#/') === 0 ? target.hash.slice(1) : '';
+  const path = normalizePath(hashPath || target.pathname);
+  if (path !== target.pathname || hashPath) {
+    history.replaceState({}, '', path + target.search);
+  } else {
+    history.pushState({}, '', path + target.search);
+  }
+  route();
+}
+
+function updateMeta(parts) {
+  const key = parts[0] === 'simulations' ? 'simulations' : parts[0] === 'learn' && parts[1] ? 'learn' : parts[0] || 'home';
+  const meta = ROUTE_META[key] || ROUTE_META.home;
+  let title = meta.title;
+  if (parts[0] === 'learn' && parts[1]) {
+    const entry = findLesson(parts[1]);
+    if (entry) title = entry.lesson.title + ' — PhysiX Academy';
+  }
+  document.title = title;
+  const description = document.querySelector('meta[name="description"]');
+  const ogTitle = document.querySelector('meta[property="og:title"]');
+  const ogDescription = document.querySelector('meta[property="og:description"]');
+  const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+  const twitterDescription = document.querySelector('meta[name="twitter:description"]');
+  const canonical = document.querySelector('link[rel="canonical"]');
+  const ogUrl = document.querySelector('meta[property="og:url"]');
+  if (description) description.setAttribute('content', meta.description);
+  if (ogTitle) ogTitle.setAttribute('content', title);
+  if (ogDescription) ogDescription.setAttribute('content', meta.description);
+  if (twitterTitle) twitterTitle.setAttribute('content', title);
+  if (twitterDescription) twitterDescription.setAttribute('content', meta.description);
+  const url = location.origin + normalizePath(location.pathname);
+  if (canonical) canonical.href = url;
+  if (ogUrl) ogUrl.setAttribute('content', url);
+}
+
+let _viewTransition = null;
 function route() {
   const doRoute = () => {
-    const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
+    App.routeToken++;
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    const parts = routeParts();
     window.scrollTo(0, 0);
     Store.touchToday();
     let nav = 'home';
-    if (parts[0] === 'lesson') { viewLesson(decodeURIComponent(parts[1] || '')); nav = 'learn'; }
+    if (parts[0] === 'learn' && parts[1]) { viewLesson(parts[1]); nav = 'learn'; }
     else {
       switch (parts[0]) {
         case undefined: viewHome(); break;
         case 'learn': viewLearn(); nav = 'learn'; break;
         case 'topics': viewTopics(); nav = 'topics'; break;
-        case 'sims': viewSimsPage(parts[1]); nav = 'sims'; break;
+        case 'simulations': viewSimsPage(parts[1]); nav = 'sims'; break;
         case 'games': viewGames(parts[1]); nav = 'games'; break;
         case 'practice': viewPractice(); nav = 'practice'; break;
         case 'tutor': viewTutorPage(); nav = 'tutor'; break;
@@ -50,23 +159,35 @@ function route() {
       }
     }
     navActive(nav);
+    updateMeta(parts);
   };
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!prefersReduced && document.startViewTransition) {
-    document.startViewTransition(() => doRoute());
+    if (_viewTransition) { doRoute(); return; }
+    try {
+      const transition = document.startViewTransition(doRoute);
+      _viewTransition = transition;
+      Promise.resolve(transition.ready).catch(() => {});
+      Promise.resolve(transition.finished).then(
+        () => { if (_viewTransition === transition) _viewTransition = null; },
+        () => { if (_viewTransition === transition) _viewTransition = null; }
+      );
+    } catch (e) {
+      _viewTransition = null;
+      doRoute();
+    }
   } else {
     doRoute();
   }
 }
-
-/* ---------------- Home ---------------- */
 function viewHome() {
-  const simsN = Object.keys(Sims.reg).length;
+  const simsN = SIMULATION_COUNT;
   const studies = [
     { id: '01', title: 'Field / Lines', type: 'Electric fields, drawn in space', mins: '18 MIN LESSON', cls: 'art-a', img: 'assets/studies/field.jpg', ch: 'l3.charges' },
     { id: '02', title: 'Gravity / Well', type: 'Orbits you can tilt and warp', mins: '12 MIN LESSON', cls: 'art-b', img: 'assets/studies/gravity.jpg', ch: 'l2.gravity' },
     { id: '03', title: 'Light / Matter', type: 'Where waves become particles', mins: '16 MIN LESSON', cls: 'art-c', img: 'assets/studies/light.jpg', ch: 'l3.dual' }
   ];
+  const nextStudy = nextStudyLesson();
   App.el.innerHTML = `
   <div id="home-cine">
   <section class="hero cine-hero">
@@ -76,14 +197,36 @@ function viewHome() {
     <h1 class="display">Understand<br><em>physics.</em><br><span class="dim">Don't memorize it.</span></h1>
     <p class="lede">Every lesson starts with a real question, builds intuition, proves the formulas, and hands you the simulation. Progress saves itself right here in your browser.</p>
     <div class="hero-cta">
-      <a class="btn btn-primary" href="#/learn">Start learning<svg class="bi" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-      <a class="btn btn-ghost" href="#/sims">Explore simulations<svg class="bi" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/></svg></a>
+      <a class="btn btn-primary" href="/learn">Start learning<svg class="bi" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn btn-ghost" href="/simulations">Explore simulations<svg class="bi" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/></svg></a>
+    </div>
+  </section>
+
+  <section class="wrap sec study-next" aria-labelledby="next-study-title">
+    <div class="sec-title"><h2 id="next-study-title">${nextStudy ? (Store.data.lastLesson ? 'Continue your path' : 'Start your path') : 'Path complete'}</h2><a class="more" href="/progress">View progress →</a></div>
+    <div class="card rec-card">
+      <div class="topic-meta"><span class="chip cyan">${nextStudy ? esc(nextStudy.level.tag) : 'All levels'}</span>${nextStudy ? `<span class="chip plain">${esc(nextStudy.chapter.title)}</span>` : ''}</div>
+      <h3>${nextStudy ? esc(nextStudy.lesson.title) : 'You finished every available lesson.'}</h3>
+      <p class="muted">${nextStudy ? 'Your next step is ready when you are.' : 'Keep reviewing with practice and the tutor whenever you want to strengthen it.'}</p>
+      <a class="btn btn-primary btn-sm" href="${nextStudy ? '/learn/' + encodeURIComponent(nextStudy.lesson.id) : '/progress'}">${nextStudy ? 'Open next lesson' : 'Review progress'} →</a>
     </div>
   </section>
 
   <section class="statement">
     <p class="eyebrow">Our point of view</p>
     <p class="statement-copy">A formula is not decoration.<br><span>It is motion, written down.</span></p>
+  </section>
+
+  <section class="wrap sec study-paths" aria-labelledby="study-paths-title">
+    <div class="sec-title"><h2 id="study-paths-title">Choose your study path</h2></div>
+    <p class="muted">I study...</p>
+    <div class="pills">
+      <a class="pill" href="/learn?level=ncert9">Class 9</a>
+      <a class="pill" href="/learn?level=ncert10">Class 10</a>
+      <a class="pill" href="/learn?level=ncert11">Class 11</a>
+      <a class="pill" href="/learn?level=ncert12">Class 12</a>
+      <a class="pill" href="/learn?level=jee">JEE / NEET</a>
+    </div>
   </section>
 
   <div class="wrap">
@@ -96,25 +239,25 @@ function viewHome() {
 
     <!-- TRIAL: Physics-Lab-inspired Topics (local only, not pushed) -->
     <section class="sec px-topics">
-      <div class="sec-title"><h2>Physics Topics</h2><a class="more" href="#/sims">All sims →</a></div>
+      <div class="sec-title"><h2>Physics Topics</h2><a class="more" href="/simulations">All sims →</a></div>
       <p class="muted" style="margin:-.6rem 0 1.2rem">Choose your area of exploration — NCERT 9/10/11 mapped</p>
       <div class="px-topic-grid">
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">8 sims</span><h3>Classical Mechanics</h3><p>Motion, forces, energy and momentum</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">2 sims</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity and flow behaviour</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">5 sims</span><h3>Wave Physics</h3><p>Oscillations, interference and propagation</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">2 sims</span><h3>Thermodynamics</h3><p>Heat transfer & ideal gas behaviour</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">6 sims</span><h3>Electricity & Magnetism</h3><p>Fields, circuits and electromagnetic effects</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
-        <article class="px-topic-card" data-href="#/sims"><span class="px-count">4 sims</span><h3>Optics</h3><p>Light, mirrors, lenses & instruments</p><a class="px-link" href="#/sims">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Classical Mechanics</h3><p>Motion, forces, energy and momentum</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Fluid Dynamics</h3><p>Pressure, viscosity and flow behaviour</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Wave Physics</h3><p>Oscillations, interference and propagation</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Thermodynamics</h3><p>Heat transfer & ideal gas behaviour</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Electricity & Magnetism</h3><p>Fields, circuits and electromagnetic effects</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
+        <article class="px-topic-card" data-href="/simulations"><span class="px-count">Explore</span><h3>Optics</h3><p>Light, mirrors, lenses & instruments</p><a class="px-link" href="/simulations">Explore simulations →</a></article>
       </div>
     </section>
 
     <section class="sec px-featured">
-      <div class="sec-title"><h2>Featured Simulations</h2><a class="more" href="#/sims">All sims →</a></div>
+      <div class="sec-title"><h2>Featured Simulations</h2><a class="more" href="/simulations">All sims →</a></div>
       <p class="muted" style="margin:-.6rem 0 1.2rem">Popular concepts to get you started</p>
       <div class="px-featured-grid">
-        <article class="px-featured-card" data-href="#/sims"><h3>Pendulum Motion</h3><p>Explore SHM with an interactive pendulum</p><span class="px-link">Open →</span></article>
-        <article class="px-featured-card" data-href="#/sims"><h3>Projectile Motion</h3><p>Path under gravity — predict the flight</p><span class="px-link">Open →</span></article>
-        <article class="px-featured-card" data-href="#/sims"><h3>Flow Rate Simulator</h3><p>Pipe width vs velocity — Bernoulli in action</p><span class="px-link">Open →</span></article>
+        <article class="px-featured-card" data-href="/simulations/phet-pendulum"><h3>Pendulum Motion</h3><p>Explore SHM with an interactive pendulum</p><span class="px-link">Open →</span></article>
+        <article class="px-featured-card" data-href="/simulations/projectile"><h3>Projectile Motion</h3><p>Path under gravity — predict the flight</p><span class="px-link">Open →</span></article>
+        <article class="px-featured-card" data-href="/simulations/ncert11-venturi"><h3>Flow Rate Simulator</h3><p>Pipe width vs velocity — Bernoulli in action</p><span class="px-link">Open →</span></article>
       </div>
     </section>
 
@@ -123,11 +266,11 @@ function viewHome() {
       <div class="px-stat"><span class="px-stat-num">6</span><span class="px-stat-label">Topics</span></div>
       <div class="px-stat"><span class="px-stat-num">${CURRICULUM.length}</span><span class="px-stat-label">Levels</span></div>
       <div class="px-stat"><span class="px-stat-num">∞</span><span class="px-stat-label">Possibilities</span></div>
-      <div class="px-stat"><span class="px-stat-num">100%</span><span class="px-stat-label">Offline</span></div>
+      <div class="px-stat"><span class="px-stat-num">Local</span><span class="px-stat-label">Progress</span></div>
     </section>
 
     <section class="sec">
-      <div class="sec-title"><h2>Selected studies</h2><a class="more" href="#/topics">All topics →</a></div>
+      <div class="sec-title"><h2>Selected studies</h2><a class="more" href="/topics">All topics →</a></div>
       <div class="st-grid">
         ${studies.map(s => `
         <article class="study" data-href="${chFirstLesson(s.ch)}">
@@ -146,10 +289,10 @@ function viewHome() {
     </section>
 
     <section class="sec" id="home-path">
-      <div class="sec-title"><h2>Your path</h2><a class="more" href="#/learn">Full curriculum →</a></div>
+      <div class="sec-title"><h2>Your path</h2><a class="more" href="/learn">Full curriculum →</a></div>
       <div class="grid g2">
         ${CURRICULUM.map(l => `
-        <a class="card hover level-card ${l.id}" href="#/learn">
+        <a class="card hover level-card ${l.id}" href="/learn?level=${encodeURIComponent(l.id)}">
           <div class="lv-num">${esc(l.tag)}</div>
           <h3>${l.icon} ${esc(l.name)}</h3>
           <p class="muted">${esc(l.desc)}</p>
@@ -165,17 +308,17 @@ function viewHome() {
       <div class="method-row">
         <div class="step"><span>01</span><h3>Find the question</h3><p>Every lesson starts underneath the formula — with the <b>why</b> that made someone ask.</p></div>
         <div class="step"><span>02</span><h3>Build the world</h3><p>Drag sliders, tilt orbits, trace fields across ${simsN} simulations. Intuition is engineered, not assumed.</p></div>
-        <div class="step"><span>03</span><h3>Prove it</h3><p>Derivations close the loop, then ${QUIZ_BANK.length} quiz questions make sure the idea survives an exam.</p></div>
+        <div class="step"><span>03</span><h3>Prove it</h3><p>Derivations close the loop, then explained practice questions make sure the idea survives an exam.</p></div>
       </div>
     </section>
 
     <section class="sec">
-      <div class="sec-title"><h2>Meet the minds</h2><a class="more" href="#/scientists">All ${SCIENTISTS.length} physicists →</a></div>
+      <div class="sec-title"><h2>Meet the minds</h2><a class="more" href="/scientists">All ${SCIENTISTS.length} physicists →</a></div>
       <div class="sci-strip">
         ${['einstein','curie','raman','newton','snbose','hawking'].map(k =>
-          '<a class="sci-mini" href="#/scientists" title="Open the Hall of Physicists"><img loading="lazy" src="assets/scientists/' +
+          '<a class="sci-mini" href="/scientists" title="Open the Hall of Physicists"><img loading="lazy" src="assets/scientists/' +
           (SCIENTISTS.find(s => s.img === k + '.jpg') || {}).img + '" alt=""></a>').join('')}
-        <a class="sci-mini sci-more" href="#/scientists">+${SCIENTISTS.length - 6} more →</a>
+        <a class="sci-mini sci-more" href="/scientists">+${SCIENTISTS.length - 6} more →</a>
       </div>
     </section>
 
@@ -183,29 +326,31 @@ function viewHome() {
       <div class="card rec-card" style="border-left-color:var(--warn)">
         <h3>Start here, not anywhere else</h3>
         <p class="muted">“Motion in a Straight Line” is the lesson we show people first: question → intuition → simulation → derivation → worked examples → quiz. If our method works for you, you'll know within twenty minutes.</p>
-        <a class="btn btn-primary btn-sm" href="#/lesson/l3.kin1d.motion">Open the flagship lesson</a>
+        <a class="btn btn-primary btn-sm" href="/learn/l3.kin1d.motion">Open the flagship lesson</a>
       </div>
     </section>
   </div>
   </div>`;
 
   $$('.study', App.el).forEach(card =>
-    card.addEventListener('click', () => location.hash = card.dataset.href));
+    card.addEventListener('click', () => navigate(card.dataset.href)));
   $$('.px-topic-card, .px-featured-card', App.el).forEach(c =>
-    c.addEventListener('click', () => location.hash = c.dataset.href));
+    c.addEventListener('click', () => navigate(c.dataset.href)));
   afterRender();
 }
 
 /* ---------------- Learn ---------------- */
 function viewLearn() {
   const pills = ['all', ...CURRICULUM.map(l => l.id)];
+  const queryLevel = new URLSearchParams(location.search).get('level');
+  App.levelFilter = queryLevel && CURRICULUM.some(l => l.id === queryLevel) ? queryLevel : 'all';
   const chosen = App.levelFilter;
   const levels = chosen === 'all' ? CURRICULUM : CURRICULUM.filter(l => l.id === chosen);
 
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>Learn</h1>
-    <p class="sub">Four levels, ${CURRICULUM.reduce((n, l) => n + l.chapters.length, 0)} chapters. Open any chapter below — ticked lessons are ones you've completed.</p></div>
+    <p class="sub">${CURRICULUM.length} learning tracks, ${CURRICULUM.reduce((n, l) => n + l.chapters.length, 0)} chapters. Open any chapter below — ticked lessons are ones you've completed.</p></div>
     <div class="pills">${pills.map(p => {
       const l = CURRICULUM.find(x => x.id === p);
       return '<button class="pill' + (chosen === p ? ' active' : '') + '" data-lvl="' + p + '">' +
@@ -226,7 +371,7 @@ function viewLearn() {
             </button>
             <div class="acc-body">
               ${ch.lessons.map(ls => `
-                <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}" href="#/lesson/${ls.id}">
+                <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}" href="/learn/${ls.id}">
                   <span class="ln">${Store.isComplete(ls.id) ? '✓' : ch.lessons.indexOf(ls) + 1}</span>
                   <span class="lt">${esc(ls.title)}</span>
                   <span class="lm">${ls.mins} min</span>
@@ -238,7 +383,9 @@ function viewLearn() {
   </div>`;
 
   $$('.pill[data-lvl]', App.el).forEach(p => p.addEventListener('click', () => {
-    App.levelFilter = p.dataset.lvl; viewLearn();
+    App.levelFilter = p.dataset.lvl;
+    history.replaceState({}, '', p.dataset.lvl === 'all' ? '/learn' : '/learn?level=' + encodeURIComponent(p.dataset.lvl));
+    viewLearn();
   }));
   afterRender();
 }
@@ -247,7 +394,7 @@ function viewLearn() {
 function viewLesson(id) {
   const entry = findLesson(id);
   if (!entry) {
-    App.el.innerHTML = '<div class="wrap"><div class="empty-state"><div class="big" style="font-family:var(--ff-head)">404<sup>physics</sup></div><h2>This lesson doesn\'t exist — yet</h2><p>Either the link is wrong, or this lesson hasn\'t been written. It\'s not you.</p><p><a href="#/learn">Back to the curriculum</a></p></div></div>';
+    App.el.innerHTML = '<div class="wrap"><div class="empty-state"><div class="big" style="font-family:var(--ff-head)">404<sup>physics</sup></div><h2>This lesson doesn\'t exist — yet</h2><p>Either the link is wrong, or this lesson hasn\'t been written. It\'s not you.</p><p><a href="/learn">Back to the curriculum</a></p></div></div>';
     return;
   }
   const { level, chapter, lesson } = entry;
@@ -267,13 +414,13 @@ function viewLesson(id) {
   App.el.innerHTML = `
   <div class="lesson-shell">
     <nav class="lesson-nav" aria-label="Curriculum">
-      <a class="btn btn-sm btn-ghost" href="#/learn">‹ All levels</a>
+      <a class="btn btn-sm btn-ghost" href="/learn">‹ All levels</a>
       ${level.chapters.map(ch => `
         <div class="acc${ch.id === chapter.id ? ' open' : ''}">
           <button class="acc-head"><span>${ch.icon}</span><span class="t" style="font-size:.86rem">${esc(ch.title.replace(' ⭐', ''))}</span><span class="acc-caret">▾</span></button>
           <div class="acc-body">
             ${ch.lessons.map(ls => `
-              <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}${ls.id === id ? '' : ''}" href="#/lesson/${ls.id}" ${ls.id === id ? 'style="background:var(--acc-soft)"' : ''}>
+              <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}${ls.id === id ? '' : ''}" href="/learn/${ls.id}" ${ls.id === id ? 'style="background:var(--acc-soft)"' : ''}>
                 <span class="ln">${Store.isComplete(ls.id) ? '✓' : ch.lessons.indexOf(ls) + 1}</span>
                 <span class="lt" style="font-size:.84rem">${esc(ls.title)}</span>
               </a>`).join('')}
@@ -290,11 +437,11 @@ function viewLesson(id) {
         <span class="chip amber" id="ls-status"></span>
       </div>
       ${renderBlocks(lesson.content)}
-      <div class="errata">Something off in this lesson — a sign, a number, a sentence? <a href="#/tutor">Tell the tutor</a> starting your message with <code>fix:</code> — corrections go live fast, and get credited on this page.</div>
+      <div class="errata">Something off in this lesson — a sign, a number, a sentence? <a href="/tutor">Tell the tutor</a> starting your message with <code>fix:</code> — corrections go live fast, and get credited on this page.</div>
       <div class="lesson-foot">
-        ${prev ? '<a class="btn btn-sm" href="#/lesson/' + prev.lesson.id + '">‹ ' + esc(prev.lesson.title.slice(0, 30)) + (prev.lesson.title.length > 30 ? '…' : '') + '</a>' : '<span></span>'}
+        ${prev ? '<a class="btn btn-sm" href="/learn/' + prev.lesson.id + '">‹ ' + esc(prev.lesson.title.slice(0, 30)) + (prev.lesson.title.length > 30 ? '…' : '') + '</a>' : '<span></span>'}
         <button class="btn btn-sm btn-primary" id="btn-done"></button>
-        ${next ? '<a class="btn btn-sm" href="#/lesson/' + next.lesson.id + '">' + esc(next.lesson.title.slice(0, 30)) + (next.lesson.title.length > 30 ? '…' : '') + ' ›</a>' : '<span></span>'}
+        ${next ? '<a class="btn btn-sm" href="/learn/' + next.lesson.id + '">' + esc(next.lesson.title.slice(0, 30)) + (next.lesson.title.length > 30 ? '…' : '') + ' ›</a>' : '<span></span>'}
       </div>
     </article>
 
@@ -363,9 +510,6 @@ function viewLesson(id) {
     utter.onerror=()=>{ speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 '; };
     window.speechSynthesis.speak(utter);
   });
-  // stop on navigate
-  window.addEventListener('hashchange',()=>{ try{window.speechSynthesis.cancel();}catch(e){} }, {once:true});
-
   afterRender();
 }
 
@@ -385,7 +529,7 @@ function viewTopics() {
         <span class="chip ${done ? 'green' : 'plain'}">${pct}%</span>
       </div>
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="topic-meta"><a class="btn btn-sm ${done ? '' : 'btn-primary'}" href="#/lesson/${target.id}">${done ? '↻ Review' : '▶ Start'}</a></div>
+      <div class="topic-meta"><a class="btn btn-sm ${done ? '' : 'btn-primary'}" href="/learn/${target.id}">${done ? '↻ Review' : '▶ Start'}</a></div>
     </div>`;
   })).join('');
   App.el.innerHTML = `
@@ -405,7 +549,7 @@ function viewSupport() {
   App.el.innerHTML = `
   <div class="wrap wrap-narrow">
     <div class="page-head"><h1>Support this project</h1>
-      <p class="sub">Everything here is free, shows no ads, and works offline. It stays that way. If it helped you understand something you'd given up on, you can send a little thanks below — any amount, straight to my UPI, no middleman.</p></div>
+      <p class="sub">Everything here is free and shows no ads. If it helped you understand something you'd given up on, you can send a little thanks below — any amount, straight to my UPI, no middleman.</p></div>
 
     <div class="card upi-card center">
       <div id="upi-qr" class="upi-qr" aria-label="UPI QR code"></div>
@@ -430,7 +574,7 @@ function viewSupport() {
     </div>
   </div>`;
 
-  /* offline QR via vendored qrcode-generator */
+  /* local QR via vendored qrcode-generator */
   try {
     const qr = window.qrcode ? window.qrcode(0, 'M') : null;
     if (qr) {
@@ -465,8 +609,8 @@ function viewAbout() {
     <div class="card" style="line-height:1.8">
       <h3>The story</h3>
       <p>Most physics websites give you a wall of notes and call it teaching. I wanted something that actually works the way physics works — with things you can move, formulas you can see respond, and questions that explain themselves.</p>
-      <p>So I built it. Every lesson, every simulation, every equation on this site was hand-written. The simulations run live in your browser. The AI tutor solves problems offline. Nothing here is a template or a copied block of notes.</p>
-      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams, JEE, or NEET.</p>
+       <p>So I built it. The lessons, equations, and original browser simulations are hand-written; selected PhET activities are clearly labeled and loaded from their official site. The simulations run live in your browser. The AI tutor uses the site's local curriculum data. Nothing here is a template or a copied block of notes.</p>
+       <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free learning platform for anyone preparing for board exams, JEE, or NEET.</p>
     </div>
 
     <div class="card" style="line-height:1.8">
@@ -474,8 +618,8 @@ function viewAbout() {
       <div class="stat-grid" style="margin-top:1rem">
         <div class="card stat"><div class="sv">${CURRICULUM.length}</div><div class="sl">Levels</div></div>
         <div class="card stat"><div class="sv">${flatLessons().length}</div><div class="sl">Lessons</div></div>
-        <div class="card stat"><div class="sv">${Object.keys(Sims.reg).length}</div><div class="sl">Simulations</div></div>
-        <div class="card stat"><div class="sv">${QUIZ_BANK ? QUIZ_BANK.length : '87'}</div><div class="sl">Questions</div></div>
+        <div class="card stat"><div class="sv">${SIMULATION_COUNT}</div><div class="sl">Simulations</div></div>
+        <div class="card stat"><div class="sv" id="about-question-count">${QUIZ_BANK.length || '—'}</div><div class="sl">Questions</div></div>
       </div>
     </div>
 
@@ -487,7 +631,11 @@ function viewAbout() {
 
     <div class="card" style="line-height:1.8">
       <h3>Keeping it free</h3>
-      <p>PhysiX Academy has no ads, no subscriptions, and no hidden paywalls. It runs as a static site, so running costs are near zero — which means it can stay free forever. If it helped you, you can <a href="#/support">support the project</a> with a small donation.</p>
+      <p>PhysiX Academy has no ads, no subscriptions, and no hidden paywalls. It runs as a static site, so running costs are low. If it helped you, you can <a href="/support">support the project</a> with a small donation.</p>
     </div>
-  </div>`;
+   </div>`;
+  ensureQuizData().then(() => {
+    const target = $('#about-question-count');
+    if (target) target.textContent = QUIZ_BANK.length;
+  }).catch(() => {});
 }

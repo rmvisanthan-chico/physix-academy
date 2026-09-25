@@ -92,7 +92,7 @@ function viewGraph() {
       <p class="small">${esc(ch.tagline)}</p>
       <div class="topic-meta"><span class="chip ${done ? 'green' : 'plain'}">${done}/${ch.lessons.length} done</span></div>
       <ul style="margin:.6rem 0;padding-left:1.1rem">
-        ${ch.lessons.map(ls => `<li><a href="#/lesson/${ls.id}">${esc(ls.title)}</a>${Store.isComplete(ls.id) ? ' ✓' : ''}</li>`).join('')}
+        ${ch.lessons.map(ls => `<li><a href="/learn/${ls.id}">${esc(ls.title)}</a>${Store.isComplete(ls.id) ? ' ✓' : ''}</li>`).join('')}
       </ul>`;
     Tex.render($('#kg-panel'));
   }));

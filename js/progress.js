@@ -51,7 +51,7 @@ function viewProgress() {
         <div class="ring" style="--p:${pct}"><span class="rv">${pct}%</span></div>
         <h3 style="margin-top:.8rem">Curriculum complete</h3>
         <p class="muted">${doneN} of ${flat.length} lessons finished</p>
-        ${doneN ? '<a class="btn btn-sm" href="#/lesson/' + Store.data.lastLesson + '">↩ Resume last lesson</a>' : ''}
+        ${doneN ? '<a class="btn btn-sm" href="/learn/"' + Store.data.lastLesson + '">↩ Resume last lesson</a>' : ''}
       </div>
       <div class="stat-grid" style="grid-template-columns:1fr 1fr">
         <div class="card stat"><div class="sv">${Store.streak()}</div><div class="sl">Day streak</div></div>
@@ -86,13 +86,13 @@ function viewProgress() {
     </section>
 
     <section class="sec">
-      <div class="sec-title"><h2>Levels</h2><a class="more" href="#/learn">Open curriculum →</a></div>
+      <div class="sec-title"><h2>Levels</h2><a class="more" href="/learn">Open curriculum →</a></div>
       <div class="card bar-list">${perLevel}</div>
     </section>
 
     ${weak.length ? `
     <section class="sec">
-      <div class="sec-title"><h2>Focus areas</h2><a class="more" href="#/practice">Practice these →</a></div>
+      <div class="sec-title"><h2>Focus areas</h2><a class="more" href="/practice">Practice these →</a></div>
       <div class="card bar-list">
         ${weak.map(([t, a, n]) => `
         <div class="bar-row">
@@ -113,7 +113,7 @@ function viewProgress() {
           <span class="chip ${h.correct ? 'green' : 'red'}">${h.correct ? '✓ correct' : '✗ missed'}</span>
         </div>`;
       }).join('') + '</div>'
-      : '<div class="empty-state"><h2>Nothing to show yet</h2><p>Answer a few practice questions and this page starts keeping honest records — including the ones you get wrong.</p><a class="btn btn-primary btn-sm" href="#/practice">Try practice →</a></div>'}
+      : '<div class="empty-state"><h2>Nothing to show yet</h2><p>Answer a few practice questions and this page starts keeping honest records — including the ones you get wrong.</p><a class="btn btn-primary btn-sm" href="/practice">Try practice →</a></div>'}
     </section>
 
     <section class="sec">

@@ -25,14 +25,14 @@ Sims.register('cdn-3d-atom','CDN 3D Atom (Lazy)','High-res env map & textures la
       const geo=new THREE.SphereGeometry(0.9,64,64); const mat=new THREE.MeshStandardMaterial({map:tex, roughness:0.35, metalness:0.1}); const mesh=new THREE.Mesh(geo,mat); scene.add(mesh);
       const elecGeo=new THREE.SphereGeometry(0.12,16,16); const elecMat=new THREE.MeshStandardMaterial({color:0x38bdf8, emissive:0x0ea5e9}); const electrons=[0,1,2].map(i=>{const m=new THREE.Mesh(elecGeo,elecMat); scene.add(m); return m;});
       let t=0; (function anim(){ requestAnimationFrame(anim); if(!cv.c.isConnected) return; t+=0.015; mesh.rotation.y+=0.006; electrons.forEach((e,i)=>{const a=t* (0.8+i*0.3); const r=1.35; e.position.set(Math.cos(a)*r, Math.sin(a*0.7)*0.4, Math.sin(a)*r);}); ren.render(scene,cam); })();
-    }, undefined, ()=>{ rS.set('❌ CDN blocked — fallback'); rT.set('local fallback'); wrap.innerHTML='<div style="padding:1rem;color:var(--txt2)">CDN blocked offline — using local fallback. Online, high-res loads.</div>'; });
+    }, undefined, ()=>{ rS.set('Network unavailable — fallback'); rT.set('local fallback'); wrap.innerHTML='<div style="padding:1rem;color:var(--txt2)">The high-resolution texture could not be loaded, so this simulation is using its local fallback.</div>'; });
   };
   const btn=SU.el('button','btn btn-primary','Load 3D (CDN)'); btn.style.margin='1rem'; btn.onclick=load; frame.appendChild(btn);
   rS.set('Idle — click Load'); rT.set('—');
 });
 
 /* WASM Fluid — lazy-loads WASM solver from CDN, falls back to JS particles */
-Sims.register('wasm-fluid','WASM Fluid (Lazy)','Navier-Stokes via WASM (CDN) — 2k particles, viscosity & pressure. Falls back to JS off-line.','🌊',frame=>{
+Sims.register('wasm-fluid','WASM Fluid (Lazy)','Navier-Stokes via WASM (CDN) — 2k particles, viscosity & pressure. Uses a local JavaScript fallback when the network is unavailable.','🌊',frame=>{
   const cv=SU.canvas(frame,320); const ctr=SU.el('div','sim-controls');frame.appendChild(ctr); const ro=SU.el('div','sim-readouts');frame.appendChild(ro);
   const VISC=SU.slider(ctr,'Viscosity',0.01,0.3,0.01,0.08); const FORCE=SU.slider(ctr,'Force',0.5,6,0.5,2.5);
   const rM=SU.readout(ro,'Mode'), rN=SU.readout(ro,'Particles');
@@ -44,8 +44,8 @@ Sims.register('wasm-fluid','WASM Fluid (Lazy)','Navier-Stokes via WASM (CDN) —
     try{
       // Tiny demo WASM: we fetch a CDN WASM fluid header to prove lazy-load; actual solve stays JS for zip-size
       await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js', {method:'HEAD'});
-      wasmReady=true; useWasm=true; rM.set('✅ WASM ready (CDN) — JS fallback active off-line'); rN.set('1800');
-    }catch(e){ rM.set('Offline — JS fallback'); rN.set('1800'); }
+      wasmReady=true; useWasm=true; rM.set('WASM ready (CDN) — JS fallback active'); rN.set('1800');
+    }catch(e){ rM.set('Network unavailable — JS fallback'); rN.set('1800'); }
   };
   tryWasm();
   SU.loop(cv.c,dt=>{

@@ -3,23 +3,23 @@
 
 const Hero3D = {
   mountedOn: null,
+  loading: false,
 
   mount() {
     const hero = $('.hero');
     if (!hero || hero === this.mountedOn) return;
     if (!window.THREE) {
-      console.warn('[Hero3D] THREE missing — vendor/three.min.js did not load');
-      toast('3D engine failed to load (three.min.js)', 'bad');
+      if (this.loading) return;
+      this.loading = true;
+      ensureThree().then(() => { this.loading = false; this.mount(); })
+        .catch(() => { this.loading = false; hero.classList.add('hero-3d-fallback'); });
       return;
     }
     this.mountedOn = hero;
     try {
-    this._build(hero);
+      this._build(hero);
     } catch (e) {
-      console.error('[Hero3D]', e);
-      toast(/webgl/i.test(e.message)
-        ? '3D needs WebGL — enable hardware acceleration in browser settings'
-        : 'Atom error: ' + e.message, 'bad');
+      hero.classList.add('hero-3d-fallback');
     }
   },
 
