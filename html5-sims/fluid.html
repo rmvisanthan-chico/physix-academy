@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluid Particles 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#38bdf8; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Fluid Particles 3D</h1>
+  <p>No equations of motion for the bulk flow &mdash; just particles that push each other apart and drag
+     each other along. Pour, stir, and drop obstacles in.</p>
+</div>
+<div class="hud eq">F = &minus;&nabla;p &minus; &eta;&Delta;u</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Particles</span><b id="dN">—</b></div>
+  <div class="chip"><span>Neighbour checks</span><b id="dC">—</b></div>
+  <div class="chip"><span>Physics step</span><b id="dF">—</b></div>
+  <div class="chip"><span>Mean speed</span><b id="dV">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Liquid</h2>
+  <div class="ctl">
+    <label>Viscosity &eta; <b><span id="vV">0.20</span></b></label>
+    <input type="range" id="sV" min="0" max="1" step="0.01" value="0.2">
+  </div>
+  <div class="ctl">
+    <label>Pressure repulsion <b><span id="vP">0.50</span></b></label>
+    <input type="range" id="sP" min="0.05" max="1" step="0.01" value="0.5">
+  </div>
+  <div class="ctl">
+    <label>Particles <b><span id="vN">900</span></b></label>
+    <input type="range" id="sN" min="200" max="1600" step="50" value="900">
+  </div>
+  <div class="ctl">
+    <label>Gravity <b><span id="vG">1.0</span> g</b></label>
+    <input type="range" id="sG" min="0" max="3" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="tank">glass tank</span>
+    <span class="tg on" data-t="grid">neighbour grid</span>
+    <span class="tg" data-t="slowmo">slow motion</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Density (low)</span><b id="rDlo">0</b></div>
+    <div class="ro"><span>Density (high)</span><b id="rDhi">0</b></div>
+    <div class="ro"><span>Worst overlap</span><b id="rOv">0</b></div>
+    <div class="ro"><span>Kinetic</span><b id="rKE">0</b></div>
+    <div class="ro"><span>Gravity force</span><b id="rGf">0</b></div>
+    <div class="ro"><span>Surface level</span><b id="rLvl">0</b></div>
+  </div>
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Refill</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Drag empty space to orbit, scroll to zoom, right-drag to pan. Hold <b>Shift</b> and drag through the
+    liquid to stir it. The neighbour search is grid-bucketed, so the pair pass stays O(n) instead of O(n&sup2;).
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const RAD = 0.60, PR = 0.28;
+  const W = 7.5, H = 6.5, D = 7.5;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x38bdf8,
+    dist: 17, minD: 8, maxD: 70, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.3, rim: 0.34,
+    theta: 0.62, phi: 1.14, target: new T.Vector3(2.4, 2.6, 0)
+  });
+  const scene = st.scene;
+  const show = { tank: true, grid: false, slowmo: false };
+
+  const floor = st.floor(52, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(34, 34, 0x2c3852, 0x171e2d);
+  scene.add(grid);
+
+  const TANK = new T.Group();
+  TANK.position.set(-2.6, 0, 0);
+  scene.add(TANK);
+
+  const glass = new T.Mesh(new T.BoxGeometry(W, H, D),
+    new T.MeshStandardMaterial({ color: 0x9fd8ff, roughness: 0.06, metalness: 0,
+      transparent: true, opacity: 0.05, side: T.DoubleSide, depthWrite: false }));
+  glass.position.y = H / 2;
+  glass.renderOrder = 4;
+  TANK.add(glass);
+  const edges = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(W, H, D)),
+    new T.LineBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.45 }));
+  edges.position.y = H / 2;
+  TANK.add(edges);
+  const base = new T.Mesh(new T.BoxGeometry(W + 0.7, 0.5, D + 0.7),
+    new T.MeshStandardMaterial({ color: 0x1b2436, roughness: 0.5, metalness: 0.6 }));
+  base.position.y = -0.25;
+  base.receiveShadow = true;
+  TANK.add(base);
+
+  const cellBoxes = new T.LineSegments(
+    new T.BufferGeometry(),
+    new T.LineBasicMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.22 }));
+  cellBoxes.frustumCulled = false;
+  const CB_MAX = 420;
+  const cbPos = new Float32Array(CB_MAX * 24 * 3);
+  cellBoxes.geometry.setAttribute('position', new T.BufferAttribute(cbPos, 3));
+  cellBoxes.geometry.setDrawRange(0, 0);
+  TANK.add(cellBoxes);
+  let gInfo = null;
+
+  const CELL_EDGES = [
+    [0, 0, 0, 1, 0, 0], [0, 1, 0, 1, 1, 0], [0, 0, 1, 1, 0, 1], [0, 1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 1, 0], [1, 0, 0, 1, 1, 0], [0, 0, 1, 0, 1, 1], [1, 0, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0, 1], [1, 0, 0, 1, 0, 1], [0, 1, 0, 0, 1, 1], [1, 1, 0, 1, 1, 1]
+  ];
+
+  const blob = new THREE.InstancedMesh(
+    new T.SphereGeometry(1, 10, 7),
+    new T.MeshStandardMaterial({ color: 0x35b6ff, roughness: 0.18, metalness: 0.05,
+      emissive: 0x0b4a7a, emissiveIntensity: 0.3 }),
+    1800);
+  blob.frustumCulled = false;
+  TANK.add(blob);
+
+  const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(),
+    tmpP = new T.Vector3(), tmpS = new T.Vector3(PR, PR, PR), tmpC = new T.Color();
+
+  let N = 700, P = [], buckets = null, run = true;
+  let checks = 0, maxOv = 0, frameMs = 0, tSim = 0;
+  const gravity = () => (+el('sG').value) * 26;
+
+  function seed() {
+    N = Math.round(+el('sN').value);
+    P = new Array(N);
+    for (let i = 0; i < N; i++) {
+      P[i] = {
+        x: (Math.random() - 0.5) * (W - 0.6),
+        y: 0.35 + Math.random() * (H * 0.5),
+        z: (Math.random() - 0.5) * (D - 0.6),
+        vx: 0, vy: 0, vz: 0
+      };
+    }
+    tSim = 0;
+  }
+
+  function step(dt) {
+    const visc = +el('sV').value, pstr = +el('sP').value;
+    const g = gravity();
+    const hw = W / 2 - PR, hd = D / 2 - PR;
+
+    let cminx = 1e9, cmaxx = -1e9, cminy = 1e9, cmaxy = -1e9, cminz = 1e9, cmaxz = -1e9;
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      if (p.x < cminx) cminx = p.x; if (p.x > cmaxx) cmaxx = p.x;
+      if (p.y < cminy) cminy = p.y; if (p.y > cmaxy) cmaxy = p.y;
+      if (p.z < cminz) cminz = p.z; if (p.z > cmaxz) cmaxz = p.z;
+    }
+    const cw = Math.max(1, Math.ceil((cmaxx - cminx) / RAD));
+    const ch = Math.max(1, Math.ceil((cmaxy - cminy) / RAD));
+    const cd = Math.max(1, Math.ceil((cmaxz - cminz) / RAD));
+    const key = (x, y, z) => (z * ch + y) * cw + x;
+    const ncell = cw * ch * cd;
+    if (!buckets || buckets.length < ncell) buckets = new Array(ncell).fill(null);
+    else for (let k = 0; k < ncell; k++) buckets[k] = null;
+
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      const cx = Math.min(cw - 1, Math.max(0, ((p.x - cminx) / RAD) | 0));
+      const cy = Math.min(ch - 1, Math.max(0, ((p.y - cminy) / RAD) | 0));
+      const cz = Math.min(cd - 1, Math.max(0, ((p.z - cminz) / RAD) | 0));
+      const k = key(cx, cy, cz);
+      if (buckets[k] === null) buckets[k] = [p];
+      else buckets[k].push(p);
+    }
+    gInfo = { cw, ch, cd, cminx, cminy, cminz, key };
+
+    checks = 0;
+    maxOv = 0;
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      const cx = Math.min(cw - 1, Math.max(0, ((p.x - cminx) / RAD) | 0));
+      const cy = Math.min(ch - 1, Math.max(0, ((p.y - cminy) / RAD) | 0));
+      const cz = Math.min(cd - 1, Math.max(0, ((p.z - cminz) / RAD) | 0));
+      let fx = 0, fy = 0, fz = 0;
+      for (let oz = -1; oz <= 1; oz++) {
+        const gz = cz + oz;
+        if (gz < 0 || gz >= cd) continue;
+        for (let oy = -1; oy <= 1; oy++) {
+          const gy = cy + oy;
+          if (gy < 0 || gy >= ch) continue;
+          for (let ox = -1; ox <= 1; ox++) {
+            const gx = cx + ox;
+            if (gx < 0 || gx >= cw) continue;
+            const cell = buckets[key(gx, gy, gz)];
+            if (cell === null) continue;
+            for (let j = 0; j < cell.length; j++) {
+              const q = cell[j];
+              if (q === p) continue;
+              checks++;
+              const dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z;
+              const d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 > RAD * RAD || d2 < 1e-9) continue;
+              const d = Math.sqrt(d2);
+              const push = (RAD - d) / RAD;
+              if (push > maxOv) maxOv = push;
+              const k2 = pstr * 300 * push;
+              fx += (dx / d) * k2; fy += (dy / d) * k2; fz += (dz / d) * k2;
+              fx -= (q.vx - p.vx) * visc * 0.9;
+              fy -= (q.vy - p.vy) * visc * 0.9;
+              fz -= (q.vz - p.vz) * visc * 0.9;
+            }
+          }
+        }
+      }
+      p.vx += fx * dt; p.vy += (fy - g) * dt; p.vz += fz * dt;
+    }
+
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      p.vx *= 0.982; p.vy *= 0.982; p.vz *= 0.982;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      if (p.x < -hw) { p.x = -hw; p.vx = Math.abs(p.vx) * 0.55; }
+      else if (p.x > hw) { p.x = hw; p.vx = -Math.abs(p.vx) * 0.55; }
+      if (p.y < PR) { p.y = PR; p.vy = Math.abs(p.vy) * 0.35; }
+      else if (p.y > H - PR) { p.y = H - PR; p.vy = -Math.abs(p.vy) * 0.55; }
+      if (p.z < -hd) { p.z = -hd; p.vz = Math.abs(p.vz) * 0.55; }
+      else if (p.z > hd) { p.z = hd; p.vz = -Math.abs(p.vz) * 0.55; }
+    }
+    tSim += dt;
+  }
+
+  function draw() {
+    let ke = 0, sp = 0, lvl = 0;
+    for (let i = 0; i < N; i++) {
+      const p = P[i];
+      const v2 = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz;
+      ke += v2; sp += Math.sqrt(v2);
+      if (p.y > lvl) lvl = p.y;
+      const f = Math.min(1, Math.sqrt(v2) / 9);
+      tmpC.setHSL(0.55 - 0.12 * f, 0.85, 0.52 + 0.12 * f);
+      tmpP.set(p.x, p.y, p.z);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      blob.setMatrixAt(i, tmpM);
+      blob.setColorAt(i, tmpC);
+    }
+    blob.count = N;
+    blob.instanceMatrix.needsUpdate = true;
+    if (blob.instanceColor) blob.instanceColor.needsUpdate = true;
+
+    glass.visible = show.tank;
+    edges.visible = show.tank;
+
+    cellBoxes.visible = show.grid;
+    if (show.grid && gInfo) {
+      const { cw, ch, cd, cminx, cminy, cminz, key } = gInfo;
+      let n = 0;
+      for (let z = 0; z < cd && n < CB_MAX; z++) {
+        for (let y = 0; y < ch && n < CB_MAX; y++) {
+          for (let x = 0; x < cw && n < CB_MAX; x++) {
+            if (!buckets[key(x, y, z)]) continue;
+            const ox = cminx + x * RAD, oy = cminy + y * RAD, oz = cminz + z * RAD;
+            for (const e of CELL_EDGES) {
+              const b = n * 24 * 3;
+              cbPos[b] = ox + e[0] * RAD; cbPos[b + 1] = oy + e[1] * RAD; cbPos[b + 2] = oz + e[2] * RAD;
+              cbPos[b + 3] = ox + e[3] * RAD; cbPos[b + 4] = oy + e[4] * RAD; cbPos[b + 5] = oz + e[5] * RAD;
+              n++;
+            }
+          }
+        }
+      }
+      cellBoxes.geometry.attributes.position.needsUpdate = true;
+      cellBoxes.geometry.setDrawRange(0, n * 2);
+    }
+
+    return { ke: 0.5 * ke, vmean: sp / N, lvl };
+  }
+
+  function outs(R) {
+    el('dN').textContent = N;
+    el('dC').textContent = (checks / 1000).toFixed(1) + 'k';
+    el('dF').textContent = frameMs.toFixed(2) + ' ms';
+    el('dV').textContent = R.vmean.toFixed(2);
+    el('rDlo').textContent = (N / (W * D)).toFixed(1) + ' /unit²';
+    el('rDhi').textContent = (N / (W * D * Math.max(0.4, R.lvl))).toFixed(1) + ' /unit²';
+    el('rOv').textContent = (maxOv * 100).toFixed(1) + '%';
+    el('rKE').textContent = (R.ke / 1000).toFixed(2) + 'k';
+    el('rGf').textContent = (gravity()).toFixed(0);
+    el('rLvl').textContent = R.lvl.toFixed(2) + ' u';
+
+    const v = el('v');
+    if (+el('sV').value > 0.75) {
+      v.innerHTML = '<b style="color:var(--warn)">Thick, slow-moving liquid.</b> At &eta; = ' +
+        (+el('sV').value).toFixed(2) + ' neighbouring particles drag each other hard, so the flow looks ' +
+        'syrupy and the surface settles flat.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (+el('sP').value < 0.2) {
+      v.innerHTML = '<b style="color:var(--bad)">Almost no repulsion.</b> Particles pass through each other and ' +
+        'the liquid collapses into clumps &mdash; turn pressure back up above 0.3.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (maxOv > 0.85) {
+      v.innerHTML = '<b style="color:var(--warn)">Particles interpenetrating.</b> Worst pair overlaps by ' +
+        (maxOv * 100).toFixed(0) + '% of the contact distance, which is past what a liquid should do. ' +
+        'Raise pressure repulsion or lower the particle count.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + N + ' particles, ' + checks.toLocaleString() +
+        ' neighbour checks.</b> A brute-force O(n&sup2;) pass would need ' +
+        (N * (N - 1) / 2).toLocaleString() + ' &mdash; the grid does it in ' +
+        (100 * checks / (N * (N - 1) / 2)).toFixed(0) + '% of that work.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sV', 'vV', 2], ['sP', 'vP', 2], ['sN', 'vN', 0], ['sG', 'vG', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sV', 'sP', 'sN', 'sG'].forEach(i => el(i).addEventListener('input', () => { syncUI(); if (i === 'sN') seed(); }));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', seed);
+
+  let last = performance.now();
+  st.onFrame(() => {
+    const t0 = performance.now();
+    if (run) step(show.slowmo ? Math.min(0.016, 0.006) : Math.min(0.016, 0.010));
+    outs(draw());
+    const t1 = performance.now();
+    frameMs = frameMs * 0.9 + (t1 - t0) * 0.1;
+    last = t1;
+  });
+  syncUI(); seed();
+  st.start();
+})();
+</script>
+</body>
+</html>

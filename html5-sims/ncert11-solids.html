@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stress&ndash;Strain Curve 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#94a3b8; --acc2:#60a5fa; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9);max-width:46ch}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(700px,52vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.gap{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .mats{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .mt{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .mt.on{background:rgba(49,215,240,.22);border-color:rgba(49,215,240,.6);color:#bff0ff}
+  .spec{font-family:var(--mono);font-size:10.5px;color:var(--txt3);margin-top:9px;line-height:1.6}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Stress&ndash;Strain Curve 3D</h1>
+  <p>A real rod being pulled to its true length. Past the elastic limit it necks, and the work you keep
+     doing no longer comes back &mdash; it leaves as heat. Different materials fail in different ways.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">&sigma; = F/A &nbsp;&nbsp; Y = &sigma;/&epsilon;</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Stress &sigma;</span><b id="dS">—</b></div>
+  <div class="chip"><span>Strain &epsilon;</span><b id="dE">—</b></div>
+  <div class="chip"><span id="lblY">Young's modulus</span><b id="dY">—</b></div>
+  <div class="chip"><span>Regime</span><b id="dR">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Material</h2>
+  <div class="mats" id="mats"></div>
+  <div class="spec" id="spec"></div>
+
+  <h2 class="gap">Pull</h2>
+  <div class="ctl">
+    <label>Strain &epsilon; <b><span id="vE">—</span> %</b></label>
+    <input type="range" id="sE" min="0" max="100" step="0.1" value="55">
+  </div>
+  <div class="ctl">
+    <label>Cross-section A <b><span id="vA">100</span> mm&sup2;</b></label>
+    <input type="range" id="sA" min="1" max="1000" step="1" value="100">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="curve">curve</span>
+    <span class="tg on" data-t="area">work in</span>
+    <span class="tg on" data-t="unload">recoverable</span>
+  </div>
+
+  <h2 class="gap">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Force F</span><b id="rF">0</b></div>
+    <div class="ro"><span>Length &times;</span><b id="rL">0</b></div>
+    <div class="ro"><span>Min. diameter</span><b id="rD">0</b></div>
+    <div class="ro"><span>Energy stored</span><b id="rUe">0</b></div>
+    <div class="ro"><span>Work in</span><b id="rW">0</b></div>
+    <div class="ro"><span>% recoverable</span><b id="rP">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Release</button>
+    <button class="ghost" id="bRst">Re-form</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Both the slider and the graph&rsquo;s strain axis are logarithmic, because a rod&rsquo;s elastic limit and its
+    breaking strain are usually orders of magnitude apart. The area under the curve is the work you put in;
+    orange is the work you put in, blue is what springs back, and the gap between them left as heat.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const MATS = {
+    steel: {
+      n: 'mild steel', kind: 'ductile', Y: 2.0e11, eY: 0.00125, sU: 4.5e8,
+      eU: 0.10, eF: 0.25, col: 0x9fb0d8,
+      spec: 'E = 200 GPa · yield 250 MPa @ 0.125% · UTS 450 MPa @ 10% · breaks at 25%'
+    },
+    aluminium: {
+      n: 'aluminium', kind: 'ductile', Y: 7.0e10, eY: 0.0013, sU: 1.3e8,
+      eU: 0.02, eF: 0.10, col: 0xd8dee9,
+      spec: 'E = 70 GPa · yield 91 MPa @ 0.13% · UTS 130 MPa @ 2% · breaks at 10%'
+    },
+    copper: {
+      n: 'copper', kind: 'ductile', Y: 1.1e11, eY: 0.0007, sU: 2.2e8,
+      eU: 0.04, eF: 0.35, col: 0xe08a4a,
+      spec: 'E = 110 GPa · yield 77 MPa @ 0.07% · UTS 220 MPa @ 4% · breaks at 35%'
+    },
+    glass: {
+      n: 'glass', kind: 'brittle', Y: 5.5e10, eF: 5.0e-4, col: 0x7fe0d0,
+      spec: 'E = 55 GPa · no yield point · snaps at 0.05% strain'
+    },
+    rubber: {
+      n: 'rubber', kind: 'rubber', G: 1.0e6, eF: 6.0, col: 0xff8a5a,
+      spec: 'G = 1 MPa · no yield point · J-shaped curve · snaps at 600% strain'
+    }
+  };
+  const E_LO = 1e-5;
+  const eHiOf = M => M.kind === 'brittle' ? M.eF * 1.7 : M.eF * 1.06;
+  const strainAt = (M, v) => E_LO * Math.pow(eHiOf(M) / E_LO, v / 100);
+  const vOf = (M, e) => 100 * Math.log(e / E_LO) / Math.log(eHiOf(M) / E_LO);
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x94a3b8,
+    dist: 17, minD: 8, maxD: 70, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.4, fill: 0.28, rim: 0.34,
+    theta: 0.44, phi: 1.28
+  });
+  const scene = st.scene;
+  const show = { curve: true, area: true, unload: true };
+
+  const grid = st.grid(16, 16, 0x1a2338, 0x111726);
+  grid.position.y = -1.3;
+  scene.add(grid);
+
+  const RIG = new T.Group();
+  scene.add(RIG);
+  const clampMat = new T.MeshStandardMaterial({ color: 0x39445e, roughness: 0.4, metalness: 0.7 });
+  const X0 = -3.0;
+  const jaw = new T.Mesh(new T.BoxGeometry(0.4, 1.15, 1.15), clampMat);
+  jaw.position.set(X0, 0.2, 0);
+  RIG.add(jaw);
+  const grip = new T.Mesh(new T.CylinderGeometry(0.27, 0.27, 0.55, 16), clampMat);
+  grip.rotation.z = Math.PI / 2;
+  grip.position.set(X0 + 0.5, 0.2, 0);
+  RIG.add(grip);
+
+  const rodMat = new T.MeshStandardMaterial({ color: 0x9fb0d8, roughness: 0.3, metalness: 0.75 });
+  const ROD_GEO = new T.CylinderGeometry(0.22, 0.22, 1, 24, 26);
+  const rod = new T.Mesh(ROD_GEO, rodMat);
+  rod.rotation.z = Math.PI / 2;
+  rod.castShadow = true;
+  RIG.add(rod);
+  let lastDepth = -1;
+  function pinch(depth) {
+    if (Math.abs(depth - lastDepth) < 0.002) return;
+    lastDepth = depth;
+    const p = ROD_GEO.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const t = p.getY(i);
+      const f = 1 - depth * Math.exp(-Math.pow(t / 0.17, 2));
+      p.setX(i, p.getX(i) * f);
+      p.setZ(i, p.getZ(i) * f);
+    }
+    p.needsUpdate = true;
+    ROD_GEO.computeVertexNormals();
+  }
+  const neckRing = new T.Mesh(new T.TorusGeometry(0.2, 0.05, 8, 24),
+    new T.MeshBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.9 }));
+  neckRing.rotation.y = Math.PI / 2;
+  neckRing.visible = false;
+  RIG.add(neckRing);
+  const heatGlow = st.glow(0xff6b3a, 2.2, 0);
+  RIG.add(heatGlow);
+
+  const L0 = 5.2, D0 = 0.52;
+
+  const GR = new T.Group();
+  GR.position.set(0, 3.1, 0);
+  scene.add(GR);
+  const GW = 6.8, GH = 4.1;
+  const N = 220, NU = 48;
+  const plate = new T.Mesh(new T.PlaneGeometry(GW + 1.1, GH + 1.25),
+    new T.MeshBasicMaterial({ color: 0x080c16, transparent: true, opacity: 0.80 }));
+  plate.position.z = -0.09;
+  GR.add(plate);
+  const frameGeo = new T.BufferGeometry().setFromPoints([
+    new T.Vector3(-GW / 2 - 0.55, -GH / 2 - 0.62, -0.08), new T.Vector3(GW / 2 + 0.55, -GH / 2 - 0.62, -0.08),
+    new T.Vector3(GW / 2 + 0.55, GH / 2 + 0.62, -0.08), new T.Vector3(-GW / 2 - 0.55, GH / 2 + 0.62, -0.08),
+    new T.Vector3(-GW / 2 - 0.55, -GH / 2 - 0.62, -0.08)
+  ]);
+  GR.add(new T.Line(frameGeo, new T.LineBasicMaterial({ color: 0x2f3d5c, transparent: true, opacity: 0.95 })));
+  const mkRib = (col, op, n) => {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array((n + 1) * 2 * 3), 3));
+    const idx = [];
+    for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    g.setIndex(idx);
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: col, side: T.DoubleSide, transparent: true, opacity: op }));
+    m.frustumCulled = false;
+    GR.add(m);
+    return m;
+  };
+  const ribC = mkRib(0x3ee0a4, 0.95, N);
+  const ribA = mkRib(0xffb03a, 0.20, N);
+  const ribU = mkRib(0x4aa8ff, 0.42, NU);
+  const gAxE = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, GW, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.55 }));
+  gAxE.rotation.z = Math.PI / 2;
+  gAxE.position.y = -GH / 2;
+  const gAxS = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, GH, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.55 }));
+  gAxS.position.x = -GW / 2;
+  GR.add(gAxE, gAxS);
+  const lE = st.label('\u03b5  (log scale)', '#c3d2ee', 0.0034);
+  lE.position.set(GW / 2 - 0.05, -GH / 2 - 0.5, 0);
+  const lS = st.label('\u03c3  (stress)', '#c3d2ee', 0.0034);
+  lS.position.set(-GW / 2 - 0.55, GH / 2 - 0.3, 0);
+  GR.add(lE, lS);
+  const markY = new T.Mesh(new T.PlaneGeometry(0.025, GH),
+    new T.MeshBasicMaterial({ color: 0x8fa8d8, transparent: true, opacity: 0.55 }));
+  GR.add(markY);
+  const lY = st.label('elastic limit', '#8fa8d8', 0.0021);
+  GR.add(lY);
+  const dot = new T.Mesh(new T.SphereGeometry(0.11, 14, 10), new T.MeshBasicMaterial({ color: 0xffffff }));
+  const dotGlow = st.glow(0xffffff, 1.0, 0.85);
+  GR.add(dot, dotGlow);
+
+  let released = false, mi = 'steel', autoFit = true;
+
+  function stress(M, e) {
+    if (M.kind === 'rubber') {
+      if (e <= 0) return 0;
+      if (e >= M.eF) return 0;
+      const lam = 1 + e;
+      return 3 * M.G * (lam - 1 / (lam * lam));
+    }
+    if (M.kind === 'brittle') return e >= M.eF ? 0 : M.Y * e;
+    if (e < M.eY) return M.Y * e;
+    const sigY = M.Y * M.eY;
+    if (e < M.eU) return sigY + (M.sU - sigY) * ((e - M.eY) / (M.eU - M.eY));
+    if (e < M.eF) return M.sU * (1 - 0.45 * Math.pow((e - M.eU) / (M.eF - M.eU), 2));
+    return 0;
+  }
+  function regime(M, e) {
+    if (M.kind === 'rubber') return e >= M.eF ? 'snapped' : 'superelastic';
+    if (M.kind === 'brittle') return e >= M.eF ? 'fractured' : 'elastic';
+    if (e >= M.eF) return 'fractured';
+    if (e >= M.eU) return 'necking';
+    if (e >= M.eY) return 'plastic';
+    return 'elastic';
+  }
+  function area(M, e) {
+    if (e <= 0) return 0;
+    let w = 0;
+    const n = 600, b = Math.log(e / E_LO);
+    for (let i = 0; i < n; i++) {
+      const t = ((i + 0.5) / n) * b;
+      const de = (E_LO * Math.exp(t)) * (b / n);
+      w += stress(M, E_LO * Math.exp(t)) * de;
+    }
+    return w;
+  }
+  const tangentMod = M => M.kind === 'rubber' ? 9 * M.G : M.Y;
+
+  const mWrap = el('mats');
+  const keys = Object.keys(MATS);
+  keys.forEach(k => {
+    const s = document.createElement('span');
+    s.className = 'mt' + (k === mi ? ' on' : '');
+    s.textContent = MATS[k].n;
+    s.addEventListener('click', () => {
+      mi = k;
+      [...mWrap.children].forEach((c, j) => c.classList.toggle('on', keys[j] === k));
+      released = false;
+      el('bGo').textContent = 'Release';
+      syncUI();
+    });
+    mWrap.appendChild(s);
+  });
+
+  function draw() {
+    const v = +el('sE').value, A = +el('sA').value;
+    const M = MATS[mi];
+    const e = released ? 0 : strainAt(M, v);
+    const sig = stress(M, e);
+
+    const lam = 1 + e;
+    const len = L0 * lam;
+    const depth = (M.kind === 'ductile' && e >= M.eU)
+      ? 0.40 * Math.pow((e - M.eU) / (M.eF - M.eU), 1.5) : 0;
+    pinch(depth);
+    const rUnif = D0 * 0.5 / Math.sqrt(lam);
+    const rad = rUnif * (1 - depth);
+    rod.scale.set(1, len, rad / 0.22);
+    rod.position.set(X0 + len / 2, 0.2, 0);
+    rod.visible = sig > 0;
+    rodMat.color.set(M.col);
+    heatGlow.position.copy(rod.position);
+    const hAmt = (M.kind === 'ductile' && e > M.eY) ? Math.min(0.6, (e - M.eY) * 12) : 0;
+    heatGlow.material.opacity = hAmt;
+    heatGlow.material.color.set(0xff5a2a);
+    neckRing.position.set(X0 + len / 2, 0.2, 0);
+    neckRing.scale.set(rad / 0.2, rad / 0.2, 1);
+    neckRing.visible = depth > 0.01 && sig > 0;
+
+    if (autoFit) {
+      const want = Math.max(16, len * 1.05 + 8);
+      st.controls.frame(want, new T.Vector3(X0 + Math.max(len, 8) * 0.5 + 1.0, 1.7, 0));
+    }
+
+    GR.visible = show.curve;
+    GR.position.set(X0 + 4.4, 3.7, -1.0);
+    if (show.curve) {
+      const eTop = eHiOf(M);
+      const sTop = Math.max(M.kind === 'brittle' ? M.Y * M.eF : M.sU, 1) * 1.18;
+      const lx = x => (Math.log(x / E_LO) / Math.log(eTop / E_LO)) * GW - GW / 2;
+      const ly = x => Math.max(-GH / 2, Math.min(GH / 2, (stress(M, x) / sTop) * GH - GH / 2));
+      const arrC = ribC.geometry.attributes.position.array;
+      const arrA = ribA.geometry.attributes.position.array;
+      for (let i = 0; i <= N; i++) {
+        const x = E_LO * Math.pow(eTop / E_LO, i / N);
+        const px = lx(x), py = ly(x), b = i * 6;
+        arrC[b] = px; arrC[b + 1] = py + 0.055; arrC[b + 2] = 0;
+        arrC[b + 3] = px; arrC[b + 4] = py - 0.055; arrC[b + 5] = 0;
+        const on = x <= e;
+        arrA[b] = px; arrA[b + 1] = on ? py : -GH / 2; arrA[b + 2] = -0.01;
+        arrA[b + 3] = px; arrA[b + 4] = -GH / 2; arrA[b + 5] = -0.01;
+      }
+      ribC.geometry.attributes.position.needsUpdate = true;
+      ribA.geometry.attributes.position.needsUpdate = true;
+
+      const eRec = e > 0 && M.kind !== 'rubber' ? Math.max(0, e - sig / tangentMod(M)) : 0;
+      ribU.visible = show.unload && e > 0 && M.kind !== 'rubber' && eRec < e - 1e-9;
+      if (ribU.visible) {
+        const arrU = ribU.geometry.attributes.position.array;
+        for (let i = 0; i <= NU; i++) {
+          const t = i / NU;
+          const x = eRec + (e - eRec) * t;
+          const yTop = (sig / tangentMod(M)) * (x - eRec);
+          arrU[i * 6] = lx(x); arrU[i * 6 + 1] = ly(yTop); arrU[i * 6 + 2] = 0.02;
+          arrU[i * 6 + 3] = lx(x); arrU[i * 6 + 4] = -GH / 2; arrU[i * 6 + 5] = 0.02;
+        }
+        ribU.geometry.attributes.position.needsUpdate = true;
+      }
+
+      if (M.kind !== 'rubber' && M.kind !== 'brittle') {
+        markY.visible = true;
+        markY.position.set(lx(M.eY), 0, -0.03);
+        lY.visible = true;
+        lY.position.set(lx(M.eY) - 0.1, GH / 2 - 0.42, 0);
+      } else { markY.visible = false; lY.visible = false; }
+      const px = e > 0 ? lx(e) : -GW / 2;
+      const py = e > 0 ? ly(e) : -GH / 2;
+      dot.position.set(px, py, 0.06);
+      dotGlow.position.copy(dot.position);
+      GR.rotation.y = Math.atan2(st.camera.position.x - GR.position.x, st.camera.position.z);
+    }
+
+    return { M, e, sig, A, len, rad, autoFit, v };
+  }
+
+  function outs(R) {
+    const { M, e, sig, A, len, rad } = R;
+    const reg = regime(M, e);
+    const W = area(M, e);
+    const rec = e <= 0 ? 0 : (M.kind === 'rubber' ? W : sig * sig / (2 * tangentMod(M)));
+    const pct = W > 0 ? Math.min(100, rec / W * 100) : 0;
+
+    el('dS').textContent = (sig / 1e6).toFixed(1) + ' MPa';
+    el('dE').textContent = (e * 100).toFixed(e < 0.01 ? 3 : 1) + ' %';
+    el('dY').textContent = (tangentMod(M) / 1e9).toFixed(M.kind === 'rubber' ? 3 : 1) + ' GPa';
+    el('lblY').textContent = M.kind === 'rubber' ? 'Initial modulus' : 'Young\u2019s modulus';
+    const rEl = el('dR');
+    rEl.textContent = reg;
+    rEl.style.color = (reg === 'elastic' || reg === 'superelastic') ? 'var(--ok)'
+      : (reg === 'fractured' || reg === 'snapped') ? 'var(--bad)' : 'var(--warn)';
+    el('rF').textContent = (sig * A * 1e-6).toFixed(1) + ' N';
+    el('rL').textContent = lamStr(e);
+    el('rD').textContent = (rad * 2000).toFixed(2) + ' mm';
+    el('rUe').textContent = (rec / 1e6).toFixed(3) + ' MJ/m³';
+    el('rW').textContent = (W / 1e6).toFixed(3) + ' MJ/m³';
+    el('rP').textContent = W > 0 ? pct.toFixed(1) + '%' : '—';
+
+    const chk = el('chk');
+    const inElastic = e > 0 && (M.kind === 'brittle' ? e < M.eF : M.kind === 'ductile' ? e < M.eY : false);
+    if (inElastic) {
+      chk.className = 'check';
+      chk.innerHTML = '&#10003; elastic: &sigma;/&epsilon; = ' + (sig / e / 1e9).toFixed(1) +
+        ' GPa = Y, and the rod returns to exactly ' + (L0 * 1000).toFixed(0) + ' mm on release';
+    } else if (e > 0 && M.kind === 'rubber') {
+      chk.className = 'check bad';
+      chk.innerHTML = '&#10007; &sigma;/&epsilon; = ' + (sig / e / 1e6).toFixed(2) +
+        ' MPa &ne; ' + (9 * M.G / 1e6).toFixed(1) + ' MPa initial modulus &mdash; rubber is not Hookean, ' +
+        'and &sigma;/&epsilon; changes at every strain';
+    } else if (e > 0) {
+      chk.className = 'check bad';
+      chk.innerHTML = '&#10007; &sigma;/&epsilon; = ' + (sig / e / 1e9).toFixed(2) +
+        ' GPa, not Y = ' + (M.Y / 1e9).toFixed(0) + ' GPa. Past the elastic limit the ratio is not a ' +
+        'constant, so Y no longer describes the rod';
+    } else {
+      chk.className = 'check';
+      chk.innerHTML = '&#10003; unloaded: &sigma; = 0, &epsilon; = 0, the rod is back to ' + (L0 * 1000).toFixed(0) + ' mm';
+    }
+
+    const v2 = el('v');
+    const lost = Math.max(0, W - rec);
+    if (reg === 'fractured' || reg === 'snapped') {
+      v2.innerHTML = '<b style="color:var(--bad)">It failed.</b> ' + M.n + ' reached its breaking strain of ' +
+        (e * 100).toFixed(e < 0.01 ? 3 : 0) + '%. The ' + (rec / 1e6).toFixed(2) +
+        ' MJ/m&sup3; still stored in the rod is released in a fraction of a second, which is why fracture is violent. ' +
+        (M.kind === 'brittle' ? 'Glass gave no warning at all.' : 'It necked first, concentrating the strain into a tiny region.');
+      v2.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (M.kind === 'rubber') {
+      v2.innerHTML = '<b style="color:var(--ok)">Stretched to ' + (e * 100).toFixed(0) +
+        '% and it will spring back.</b> The curve is J-shaped, not straight: nearly incompressible rubber gets ' +
+        'dramatically harder to stretch as it goes. All ' + (rec / 1e6).toFixed(2) +
+        ' MJ/m&sup3; is recoverable, unlike steel past its limit.';
+      v2.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (reg === 'elastic') {
+      v2.innerHTML = '<b style="color:var(--ok)">Still elastic at ' + (e * 100).toFixed(3) + '%.</b> ' +
+        'Stress is ' + (sig / 1e6).toFixed(1) + ' MPa and the rod will return to exactly ' +
+        (L0 * 1000).toFixed(0) + ' mm when released. Everything put in so far (' + (W / 1e6).toFixed(3) +
+        ' MJ/m&sup3;) is stored, not lost.';
+      v2.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (reg === 'necking') {
+      const ra = (1 - Math.pow(rad / (D0 * 0.5), 2)) * 100;
+      v2.innerHTML = '<b style="color:var(--warn)">Necking at ' + (e * 100).toFixed(1) + '%.</b> Past the ' +
+        'ultimate strength of ' + (M.sU / 1e6).toFixed(0) + ' MPa the bar cannot carry more load, so it pulls ' +
+        'itself thinner instead of longer. The waist has fallen to ' + (rad * 2000).toFixed(1) +
+        ' mm &mdash; a ' + ra.toFixed(0) + '% reduction of area &mdash; and every extra bit of strain now piles ' +
+        'into that tiny region, which is exactly where it will tear.';
+      v2.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v2.innerHTML = '<b style="color:var(--warn)">' + reg.charAt(0).toUpperCase() + reg.slice(1) +
+        ' at ' + (e * 100).toFixed(e < 0.01 ? 3 : 1) + '%.</b> ' + (M.Y * M.eY / 1e6).toFixed(0) +
+        ' MPa was the yield point; past it the rod deforms permanently. You have done ' + (W / 1e6).toFixed(2) +
+        ' MJ/m&sup3; of work but only ' + (rec / 1e6).toFixed(2) + ' MJ/m&sup3; can come back &mdash; the other ' +
+        (lost / 1e6).toFixed(2) + ' MJ/m&sup3; left as heat. That is why a bent spring stays bent.';
+      v2.style.borderColor = 'rgba(255,192,67,.34)';
+    }
+  }
+
+  const lamStr = e => e > 0.999 ? (1 + e).toFixed(1) + '×' : (1 + e).toFixed(3) + '×';
+
+  function syncUI() {
+    const e = el('sE'), a = el('sA');
+    e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+    a.style.setProperty('--p', ((a.value - a.min) / (a.max - a.min) * 100) + '%');
+    el('vA').textContent = (+a.value).toFixed(0);
+    const M = MATS[mi];
+    el('vE').textContent = (strainAt(M, +e.value) * 100).toFixed(M.kind === 'brittle' || M.kind === 'ductile' ? 3 : 0);
+    el('spec').innerHTML = MATS[mi].spec;
+  }
+  el('sE').addEventListener('input', () => { syncUI(); released = false; el('bGo').textContent = 'Release'; });
+  el('sA').addEventListener('input', syncUI);
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', () => {
+    released = !released;
+    el('bGo').textContent = released ? 'Pull again' : 'Release';
+  });
+  el('bRst').addEventListener('click', () => {
+    released = false; el('bGo').textContent = 'Release';
+    const e = el('sE');
+    e.value = 55; el('sA').value = 100; syncUI();
+  });
+
+  syncUI();
+  st.onFrame(() => outs(draw()));
+  st.start();
+})();
+</script>
+</body>
+</html>

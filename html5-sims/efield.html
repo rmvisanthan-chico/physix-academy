@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electric Field Mapper 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#8b5cf6; --acc2:#c084fc; --onAcc:#ffffff; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Electric Field Mapper 3D</h1>
+  <p>Potential on a slice through two point charges. The coloured bands are equipotentials &mdash;
+     equal energy per unit charge. Field lines live in the 3D sim; this one is about the map.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">V = k(q&#8321;/r&#8321; + q&#8322;/r&#8322;)</div>
+
+<div class="hud dock">
+  <div class="chip"><span>V at probe</span><b id="dV">—</b></div>
+  <div class="chip"><span>|E| at probe</span><b id="dE">—</b></div>
+  <div class="chip"><span>Direction</span><b id="dA">—</b></div>
+  <div class="chip"><span>Energy / charge</span><b id="dU">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Charges</h2>
+  <div class="ctl">
+    <label>q&#8321; (left) <b><span id="vQ1">+2.0</span> &mu;C</b></label>
+    <input type="range" id="sQ1" min="-4" max="4" step="0.1" value="2">
+  </div>
+  <div class="ctl">
+    <label>q&#8322; (right) <b><span id="vQ2">-1.0</span> &mu;C</b></label>
+    <input type="range" id="sQ2" min="-4" max="4" step="0.1" value="-1">
+  </div>
+  <div class="ctl">
+    <label>Separation <b><span id="vSep">3.0</span> m</b></label>
+    <input type="range" id="sSep" min="1.2" max="6" step="0.1" value="3">
+  </div>
+  <div class="ctl">
+    <label>Contour spacing &Delta;V <b><span id="vL">2.0</span> kV</b></label>
+    <input type="range" id="sL" min="0.2" max="20" step="0.2" value="2">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="heat">potential map</span>
+    <span class="tg on" data-t="iso">iso-contours</span>
+    <span class="tg" data-t="grid">sample grid</span>
+  </div>
+
+  <h2 class="mt">Readouts at probe</h2>
+  <div class="ros">
+    <div class="ro"><span>V&#8321;</span><b id="r1">0</b></div>
+    <div class="ro"><span>V&#8322;</span><b id="r2">0</b></div>
+    <div class="ro"><span>E&#8321;</span><b id="rE1">0</b></div>
+    <div class="ro"><span>E&#8322;</span><b id="rE2">0</b></div>
+    <div class="ro"><span>r&#8321;</span><b id="rD1">0</b></div>
+    <div class="ro"><span>r&#8322;</span><b id="rD2">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button class="ghost" id="bRst">Probe to midpoint</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Drag the probe anywhere on the slice. The check box compares the field from Coulomb&rsquo;s law
+    against the <em>numerical gradient</em> of the plotted potential &mdash; E = &minus;&nabla;V &mdash;
+    so the map and the field are verified against each other, not just asserted.
+    Scroll to zoom, right-drag to pan.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const K = 8.9875517873681764e9;
+  const GW = 11, GH = 8, GZ = 0;
+  const NX = 96, NY = 70;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x8b5cf6,
+    dist: 17, minD: 8, maxD: 70, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.2, fill: 0.3, rim: 0.3,
+    theta: 0.06, phi: 1.50, target: new T.Vector3(2.0, 0.2, 0)
+  });
+  const scene = st.scene;
+  const show = { heat: true, iso: true, grid: false };
+
+  const grid = st.grid(26, 26, 0x1a2338, 0x111726);
+  grid.position.y = -5.4;
+  scene.add(grid);
+
+  const planeGeo = new T.PlaneGeometry(GW, GH, NX, NY);
+  const ppos = planeGeo.attributes.position.array;
+  const pcol = new Float32Array(ppos.length);
+  planeGeo.setAttribute('color', new T.BufferAttribute(pcol, 3));
+  const plane = new T.Mesh(planeGeo, new T.MeshBasicMaterial({
+    vertexColors: true, side: T.DoubleSide, transparent: true, opacity: 0.94 }));
+  plane.position.set(0, 0, GZ - 0.06);
+  scene.add(plane);
+  const frame = new T.LineSegments(
+    new T.EdgesGeometry(new T.PlaneGeometry(GW, GH)),
+    new T.LineBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.5 }));
+  frame.position.copy(plane.position);
+  scene.add(frame);
+
+  const V = new Float32Array(NX * NY);
+  const isoGeo = new T.BufferGeometry();
+  const ISO_MAX = 24000;
+  isoGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(ISO_MAX * 3), 3));
+  const iso = new T.LineSegments(isoGeo, new T.LineBasicMaterial({
+    color: 0x0b1220, transparent: true, opacity: 0.55 }));
+  iso.frustumCulled = false;
+  iso.geometry.setDrawRange(0, 0);
+  scene.add(iso);
+
+  const sampleGeo = new T.BufferGeometry();
+  sampleGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(NX * NY * 3), 3));
+  const samples = new T.Points(sampleGeo, new T.PointsMaterial({
+    size: 0.075, color: 0x9fd8ff, transparent: true, opacity: 0.5, depthWrite: false }));
+  samples.frustumCulled = false;
+  samples.visible = false;
+  scene.add(samples);
+
+  const chargeMeshes = [];
+  for (let i = 0; i < 2; i++) {
+    const g = new T.Group();
+    const sgn = i === 0 ? 1 : -1;
+    const m = new T.Mesh(new T.SphereGeometry(0.26, 22, 16),
+      new T.MeshStandardMaterial({ color: sgn > 0 ? 0xff6b6b : 0x5a8aff,
+        emissive: sgn > 0 ? 0x8a1414 : 0x142a8a, emissiveIntensity: 0.8, roughness: 0.3 }));
+    const gl = st.glow(sgn > 0 ? 0xff6b6b : 0x5a8aff, 1.8, 0.5);
+    g.add(m, gl);
+    scene.add(g);
+    chargeMeshes.push(g);
+  }
+  const clbl = [st.label('q₁', '#ff9a9a', 0.0024), st.label('q₂', '#9ab4ff', 0.0024)];
+  clbl.forEach(l => scene.add(l));
+
+  const probe = new T.Group();
+  const pBall = new T.Mesh(new T.SphereGeometry(0.13, 16, 12),
+    new T.MeshBasicMaterial({ color: 0xffffff }));
+  const pGlow = st.glow(0xffffff, 1.1, 0.85);
+  probe.add(pBall, pGlow);
+  scene.add(probe);
+  const eArrow = st.arrow(0x3ee0a4, new T.Vector3(), new T.Vector3(1, 0, 0), 2);
+  scene.add(eArrow);
+  let probeX = 1.2, probeY = 0.6;
+  const lblP = st.label('probe', '#ffffff', 0.0022);
+  scene.add(lblP);
+
+  let fieldDirty = true;
+
+  const phys = () => ({
+    q1: +el('sQ1').value * 1e-6,
+    q2: +el('sQ2').value * 1e-6,
+    sep: +el('sSep').value,
+    lvl: +el('sL').value * 1000
+  });
+
+  function pos(P) {
+    return [new T.Vector3(-P.sep / 2, 0, GZ), new T.Vector3(P.sep / 2, 0, GZ)];
+  }
+  function Vat(x, y, P, S) {
+    const r1 = Math.hypot(x - S[0].x, y - S[0].y);
+    const r2 = Math.hypot(x - S[1].x, y - S[1].y);
+    const e1 = Math.max(r1, 0.16), e2 = Math.max(r2, 0.16);
+    return K * (P.q1 / e1 + P.q2 / e2);
+  }
+  function Evec(x, y, P, S) {
+    let ex = 0, ey = 0;
+    const add = (q, cx) => {
+      const dx = x - cx, dy = y;
+      const r = Math.max(Math.hypot(dx, dy), 0.16);
+      const m = K * q / (r * r * r);
+      ex += m * dx; ey += m * dy;
+    };
+    add(P.q1, S[0].x);
+    add(P.q2, S[1].x);
+    return [ex, ey];
+  }
+
+  function field(P, S) {
+    let mx = 0;
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const x = -GW / 2 + (i / (NX - 1)) * GW;
+        const y = -GH / 2 + (j / (NY - 1)) * GH;
+        const v = Vat(x, y, P, S);
+        V[j * NX + i] = v;
+        const a = Math.abs(v);
+        if (a > mx) mx = a;
+      }
+    }
+    const scale = Math.max(1, mx * 0.75);
+    const v0 = Math.max(1, K * (Math.abs(P.q1) + Math.abs(P.q2)) * 0.25);
+    const denom = Math.log1p(mx / v0);
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const raw = V[j * NX + i] / scale;
+        const cl = Math.max(-1, Math.min(1, Math.sign(raw) * Math.log1p(Math.abs(V[j * NX + i]) / v0) / denom));
+        let r, g, b;
+        if (cl >= 0) { r = 0.10 + cl * 0.88; g = 0.22 + cl * 0.42; b = 0.52 - cl * 0.44; }
+        else { const u = -cl; r = 0.10; g = 0.22 - u * 0.16; b = 0.52 + u * 0.46; }
+        const o = (j * NX + i) * 3;
+        pcol[o] = r; pcol[o + 1] = g; pcol[o + 2] = b;
+        samples.geometry.attributes.position.array[o] = -GW / 2 + (i / (NX - 1)) * GW;
+        samples.geometry.attributes.position.array[o + 1] = -GH / 2 + (j / (NY - 1)) * GH;
+        samples.geometry.attributes.position.array[o + 2] = GZ + 0.01;
+      }
+    }
+    planeGeo.attributes.color.needsUpdate = true;
+    samples.geometry.attributes.position.needsUpdate = true;
+
+    const arr = isoGeo.attributes.position.array;
+    let n = 0;
+    const gx = i => -GW / 2 + (i / (NX - 1)) * GW;
+    const gy = j => -GH / 2 + (j / (NY - 1)) * GH;
+    const maxL = Math.min(60, Math.ceil(mx / P.lvl));
+    for (let L = -maxL; L <= maxL; L++) {
+      if (L === 0) continue;
+      const lev = L * P.lvl;
+      for (let j = 0; j < NY - 1 && n < ISO_MAX - 2; j++) {
+        for (let i = 0; i < NX - 1 && n < ISO_MAX - 2; i++) {
+          const a = V[j * NX + i], b = V[j * NX + i + 1];
+          const c = V[(j + 1) * NX + i + 1], d = V[(j + 1) * NX + i];
+          const pts = [];
+          const ip = (v0, v1, x0, y0, x1, y1) => {
+            const f = (lev - v0) / (v1 - v0);
+            pts.push([x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, GZ + 0.02]);
+          };
+          if ((a - lev) * (b - lev) < 0) ip(a, b, gx(i), gy(j), gx(i + 1), gy(j));
+          if ((b - lev) * (c - lev) < 0) ip(b, c, gx(i + 1), gy(j), gx(i + 1), gy(j + 1));
+          if ((c - lev) * (d - lev) < 0) ip(c, d, gx(i + 1), gy(j + 1), gx(i), gy(j + 1));
+          if ((d - lev) * (a - lev) < 0) ip(d, a, gx(i), gy(j + 1), gx(i), gy(j));
+          for (let s = 0; s + 1 < pts.length && n < ISO_MAX - 2; s += 2) {
+            arr[n * 3] = pts[s][0]; arr[n * 3 + 1] = pts[s][1]; arr[n * 3 + 2] = pts[s][2];
+            arr[n * 3 + 3] = pts[s + 1][0]; arr[n * 3 + 4] = pts[s + 1][1]; arr[n * 3 + 5] = pts[s + 1][2];
+            n += 2;
+          }
+        }
+      }
+    }
+    isoGeo.attributes.position.needsUpdate = true;
+    isoGeo.setDrawRange(0, n);
+  }
+
+  function draw() {
+    const P = phys();
+    const S = pos(P);
+    chargeMeshes.forEach((g, i) => {
+      g.position.set(S[i].x, 0, GZ + 0.22);
+      g.visible = Math.abs(i === 0 ? P.q1 : P.q2) > 1e-9;
+    });
+    clbl.forEach((l, i) => l.position.set(S[i].x, 0.62, GZ + 0.22));
+
+    const v = Vat(probeX, probeY, P, S);
+    const [ex, ey] = Evec(probeX, probeY, P, S);
+    const mag = Math.hypot(ex, ey);
+    probe.position.set(probeX, probeY, GZ + 0.22);
+    pGlow.position.set(0, 0, 0);
+    lblP.position.set(probeX, probeY + 0.42, GZ + 0.22);
+
+    const len = Math.min(1.7, 0.35 + Math.log10(1 + mag) * 0.5);
+    eArrow.position.set(probeX, probeY, GZ + 0.12);
+    if (mag > 1e-9) {
+      eArrow.quaternion.setFromUnitVectors(new T.Vector3(1, 0, 0),
+        new T.Vector3(ex / mag, ey / mag, 0));
+    }
+    eArrow.scale.set(len, len, len);
+
+    plane.visible = show.heat;
+    samples.visible = show.grid;
+    iso.visible = show.iso;
+
+    return { P, S, v, ex, ey, mag };
+  }
+
+  function outs(R) {
+    const { P, S, v, ex, ey, mag } = R;
+    const r1 = Math.max(0.16, Math.hypot(probeX - S[0].x, probeY));
+    const r2 = Math.max(0.16, Math.hypot(probeX - S[1].x, probeY));
+    el('dV').textContent = (v / 1000).toFixed(2) + ' kV';
+    el('dE').textContent = (mag / 1000).toFixed(2) + ' kN/C';
+    const ang = Math.atan2(ey, ex) * 180 / Math.PI;
+    el('dA').textContent = (mag < 1e-9) ? '—' : ang.toFixed(0) + '°';
+    el('dU').textContent = (v / 1000).toFixed(2) + ' kJ/C';
+    el('r1').textContent = (K * P.q1 / r1 / 1000).toFixed(2) + ' kV';
+    el('r2').textContent = (K * P.q2 / r2 / 1000).toFixed(2) + ' kV';
+    el('rE1').textContent = (Math.abs(K * P.q1 / (r1 * r1)) / 1000).toFixed(2);
+    el('rE2').textContent = (Math.abs(K * P.q2 / (r2 * r2)) / 1000).toFixed(2);
+    el('rD1').textContent = r1.toFixed(2) + ' m';
+    el('rD2').textContent = r2.toFixed(2) + ' m';
+
+    const h = 0.05;
+    const dVdx = (Vat(probeX + h, probeY, P, S) - Vat(probeX - h, probeY, P, S)) / (2 * h);
+    const dVdy = (Vat(probeX, probeY + h, P, S) - Vat(probeX, probeY - h, P, S)) / (2 * h);
+    const gx = -dVdx, gy = -dVdy;
+    const gmag = Math.hypot(gx, gy);
+    const rel = gmag > 1e-6 ? Math.abs(gmag - mag) / gmag * 100 : 0;
+    const chk = el('chk');
+    chk.className = 'check' + (rel < 2.5 ? '' : ' bad');
+    chk.innerHTML = rel < 2.5
+      ? '&#10003; |E| from Coulomb = ' + (mag / 1000).toFixed(3) + ' kN/C vs |&nabla;V| from the map = ' +
+        (gmag / 1000).toFixed(3) + ' kN/C (' + rel.toFixed(2) + '% apart)'
+      : '&#10007; |E| = ' + (mag / 1000).toFixed(3) + ' but |&nabla;V| = ' + (gmag / 1000).toFixed(3) +
+        ' kN/C (' + rel.toFixed(1) + '% apart)';
+
+    const vEl = el('v');
+    const same = Math.abs(P.q1 + P.q2) < 1e-12;
+    if (same && P.q1 > 0) {
+      vEl.innerHTML = '<b style="color:var(--acc2)">Equal and like.</b> Far from this pair the potential is ' +
+        'still positive but the two fields very nearly cancel, so the map fades without ever changing sign. ' +
+        'Potential is the harder idea: it adds as a plain sum, fields add as vectors.';
+      vEl.style.borderColor = 'rgba(49,215,240,.34)';
+    } else if (mag < Math.abs(K * P.q1 / (r1 * r1)) * 0.02) {
+      vEl.innerHTML = '<b style="color:var(--warn)">Nearly a null point.</b> |E| = ' + (mag / 1000).toFixed(3) +
+        ' kN/C here, but each charge alone would give over ' +
+        (Math.abs(K * P.q1 / (r1 * r1)) / 1000).toFixed(1) + ' kN/C. The two cancel almost exactly &mdash; ' +
+        'yet V = ' + (v / 1000).toFixed(2) + ' kV is not zero, because potentials add without regard to direction.';
+      vEl.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      vEl.innerHTML = '<b style="color:var(--ok)">V = ' + (v / 1000).toFixed(2) + ' kV, |E| = ' +
+        (mag / 1000).toFixed(2) + ' kN/C.</b> Near a charge |E| climbs as 1/r&sup2; &mdash; halve the distance ' +
+        'and the field quadruples. Along a contour of constant V the field is always perpendicular, which is ' +
+        'why the iso-lines here are everywhere at right angles to the arrows.';
+      vEl.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sQ1', 'vQ1', 1], ['sQ2', 'vQ2', 1], ['sSep', 'vSep', 1], ['sL', 'vL', 1]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sQ1', 'sQ2', 'sSep', 'sL'].forEach(i => el(i).addEventListener('input', () => { syncUI(); fieldDirty = true; }));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bRst').addEventListener('click', () => { probeX = 0; probeY = 0; });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  function pick(e) {
+    ndc.x = (e.clientX / cv.clientWidth) * 2 - 1;
+    ndc.y = -(e.clientY / cv.clientHeight) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    const hit = ray.intersectObject(plane, false);
+    if (hit.length) {
+      probeX = Math.max(-GW / 2 + 0.1, Math.min(GW / 2 - 0.1, hit[0].point.x));
+      probeY = Math.max(-GH / 2 + 0.1, Math.min(GH / 2 - 0.1, hit[0].point.y));
+    }
+  }
+  cv.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.no-orbit')) pick(e); });
+  cv.addEventListener('pointermove', e => { if (e.buttons && !e.target.closest?.('.no-orbit')) pick(e); });
+
+  syncUI();
+  field(phys(), pos(phys()));
+  st.onFrame(() => {
+    if (fieldDirty) { field(phys(), pos(phys())); fieldDirty = false; }
+    outs(draw());
+  });
+  st.start();
+})();
+</script>
+</body>
+</html>

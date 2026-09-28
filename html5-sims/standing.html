@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Standing Waves 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#10b981; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  .keys{display:flex;flex-wrap:wrap;gap:11px;margin-top:9px;font-size:11px;color:var(--txt2)}
+  .keys i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+  .dotc{width:9px;height:9px;border-radius:50%;display:inline-block}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Standing Waves 3D</h1>
+  <p>A string pinned at both ends can only oscillate at whole numbers of half-wavelengths.
+     Watch the two travelling waves that produce it, running through each other.</p>
+</div>
+<div class="hud eq">y = A sin(n&pi;x/L) cos(2&pi;ft)</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Wavelength</span><b id="dL">—</b></div>
+  <div class="chip"><span>Nodes</span><b id="dN">—</b></div>
+  <div class="chip"><span>Antinodes</span><b id="dA">—</b></div>
+  <div class="chip"><span>Frequency</span><b id="dF">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>String</h2>
+  <div class="ctl">
+    <label>Harmonic n <b><span id="vN">3</span></b></label>
+    <input type="range" id="sN" min="1" max="6" step="1" value="3">
+  </div>
+  <div class="ctl">
+    <label>Amplitude A <b><span id="vA">0.45</span> m</b></label>
+    <input type="range" id="sA" min="0.05" max="1.1" step="0.01" value="0.45">
+  </div>
+  <div class="ctl">
+    <label>String length L <b><span id="vL">2.0</span> m</b></label>
+    <input type="range" id="sL" min="1" max="4" step="0.1" value="2">
+  </div>
+  <div class="ctl">
+    <label>Wave speed v <b><span id="vV">40</span> m/s</b></label>
+    <input type="range" id="sV" min="10" max="120" step="1" value="40">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="nodes">nodes</span>
+    <span class="tg on" data-t="parts">component waves</span>
+    <span class="tg" data-t="slowmo">slow motion</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>f = v/&lambda;</span><b id="rF">0</b></div>
+    <div class="ro"><span>&lambda; / L</span><b id="rR">0</b></div>
+    <div class="ro"><span>Ends fixed</span><b id="rE">0</b></div>
+    <div class="ro"><span>Peak speed</span><b id="rV">0</b></div>
+    <div class="ro"><span>Segments</span><b id="rS">0</b></div>
+    <div class="ro"><span>Fundamental</span><b id="rU">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Fundamental</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <div class="keys">
+    <i><span class="dotc" style="background:#ff6b6b"></span>node (never moves)</i>
+    <i><span class="dotc" style="background:#3ee0a4"></span>antinode (max swing)</i>
+    <i><span class="dotc" style="background:#7fb2ff"></span>component wave &rarr;</i>
+    <i><span class="dotc" style="background:#ffb057"></span>component wave &larr;</i>
+  </div>
+  <p class="hint">
+    Every half-wave is a pendulum of its own, swinging in step with its neighbours but in
+    opposite sense. That is why the nodes never move and the string never carries energy away.
+    The oscillation is drawn about 50&times; slower than real time, otherwise a 30&nbsp;Hz string would
+    just look like a blur. Readouts are true values. Drag empty space to orbit, scroll to zoom.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const NS = 220, SW = 0.055, SX = 9;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x10b981,
+    dist: 13, minD: 7, maxD: 60, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.28, rim: 0.36,
+    theta: 0.40, phi: 1.40, target: new T.Vector3(1.8, 2.4, 0)
+  });
+  const scene = st.scene;
+  const show = { nodes: true, parts: false, slowmo: false };
+
+  const grid = st.grid(24, 24, 0x1a2338, 0x111726);
+  grid.position.y = -3.2;
+  scene.add(grid);
+
+  const STR = new T.Group();
+  STR.position.set(0, 2.4, 0);
+  scene.add(STR);
+
+  const postMat = new T.MeshStandardMaterial({ color: 0x39445e, roughness: 0.4, metalness: 0.7 });
+  const clampMat = new T.MeshStandardMaterial({ color: 0xffb057, roughness: 0.3, metalness: 0.6 });
+  for (const sgn of [-1, 1]) {
+    const post = new T.Mesh(new T.CylinderGeometry(0.12, 0.16, 3.4, 14), postMat);
+    post.position.set(sgn * SX / 2, -1.7, 0);
+    post.castShadow = true;
+    STR.add(post);
+    const clamp = new T.Mesh(new T.BoxGeometry(0.42, 0.5, 0.42), clampMat);
+    clamp.position.set(sgn * SX / 2, 0.02, 0);
+    STR.add(clamp);
+    const glow = st.glow(0xffb057, 1.5, 0.4);
+    glow.position.set(sgn * SX / 2, 0.02, 0);
+    STR.add(glow);
+  }
+  const lblEnd = st.label('fixed end', '#ffb057', 0.0022);
+  lblEnd.position.set(SX / 2 + 0.9, -0.5, 0);
+  STR.add(lblEnd);
+
+  function ribbon(color, opacity, width) {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array(NS * 2 * 3), 3));
+    const idx = [];
+    for (let i = 0; i < NS - 1; i++) {
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const m = new T.Mesh(g, new T.MeshStandardMaterial({
+      color, roughness: 0.42, metalness: 0.15, side: T.DoubleSide,
+      transparent: opacity < 1, opacity, emissive: color, emissiveIntensity: 0.12 }));
+    m.frustumCulled = false;
+    STR.add(m);
+    return { mesh: m, geo: g, arr: g.attributes.position.array, width };
+  }
+  const main = ribbon(0x8fe3ff, 1, SW);
+  const waveR = ribbon(0x7fb2ff, 0.55, SW * 0.5);
+  const waveL = ribbon(0xffb057, 0.55, SW * 0.5);
+
+  const tangent = new T.Vector3(), toCam = new T.Vector3(), side = new T.Vector3();
+  function shape(rib, yFn, x0, x1) {
+    const arr = rib.arr;
+    const cam = st.camera.position;
+    for (let i = 0; i < NS; i++) {
+      const u = i / (NS - 1);
+      const x = x0 + (x1 - x0) * u;
+      const y = yFn(x, u);
+      const dy = 0.001;
+      tangent.set(1, (yFn(x + dy, u) - y) / dy, 0).normalize();
+      toCam.set(cam.x - x, cam.y - y - STR.position.y, cam.z).normalize();
+      side.crossVectors(tangent, toCam);
+      if (side.lengthSq() < 1e-8) side.set(0, 1, 0); else side.normalize();
+      const b = i * 6;
+      arr[b] = x + side.x * rib.width;
+      arr[b + 1] = y + side.y * rib.width;
+      arr[b + 2] = side.z * rib.width;
+      arr[b + 3] = x - side.x * rib.width;
+      arr[b + 4] = y - side.y * rib.width;
+      arr[b + 5] = -side.z * rib.width;
+    }
+    rib.geo.attributes.position.needsUpdate = true;
+    rib.geo.computeVertexNormals();
+    rib.geo.computeBoundingSphere();
+  }
+
+  const nodeDots = [], antiDots = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new T.Mesh(new T.SphereGeometry(0.11, 14, 10),
+      new T.MeshBasicMaterial({ color: 0xff6b6b }));
+    const g = st.glow(0xff6b6b, 0.9, 0.5);
+    d.add(g); d.userData.g = g;
+    STR.add(d); nodeDots.push(d);
+    const a = new T.Mesh(new T.SphereGeometry(0.085, 14, 10),
+      new T.MeshBasicMaterial({ color: 0x3ee0a4 }));
+    const ag = st.glow(0x3ee0a4, 0.8, 0.45);
+    a.add(ag); a.userData.g = ag;
+    STR.add(a); antiDots.push(a);
+  }
+
+  const probe = new T.Mesh(new T.SphereGeometry(0.1, 14, 10),
+    new T.MeshBasicMaterial({ color: 0xffffff }));
+  const probeGlow = st.glow(0xffffff, 1.1, 0.8);
+  STR.add(probe, probeGlow);
+  let probeU = 0.5;
+  const lblProbe = st.label('probe', '#ffffff', 0.0022);
+  STR.add(lblProbe);
+
+  const axis = new T.Line(
+    new T.BufferGeometry().setFromPoints([new T.Vector3(-SX / 2, 0, 0), new T.Vector3(SX / 2, 0, 0)]),
+    new T.LineDashedMaterial({ color: 0x6f8ec4, dashSize: 0.16, gapSize: 0.12, transparent: true, opacity: 0.7 }));
+  axis.computeLineDistances();
+  STR.add(axis);
+
+  let n = 3, run = true, t = 0;
+
+  const phys = () => ({
+    n: Math.round(+el('sN').value),
+    A: +el('sA').value,
+    L: +el('sL').value,
+    v: +el('sV').value
+  });
+
+  function draw() {
+    const P = phys();
+    const A = P.A * 1.6, L = P.L, lam = 2 * L / P.n;
+    const f = P.v / lam, w = 2 * Math.PI * f;
+    const ph = w * t;
+    const yMain = x => A * Math.sin(P.n * Math.PI * (x + SX / 2) / SX) * Math.cos(ph);
+    const kx = x => P.n * Math.PI * (x + SX / 2) / SX;
+    const yR = x => A * 0.5 * Math.sin(kx(x) - ph);
+    const yL = x => A * 0.5 * Math.sin(kx(x) + ph);
+
+    shape(main, yMain, -SX / 2, SX / 2);
+    waveR.mesh.visible = show.parts;
+    waveL.mesh.visible = show.parts;
+    if (show.parts) {
+      shape(waveR, yR, -SX / 2, SX / 2);
+      shape(waveL, yL, -SX / 2, SX / 2);
+      waveR.mesh.position.y = -1.5;
+      waveL.mesh.position.y = -1.5;
+    } else { waveR.mesh.position.y = 0; waveL.mesh.position.y = 0; }
+
+    for (let p = 0; p <= P.n; p++) {
+      const d = nodeDots[p];
+      if (!d) continue;
+      d.visible = show.nodes;
+      d.position.set(-SX / 2 + p * SX / P.n, 0, 0);
+      d.userData.g.visible = show.nodes;
+    }
+    for (let i = nodeDots.length - 1; i > P.n; i--) nodeDots[i].visible = false;
+
+    for (let q = 0; q < P.n; q++) {
+      const a = antiDots[q];
+      if (!a) continue;
+      const ax = -SX / 2 + (q + 0.5) * SX / P.n;
+      a.visible = show.nodes;
+      a.position.set(ax, yMain(ax), 0);
+      a.userData.g.visible = show.nodes;
+    }
+    for (let i = antiDots.length - 1; i > P.n; i--) antiDots[i].visible = false;
+
+    const py = yMain(-SX / 2 + probeU * SX);
+    probe.position.set(-SX / 2 + probeU * SX, py, 0);
+    probeGlow.position.copy(probe.position);
+    lblProbe.position.set(probe.position.x, py + 0.34, 0);
+
+    return { P, A, L, lam, f, w, ph };
+  }
+
+  function outs(R) {
+    const { P, L, lam, f, w } = R;
+    el('dL').textContent = lam.toFixed(2) + ' m';
+    el('dN').textContent = P.n + 1;
+    el('dA').textContent = P.n;
+    el('dF').textContent = f.toFixed(1) + ' Hz';
+    el('rF').textContent = f.toFixed(1) + ' Hz';
+    el('rR').textContent = '1 : ' + P.n;
+    el('rE').textContent = 'both';
+    el('rV').textContent = (P.A * w).toFixed(1) + ' m/s';
+    el('rS').textContent = P.n;
+    el('rU').textContent = (P.v / (2 * L)).toFixed(1) + ' Hz';
+
+    const v = el('v');
+    if (P.n === 1) {
+      v.innerHTML = '<b style="color:var(--acc2)">Fundamental.</b> The whole string swings as one loop, wavelength ' +
+        (2 * L).toFixed(2) + ' m &mdash; the longest pattern the string can hold. Every other harmonic is a whole ' +
+        'number of these stacked on top.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else if (P.n >= 5) {
+      v.innerHTML = '<b style="color:var(--warn)">High harmonic, ' + (P.n + 1) +
+        ' nodes.</b> Wavelength is down to ' + lam.toFixed(2) + ' m, so the frequency is ' +
+        f.toFixed(1) + ' Hz &mdash; ' + P.n + '&times; the fundamental. The nodes are permanent; only the ' +
+        'loops between them move.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + P.n + ' half-wavelengths fit exactly.</b> ' +
+        (P.n + 1) + ' nodes are pinned for ever, ' + P.n + ' antinodes swing to &plusmn;' +
+        (P.A).toFixed(2) + ' m. The two component waves you can switch on run through each other in ' +
+        'opposite directions and add up to this.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sN', 'vN', 0], ['sA', 'vA', 2], ['sL', 'vL', 1], ['sV', 'vV', 0]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sN', 'sA', 'sL', 'sV'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { el('sN').value = 1; n = 1; t = 0; syncUI(); });
+
+  cv.addEventListener('pointerdown', e => {
+    if (e.target.closest && e.target.closest('.no-orbit')) return;
+    probeU = Math.max(0, Math.min(1, (e.clientX / cv.clientWidth)));
+  });
+  cv.addEventListener('pointermove', e => {
+    if (e.buttons) probeU = Math.max(0, Math.min(1, (e.clientX / cv.clientWidth)));
+  });
+
+  syncUI();
+  n = 3;
+  st.onFrame(dt => {
+    if (run) t += dt * (show.slowmo ? 0.006 : 0.02);
+    outs(draw());
+  });
+  st.start();
+})();
+</script>
+</body>
+</html>

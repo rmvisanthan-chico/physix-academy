@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Energy Conservation 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#84cc16; --acc2:#fbbf24; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(680px,49vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:304px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .bars{margin-top:12px;display:grid;gap:9px}
+  .brow{display:grid;grid-template-columns:74px 1fr auto;gap:9px;align-items:center;font-size:11.5px;color:var(--txt2)}
+  .brow i{font-style:normal;font-family:var(--mono);font-size:10.5px}
+  .btrack{height:11px;background:rgba(255,255,255,.07);border-radius:6px;overflow:hidden}
+  .bfill{height:100%;border-radius:6px;transition:width .08s linear}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Energy Conservation 3D</h1>
+  <p>Same total energy the whole way down. Watch it swap between potential and kinetic.</p>
+</div>
+<div class="hud eq">PE + KE = constant</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Height</span><b id="dH">—</b></div>
+  <div class="chip"><span>Speed</span><b id="dV">—</b></div>
+  <div class="chip"><span>Total</span><b id="dT">—</b></div>
+  <div class="chip"><span>State</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Controls</h2>
+  <div class="ctl">
+    <label>Start height <b><span id="vH">7.0</span> m</b></label>
+    <input type="range" id="sH" min="1" max="14" step="0.1" value="7">
+  </div>
+  <div class="ctl">
+    <label>Mass <b><span id="vm">2</span> kg</b></label>
+    <input type="range" id="sm" min="0.5" max="20" step="0.5" value="2">
+  </div>
+  <div class="ctl">
+    <label>Gravity g <b><span id="vg">9.81</span> m/s&sup2;</b></label>
+    <input type="range" id="sg" min="1.6" max="24.8" step="0.01" value="9.81">
+  </div>
+  <div class="ctl">
+    <label>Friction <b><span id="vu">0.00</span></b></label>
+    <input type="range" id="su" min="0" max="0.4" step="0.005" value="0">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="track">track</span>
+    <span class="tg on" data-t="trail">trail</span>
+    <span class="tg" data-t="ghost">ghost trail</span>
+  </div>
+
+  <h2 class="mt">Energy bars</h2>
+  <div class="bars">
+    <div class="brow"><i>PE</i><div class="btrack"><div class="bfill" id="fPE" style="background:linear-gradient(90deg,#6d5df6,#a78bfa);width:0%"></div></div><i id="nPE">0 J</i></div>
+    <div class="brow"><i>KE</i><div class="btrack"><div class="bfill" id="fKE" style="background:linear-gradient(90deg,#31d7f0,#67e8f9);width:0%"></div></div><i id="nKE">0 J</i></div>
+    <div class="brow"><i>Lost</i><div class="btrack"><div class="bfill" id="fL" style="background:linear-gradient(90deg,#ff7a7a,#ffc043);width:0%"></div></div><i id="nL">0 J</i></div>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button id="bGo">Release</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    <b>Drag the ball along the track</b> to reposition it. Scroll to zoom, right-drag to pan,
+    drag empty space to orbit.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const TRACK = 30, WIDTH = 3.4;
+  const show = { track: true, trail: true, ghost: false };
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x84cc16,
+    dist: 26, minD: 10, maxD: 90, exposure: 0.95, bg: 0x060a12,
+    preserve: true, hemi: 0.24, key: 2.6, fill: 0.24, rim: 0.4,
+    theta: 0.45, phi: 1.12
+  });
+  const scene = st.scene;
+
+  const floor = st.floor(56, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(50, 50, 0x2c3852, 0x171e2d);
+  scene.add(grid);
+
+  function curve() {
+    const h0 = 7.4, span = 26, a = span * 0.62;
+    const pts = [];
+    for (let i = 0; i <= 60; i++) {
+      const u = i / 60;
+      const x = -a / 2 + u * a;
+      const y = h0 * Math.pow(1 - u, 1.85) + 0.55;
+      pts.push(new T.Vector3(x, y, 0));
+    }
+    for (let i = 1; i <= 40; i++) {
+      const u = i / 40;
+      const x = a / 2 + u * (TRACK - a - span * 0.05);
+      const y = 0.55;
+      pts.push(new T.Vector3(x, y, 0));
+    }
+    return pts;
+  }
+
+  const pts = curve();
+  const curveObj = new T.CatmullRomCurve3(pts, false, 'catmullrom', 0.2);
+  const totalLen = curveObj.getLength();
+
+  const railMat = new T.MeshStandardMaterial({ color: 0x4a5a7d, roughness: 0.42, metalness: 0.5 });
+  const trackGrp = new T.Group(); scene.add(trackGrp);
+  for (const off of [-WIDTH / 2, WIDTH / 2]) {
+    const g = new T.TubeGeometry(curveObj, 220, 0.16, 8, false);
+    const m = new T.Mesh(g, railMat);
+    m.castShadow = true;
+    trackGrp.add(m);
+  }
+  const bed = new T.Mesh(new T.TubeGeometry(curveObj, 220, 0.1, 6, false),
+    new T.MeshStandardMaterial({ color: 0x2b3550, roughness: 0.7, metalness: 0.2 }));
+  trackGrp.add(bed);
+
+  for (let i = 0; i <= 7; i++) {
+    const u = i / 7;
+    const pt = curveObj.getPointAt(Math.min(0.999, u));
+    const tan = curveObj.getTangentAt(Math.min(0.999, u));
+    const h = pt.y;
+    const leg = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, h, 8), railMat);
+    leg.position.set(pt.x, h / 2, 0);
+    leg.castShadow = true;
+    trackGrp.add(leg);
+  }
+
+  const ball = new T.Mesh(new T.SphereGeometry(0.62, 40, 28),
+    new T.MeshStandardMaterial({ color: 0xff8a3c, emissive: 0x8a3a08, emissiveIntensity: 0.5, roughness: 0.28, metalness: 0.35 }));
+  ball.castShadow = true;
+  scene.add(ball);
+  const ballGlow = st.glow(0xffa23c, 3.6, 0.7);
+  scene.add(ballGlow);
+
+  const MAXP = 1500;
+  const tp = new Float32Array(MAXP * 3), tc = new Float32Array(MAXP * 3);
+  const tg = new T.BufferGeometry();
+  tg.setAttribute('position', new T.BufferAttribute(tp, 3));
+  tg.setAttribute('color', new T.BufferAttribute(tc, 3));
+  tg.setDrawRange(0, 0);
+  const trail = new T.Points(tg, new T.PointsMaterial({
+    size: 2.6, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending
+  }));
+  trail.frustumCulled = false;
+  scene.add(trail);
+  let tn = 0;
+
+  const p = { s: 0, v: 0, y0: 0, lost: 0, moving: false };
+  const tan = new T.Vector3();
+  const nrm = new T.Vector3();
+
+  function par() {
+    return { m: +el('sm').value, g: +el('sg').value, u: +el('su').value, h0: +el('sH').value };
+  }
+
+  const BALL_R = 0.62, DATUM = 0.55;
+
+  /* Returns the height of the ball's CENTRE, not the rail. The energy
+     reference (p.y0) and the live PE must share this datum, otherwise PE
+     starts a whole m*g*BALL_R above the quoted total. */
+  function heightAt(s) {
+    const u = curveObj.getPointAt(Math.min(0.9999, s / totalLen));
+    return u.y + BALL_R;
+  }
+
+  function launch() {
+    const P = par();
+    p.s = 0;
+    p.moving = true;
+    p.v = 0;
+    p.y0 = heightAt(0);
+    p.lost = 0;
+    tn = 0; tg.setDrawRange(0, 0);
+  }
+
+  /* One small physics step along the track. */
+  function tick(dt) {
+    const P = par();
+    const u = Math.min(0.9999, p.s / totalLen);
+    const tan = curveObj.getTangentAt(u);
+    /* Gravity resolved along the direction of travel. tan.y is negative on
+       the way down, so -g*tan.y is the acceleration that turns PE into KE.
+       Driving from the real tangent (rather than a fixed guess) is what makes
+       PE + KE come out constant when friction is zero. */
+    const drive = -P.g * tan.y;
+    /* Normal force is mg*cos(theta), and for a unit tangent in the xy-plane
+       cos(theta) = sqrt(1 - tan.y^2). */
+    const fr = P.u * P.g * Math.sqrt(Math.max(0, 1 - tan.y * tan.y));
+    let a;
+    if (Math.abs(p.v) < 0.02) {
+      if (drive <= fr) { p.v = 0; p.moving = false; return; }   // static friction holds it
+      a = drive - fr;
+    } else {
+      a = drive - fr * Math.sign(p.v);
+    }
+    p.v += a * dt;
+    const sPrev = p.s;
+    p.s += p.v * dt;
+    /* Heat is the friction work actually done, f*ds. Accumulating it means
+       "Lost" is exactly zero for a frictionless run instead of leaking the
+       integrator's drift, and PE + KE + Lost stays equal to the start total. */
+    p.lost += P.m * fr * Math.abs(p.s - sPrev);
+    if (p.s < 0) { p.s = 0; p.v = 0; p.moving = false; }
+    if (p.s > totalLen - 0.4) { p.s = totalLen - 0.4; p.v = 0; p.moving = false; }
+  }
+
+  function step(dt) {
+    const P = par();
+    if (!p.moving) return;
+    /* Fixed sub-steps. One explicit Euler step of a whole frame makes the
+       energy visibly breathe on a slow machine, which would contradict the
+       whole point of the sim, so the frame is split into small pieces. */
+    let rem = Math.min(dt, 0.1);
+    while (rem > 1e-6 && p.moving) { tick(Math.min(1 / 240, rem)); rem -= 1 / 240; }
+    if (show.trail) {
+      const pt = curveObj.getPointAt(Math.min(0.9999, p.s / totalLen));
+      if (tn < MAXP) {
+        const i = tn++;
+        tp[i * 3] = pt.x; tp[i * 3 + 1] = pt.y + BALL_R; tp[i * 3 + 2] = 0;
+      } else {
+        tp.copyWithin(0, 3);
+        const k = (MAXP - 1) * 3;
+        tp[k] = pt.x; tp[k + 1] = pt.y + BALL_R; tp[k + 2] = 0;
+      }
+      for (let i = 0; i < tn; i++) {
+        const al = 0.1 + 0.7 * Math.pow(i / Math.max(1, tn - 1), 2.2);
+        tc[i * 3] = 1.0 * al; tc[i * 3 + 1] = 0.55 * al; tc[i * 3 + 2] = 0.2 * al;
+      }
+      tg.attributes.position.needsUpdate = true;
+      tg.attributes.color.needsUpdate = true;
+      tg.setDrawRange(0, tn);
+    }
+  }
+
+  function draw() {
+    const u = Math.min(0.9999, p.s / totalLen);
+    const pt = curveObj.getPointAt(u);
+    const tg2 = curveObj.getTangentAt(u);
+    ball.position.set(pt.x, pt.y + BALL_R, 0);
+    ballGlow.position.copy(ball.position);
+    ballGlow.scale.setScalar(3.4 + Math.sin(performance.now() * 0.005) * 0.2);
+    trackGrp.visible = show.track;
+    trail.visible = show.trail;
+    return pt.y + BALL_R;
+  }
+
+  function outs(y) {
+    const P = par();
+    const yMax = p.y0 || heightAt(0);
+    const pe = P.m * P.g * Math.max(0, y - DATUM);
+    const ke = 0.5 * P.m * p.v * p.v;
+    const total0 = P.m * P.g * Math.max(0, yMax - DATUM);
+    const lost = Math.min(Math.max(0, p.lost), total0);
+    const denom = Math.max(0.001, total0);
+
+    el('dH').textContent = y.toFixed(2) + ' m';
+    el('dV').textContent = p.v.toFixed(2) + ' m/s';
+    el('dT').textContent = (pe + ke).toFixed(1) + ' J';
+    const stt = p.moving ? 'Sliding' : (p.s >= totalLen - 0.5 ? 'At rest' : 'Held');
+    el('dS').textContent = stt;
+
+    el('fPE').style.width = Math.min(100, pe / denom * 100) + '%';
+    el('fKE').style.width = Math.min(100, ke / denom * 100) + '%';
+    el('fL').style.width = Math.min(100, lost / denom * 100) + '%';
+    el('nPE').textContent = pe.toFixed(1) + ' J';
+    el('nKE').textContent = ke.toFixed(1) + ' J';
+    el('nL').textContent = lost.toFixed(1) + ' J';
+
+    const v = el('v');
+    if (P.u < 0.005) {
+      v.innerHTML = '<b style="color:var(--ok)">Total is conserved.</b> PE + KE holds at ' +
+        total0.toFixed(1) + ' J the whole way down — the bars trade, the sum never moves.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (lost > total0 * 0.02) {
+      v.innerHTML = '<b style="color:var(--warn)">' + lost.toFixed(1) + ' J has gone.</b> ' +
+        'Friction turns mechanical energy into heat and sound. Only PE + KE + heat still adds up.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--acc2)">Still nearly all of it.</b> At ' + y.toFixed(1) +
+        ' m the ball holds ' + pe.toFixed(1) + ' J as PE and ' + ke.toFixed(1) + ' J as KE.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sH', 'vH', 1], ['sm', 'vm', 1], ['sg', 'vg', 2], ['su', 'vu', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sH', 'sm', 'sg', 'su'].forEach(i => el(i).addEventListener('input', () => {
+    syncUI(); p.y0 = heightAt(p.s);
+  }));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', launch);
+    el('bRst').addEventListener('click', () => { p.s = 0; p.v = 0; p.moving = false; p.y0 = heightAt(0); p.lost = 0; tn = 0; tg.setDrawRange(0, 0); });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  let drag = false;
+
+  cv.addEventListener('pointerdown', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (ray.ray.distanceToPoint(ball.position) < 1.5) {
+      drag = true; st.controls.enabled = false; cv.setPointerCapture(ev.pointerId);
+    }
+  }, true);
+
+  cv.addEventListener('pointermove', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (!drag) { cv.style.cursor = ray.ray.distanceToPoint(ball.position) < 1.5 ? 'grab' : 'default'; return; }
+    const dp = new T.Plane(new T.Vector3(0, 0, 1), 0);
+    const hit = new T.Vector3();
+    if (!ray.ray.intersectPlane(dp, hit)) return;
+    let best = 0, bd = 1e9;
+    for (let i = 0; i <= 120; i++) {
+      const u = i / 120;
+      const pt = curveObj.getPointAt(u);
+      const d = pt.distanceToSquared(new T.Vector3(hit.x, pt.y, 0));
+      if (d < bd) { bd = d; best = u; }
+    }
+    p.s = best * totalLen;
+    p.v = 0; p.moving = false;
+    p.y0 = heightAt(p.s);
+    p.lost = 0;
+    tn = 0; tg.setDrawRange(0, 0);
+  }, true);
+
+  const end = () => { drag = false; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', end, true);
+  cv.addEventListener('pointercancel', end, true);
+
+  syncUI(); p.y0 = heightAt(0);
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

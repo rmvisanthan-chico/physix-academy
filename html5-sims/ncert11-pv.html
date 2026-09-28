@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thermodynamics PV Cycle 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#ef4444; --acc2:#fb923c; --onAcc:#ffffff; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Thermodynamics PV Cycle 3D</h1>
+  <p>Brayton cycle: compress, add heat at constant pressure, expand, reject heat. The work is the area the loop encloses.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">W = &oint; P dV = enclosed area</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Work / cycle</span><b id="dW">—</b></div>
+  <div class="chip"><span>Heat in</span><b id="dQin">—</b></div>
+  <div class="chip"><span>Efficiency</span><b id="dE">—</b></div>
+  <div class="chip"><span>Leg</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Cycle shape</h2>
+  <div class="ctl">
+    <label>Pressure ratio P<sub>max</sub>/P<sub>min</sub> <b><span id="vPr">6.0</span></b></label>
+    <input type="range" id="sPr" min="1.4" max="14" step="0.1" value="6">
+  </div>
+  <div class="ctl">
+    <label>Volume span V<sub>3</sub>/V<sub>2</sub> <b><span id="vK">4.0</span></b></label>
+    <input type="range" id="sK" min="1.2" max="8" step="0.1" value="4">
+  </div>
+  <div class="ctl">
+    <label>Adiabatic exponent &gamma; <b><span id="vG">1.40</span></b></label>
+    <input type="range" id="sG" min="1.05" max="1.8" step="0.01" value="1.4">
+  </div>
+  <div class="ctl">
+    <label>Cycle rate <b><span id="vRt">0.22</span> cycles/s</b></label>
+    <input type="range" id="sRt" min="0.05" max="1" step="0.01" value="0.22">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="fill">area fill</span>
+    <span class="tg on" data-t="marks">state marks</span>
+    <span class="tg" data-t="flow">flow arrows</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Leg</span><b id="rL">—</b></div>
+    <div class="ro"><span>State</span><b id="rS">—</b></div>
+    <div class="ro"><span>P now</span><b id="rP">0</b></div>
+    <div class="ro"><span>V now</span><b id="rV">0</b></div>
+    <div class="ro"><span>T now</span><b id="rT">0</b></div>
+    <div class="ro"><span>&Delta;U now</span><b id="rU">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Every number here is computed, not scripted: the loop is integrated for
+    &oint;P dV and compared against Q<sub>in</sub> &minus; Q<sub>out</sub>. If the two ever disagree
+    the physics is wrong, and the box below turns red. Scroll to zoom, right-drag to pan,
+    drag empty space to orbit.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const PL = 1e5;          // low pressure, Pa
+  const V2 = 5e-3;         // smallest volume, m^3 (5 L)
+  const nR = 8.314;        // one mole, J/K
+  const XW = 15, YH = 8.4, OX = -8.6, OY = 0.06;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xef4444,
+    dist: 21, minD: 12, maxD: 110, exposure: 0.95, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.2, fill: 0.3, rim: 0.34,
+    theta: 0.0, phi: 1.44, target: new T.Vector3(5.2, 4.6, 0)
+  });
+  const scene = st.scene;
+  const show = { fill: true, marks: true, flow: false };
+
+  const floor = st.floor(56, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(40, 40, 0x2c3852, 0x171e2d);
+  scene.add(grid);
+
+  const axV = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, XW + 4, 8),
+    new T.MeshBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.7 }));
+  axV.rotation.z = Math.PI / 2; axV.position.set(OX + (XW + 4) / 2, OY, 0);
+  const axP = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, YH + 2.6, 8),
+    new T.MeshBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.7 }));
+  axP.position.set(OX, OY + (YH + 2.6) / 2, 0);
+  scene.add(axV, axP);
+  const lblV = st.label('V', '#9fb0d8', 0.007);
+  const lblP = st.label('P', '#9fb0d8', 0.007);
+  scene.add(lblV, lblP);
+
+  const LEGS = [
+    { col: 0x31d7f0, name: 'adiabatic compression', tag: '1→2' },
+    { col: 0xff7a7a, name: 'isobaric heat in', tag: '2→3' },
+    { col: 0x3ee0a4, name: 'adiabatic expansion', tag: '3→4' },
+    { col: 0xffc043, name: 'isobaric heat out', tag: '4→1' }
+  ];
+
+  const PER = 160;
+  const legLines = LEGS.map(L => {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array(PER * 3), 3));
+    const l = new T.Line(g, new T.LineBasicMaterial({ color: L.col }));
+    l.frustumCulled = false;
+    scene.add(l);
+    return l;
+  });
+
+  const LOOP = PER * 4;
+  const fillGeo = new T.BufferGeometry();
+  fillGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(LOOP * 3), 3));
+  const idx = [];
+  for (let i = 1; i < LOOP - 1; i++) idx.push(0, i, i + 1);
+  fillGeo.setIndex(idx);
+  const fill = new T.Mesh(fillGeo, new T.MeshBasicMaterial({
+    color: 0x7b6cff, transparent: true, opacity: 0.20, side: T.DoubleSide, depthWrite: false }));
+  fill.frustumCulled = false;
+  scene.add(fill);
+
+  const marks = [1, 2, 3, 4].map(n => {
+    const g = new T.Group();
+    const m = new T.Mesh(new T.SphereGeometry(0.22, 18, 14),
+      new T.MeshBasicMaterial({ color: 0xffffff }));
+    const gl = st.glow(0xffffff, 1.1, 0.4);
+    const lbl = st.label(String(n), '#e8edf7', 0.006);
+    lbl.position.y = 0.75;
+    g.add(m, gl, lbl);
+    scene.add(g);
+    return g;
+  });
+
+  const dot = new T.Mesh(new T.SphereGeometry(0.19, 18, 14),
+    new T.MeshBasicMaterial({ color: 0xffffff }));
+  const dotGlow = st.glow(0xffffff, 2, 0.9);
+  scene.add(dot, dotGlow);
+
+  const flowArrows = LEGS.map((L, i) => {
+    const a = st.arrow(L.col, new T.Vector3(), new T.Vector3(1, 0, 0), 3);
+    scene.add(a);
+    return a;
+  });
+
+  function par() {
+    return { r: +el('sPr').value, k: +el('sK').value, g: +el('sG').value, rate: +el('sRt').value };
+  }
+
+  function cycle() {
+    const { r, k, g } = par();
+    const Ph = PL * r;
+    const V3 = V2 * k;
+    const f = Math.pow(r, 1 / g);
+    const V1 = V2 * f;
+    const V4 = V3 * f;
+    const T = (p, v) => p * v / nR;
+    return {
+      r, k, g, Ph, V1, V2, V3, V4,
+      st: [
+        { n: 1, V: V1, p: PL, T: T(PL, V1) },
+        { n: 2, V: V2, p: Ph, T: T(Ph, V2) },
+        { n: 3, V: V3, p: Ph, T: T(Ph, V3) },
+        { n: 4, V: V4, p: PL, T: T(PL, V4) }
+      ],
+      vmax: V4, pmax: Ph
+    };
+  }
+
+  const sx = (V, C) => OX + (V / C.vmax) * XW;
+  const sy = (p, C) => OY + (p / C.pmax) * YH;
+
+  function legPoints(C, leg) {
+    const pts = [];
+    const S = C.st;
+    for (let i = 0; i < PER; i++) {
+      const u = i / (PER - 1);
+      let V, p;
+      if (leg === 0) { const a = S[0], b = S[1]; V = a.V + (b.V - a.V) * u; p = a.p * Math.pow(a.V / V, C.g); }
+      else if (leg === 1) { V = S[1].V + (S[2].V - S[1].V) * u; p = S[1].p; }
+      else if (leg === 2) { const a = S[2], b = S[3]; V = a.V + (b.V - a.V) * u; p = a.p * Math.pow(a.V / V, C.g); }
+      else { V = S[3].V + (S[0].V - S[3].V) * u; p = S[3].p; }
+      pts.push({ V, p, T: p * V / nR });
+    }
+    return pts;
+  }
+
+  function energy(C) {
+    const S = C.st;
+    const nCp = C.g * nR / (C.g - 1);
+    const Qin = nCp * (S[2].T - S[1].T);
+    const Qout = nCp * (S[3].T - S[0].T);
+    const Wleg = [
+      (S[1].p * S[1].V - S[0].p * S[0].V) / (1 - C.g),
+      S[1].p * (S[2].V - S[1].V),
+      (S[3].p * S[3].V - S[2].p * S[2].V) / (1 - C.g),
+      S[3].p * (S[0].V - S[3].V)
+    ];
+    const Wint = Wleg.reduce((a, b) => a + b, 0);
+    return { Qin, Qout: Math.abs(Qout), Wleg, Wint, Wtheory: Qin - Math.abs(Qout) };
+  }
+
+  function sample(s, C) {
+    const seg = Math.min(3, Math.floor(s * 4));
+    const u = s * 4 - seg;
+    const pts = legPoints(C, seg);
+    const a = pts[Math.floor(u * (PER - 1))];
+    const b = pts[Math.min(PER - 1, Math.floor(u * (PER - 1)) + 1)];
+    const nCv = nR / (C.g - 1);
+    const base = C.st[0].T;
+    return {
+      seg, V: a.V, p: a.p, T: a.T,
+      dU: nCv * (a.T - base),
+      dQ: seg === 1 ? C.g * nR / (C.g - 1) * (b.T - a.T) * 0 : 0
+    };
+  }
+
+  let s = 0, run = true;
+  function step(dt) {
+    if (!run) return;
+    s = (s + dt * (+el('sRt').value)) % 1;
+    if (s < 0) s += 1;
+  }
+
+  function draw() {
+    const C = cycle();
+    const E = energy(C);
+
+    for (let i = 0; i < 4; i++) {
+      const pts = legPoints(C, i);
+      const arr = legLines[i].geometry.attributes.position.array;
+      for (let j = 0; j < PER; j++) {
+        arr[j * 3] = sx(pts[j].V, C);
+        arr[j * 3 + 1] = sy(pts[j].p, C);
+        arr[j * 3 + 2] = 0;
+      }
+      legLines[i].geometry.attributes.position.needsUpdate = true;
+      legLines[i].visible = true;
+    }
+
+    const loop = [];
+    for (let i = 0; i < 4; i++) loop.push(...legPoints(C, i));
+    const farr = fillGeo.attributes.position.array;
+    for (let j = 0; j < LOOP; j++) {
+      farr[j * 3] = sx(loop[j].V, C);
+      farr[j * 3 + 1] = sy(loop[j].p, C);
+      farr[j * 3 + 2] = -0.03;
+    }
+    fillGeo.attributes.position.needsUpdate = true;
+    fill.visible = show.fill;
+
+    C.st.forEach((S, i) => {
+      marks[i].position.set(sx(S.V, C), sy(S.p, C), 0.05);
+      marks[i].visible = show.marks;
+    });
+
+    lblV.position.set(OX + XW + 4.2, OY, 0);
+    lblP.position.set(OX, OY + YH + 2.8, 0);
+
+    const cur = sample(s, C);
+    dot.position.set(sx(cur.V, C), sy(cur.p, C), 0.12);
+    dotGlow.position.copy(dot.position);
+    dot.material.color.set(LEGS[cur.seg].col);
+
+    for (let i = 0; i < 4; i++) {
+      const a = flowArrows[i];
+      a.visible = show.flow;
+      if (!show.flow) continue;
+      const pts = legPoints(C, i);
+      const m = pts[Math.floor(PER * 0.5)];
+      const prev = pts[Math.floor(PER * 0.42)];
+      const dir = new T.Vector3(m.V - prev.V, m.p - prev.p, 0).normalize();
+      a.position.set(sx(m.V, C) - dir.x * 1.1, sy(m.p, C) - dir.y * 1.1, 0.3);
+      a.quaternion.setFromUnitVectors(new T.Vector3(1, 0, 0), dir);
+    }
+
+    return { C, E, cur };
+  }
+
+  function outs(R) {
+    const { C, E, cur } = R;
+    const L = LEGS[cur.seg];
+    const err = Math.abs(E.Wint - E.Wtheory);
+    const rel = err / Math.max(1e-9, Math.abs(E.Wtheory));
+    const eff = E.Wint / E.Qin;
+
+    el('dW').textContent = (E.Wint / 1000).toFixed(2) + ' kJ';
+    el('dQin').textContent = (E.Qin / 1000).toFixed(2) + ' kJ';
+    el('dE').textContent = (eff * 100).toFixed(1) + '%';
+    el('dS').textContent = L.name.split(' ')[0];
+    el('rL').textContent = L.tag;
+    el('rS').textContent = 'T = ' + cur.T.toFixed(0) + ' K';
+    el('rP').textContent = (cur.p / 1000).toFixed(0) + ' kPa';
+    el('rV').textContent = (cur.V * 1000).toFixed(2) + ' L';
+    el('rT').textContent = cur.T.toFixed(0) + ' K';
+    el('rU').textContent = cur.dU.toFixed(0) + ' J';
+
+    const chk = el('chk');
+    chk.className = 'check' + (rel < 1e-6 ? '' : ' bad');
+    chk.innerHTML = rel < 1e-6
+      ? '&#10003; balance holds: &oint;P dV = ' + E.Wint.toFixed(1) + ' J = Q<sub>in</sub> &minus; Q<sub>out</sub> = ' +
+        E.Qin.toFixed(1) + ' &minus; ' + E.Qout.toFixed(1)
+      : '&#10007; energy balance off by ' + err.toFixed(3) + ' J (' + (rel * 100).toFixed(3) + '%)';
+
+    const v = el('v');
+    if (C.r < 1.8) {
+      v.innerHTML = '<b style="color:var(--warn)">Barely any pressure difference.</b> With P<sub>max</sub>/P<sub>min</sub> = ' +
+        C.r.toFixed(1) + ' the loop is a thin sliver and you only get ' + (eff * 100).toFixed(1) +
+        '% efficiency. Pressure ratio is what makes the area.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (C.k < 1.6) {
+      v.innerHTML = '<b style="color:var(--warn)">Narrow volume span.</b> The gas barely changes volume, so the isobars are short and the work is only ' +
+        (E.Wint / 1000).toFixed(2) + ' kJ per cycle.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + L.name + '.</b> At ' + (cur.p / 1000).toFixed(0) +
+        ' kPa and ' + (cur.V * 1000).toFixed(1) + ' L the gas is at ' + cur.T.toFixed(0) +
+        ' K. Adiabatic legs obey PV<sup>&gamma;</sup> = const, so each one trades pressure for volume at a factor of ' +
+        C.r.toFixed(1) + '<sup>1/&gamma;</sup> = ' + Math.pow(C.r, 1 / C.g).toFixed(2) + '.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sPr', 'vPr', 1], ['sK', 'vK', 1], ['sG', 'vG', 2], ['sRt', 'vRt', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sPr', 'sK', 'sG', 'sRt'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { s = 0; });
+
+  syncUI();
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

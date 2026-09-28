@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atwood Machine — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#f59e0b; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:70ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+  .swap{margin-top:10px}
+  .swap button{width:100%;background:rgba(255,255,255,.07);color:var(--txt2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Atwood Machine</h1>
+    <span class="eq">a = (m<sub>2</sub> &minus; m<sub>1</sub>)g / (m<sub>1</sub> + m<sub>2</sub>)</span>
+  </header>
+  <p class="sub">Two masses on one rope over a pulley. The heavier side always wins &mdash; but the acceleration stays small, because the tension pulling back is nearly as large as the weight driving it forward.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <h2>Controls</h2>
+      <div class="ctl">
+        <label>Left mass m<sub>1</sub> <b><span id="v1">4</span> kg</b></label>
+        <input type="range" id="s1" min="0.5" max="30" step="0.5" value="4">
+      </div>
+      <div class="ctl">
+        <label>Right mass m<sub>2</sub> <b><span id="v2">10</span> kg</b></label>
+        <input type="range" id="s2" min="0.5" max="30" step="0.5" value="10">
+      </div>
+      <div class="ctl">
+        <label>Bearing friction <b><span id="vc">0.00</span></b></label>
+        <input type="range" id="sc" min="0" max="0.15" step="0.005" value="0">
+      </div>
+      <div class="swap"><button id="bSwap">Swap the masses</button></div>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Acceleration</span><b id="rA">0 m/s&sup2;</b></div>
+        <div class="ro"><span>Tension</span><b id="rT">0 N</b></div>
+        <div class="ro"><span>m₁ weight</span><b id="rW1">0 N</b></div>
+        <div class="ro"><span>m₂ weight</span><b id="rW2">0 N</b></div>
+        <div class="ro"><span>v₁</span><b id="rV1">0 m/s</b></div>
+        <div class="ro"><span>v₂</span><b id="rV2">0 m/s</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Pause</button>
+        <button class="ghost" id="bRst">Reset</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+
+      <p class="note">Both masses share one tension, so the tension is <em>not</em> m₁g. It is less than m₁g on the way up and less than m₂g on the way down &mdash; the difference is what accelerates each mass.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const G = 9.81, TRAVEL = 150;
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const s1 = document.getElementById('s1'), s2 = document.getElementById('s2'), sC = document.getElementById('sc');
+  const st = { d: 0, v: 0, run: true };
+
+  let W = 0, H = 0, px = 0, py = 0, pr = 0, drop = 0, s = 0;
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    W = Math.max(320, r.width); H = Math.round(W * 0.56);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    px = W / 2; pr = Math.max(26, Math.min(38, W * 0.05));
+    py = H * 0.20;
+    drop = H * 0.30;
+    s = (H - py - pr - drop - 22) / TRAVEL;
+  }
+
+  function forces() {
+    const m1 = +s1.value, m2 = +s2.value, c = +sC.value;
+    const drive = (m2 - m1) * G;
+    const loss = c * (m1 + m2) * G;
+    const net = drive - Math.sign(drive || 1) * Math.min(Math.abs(drive), loss);
+    const a = net / (m1 + m2);
+    const T = m1 * (G + a);
+    return { m1, m2, c, drive, a, T, w1: m1 * G, w2: m2 * G };
+  }
+
+  function step(dt) {
+    const f = forces();
+    st.v += f.a * dt;
+    st.d += st.v * dt;
+    if (st.d < 0) { st.d = 0; st.v = 0; }
+    if (st.d > TRAVEL) { st.d = TRAVEL; st.v = 0; }
+  }
+
+  function arrow(x, y, dx, dy, col, label) {
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    const ex = x + dx, ey = y + dy;
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+    const a = Math.atan2(dy, dx), h = 8;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - h * Math.cos(a - 0.42), ey - h * Math.sin(a - 0.42));
+    ctx.lineTo(ex - h * Math.cos(a + 0.42), ey - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+    if (label) {
+      ctx.font = '600 11px ui-monospace,Menlo,Consolas,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, (x + ex) / 2, (y + ey) / 2 - 7);
+    }
+  }
+
+  function draw() {
+    const f = forces();
+    ctx.clearRect(0, 0, W, H);
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a1020'); bg.addColorStop(1, '#070b16');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    const y1 = py + pr + st.d * s;
+    const y2 = py + pr + (TRAVEL - st.d) * s;
+    const L = px - pr, R = px + pr;
+
+    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(L, y1); ctx.lineTo(L, py);
+    ctx.arc(px, py, pr, Math.PI, 0, false);
+    ctx.lineTo(R, y2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#4a5b80'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 6.284); ctx.stroke();
+    ctx.fillStyle = '#1b2540';
+    ctx.beginPath(); ctx.arc(px, py, pr - 5, 0, 6.284); ctx.fill();
+
+    const ang = st.d * s / pr;
+    ctx.strokeStyle = '#6d5df6'; ctx.lineWidth = 2.5;
+    for (let k = 0; k < 3; k++) {
+      const a0 = ang + k * 2.094;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      ctx.lineTo(px + Math.cos(a0) * (pr - 8), py + Math.sin(a0) * (pr - 8)); ctx.stroke();
+    }
+    ctx.fillStyle = '#e8edf7';
+    ctx.beginPath(); ctx.arc(px, py, 3.4, 0, 6.284); ctx.fill();
+
+    function block(x, y, m, col, heavy) {
+      const h = 22 + m * 1.7, w = 40;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.roundRect(x - w / 2, y, w, h, 6); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.26)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = heavy ? '#0b1020' : '#e8edf7';
+      ctx.font = '600 12px ui-monospace,Menlo,Consolas,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(m.toFixed(1) + ' kg', x, y + h / 2 + 4);
+    }
+    block(L, y1, f.m1, '#3d2f6d', f.m1 > f.m2);
+    block(R, y2, f.m2, '#1f3a5c', f.m2 >= f.m1);
+
+    const k = Math.min(1.4, 240 / Math.max(30, Math.max(f.w1, f.w2)));
+    arrow(L, y1 + 12, 0, f.w1 * k, '#f87171', f.w1.toFixed(0) + ' N');
+    arrow(R, y2 + 12, 0, f.w2 * k, '#f87171', f.w2.toFixed(0) + ' N');
+    arrow(L, y1 - 6, 0, -f.T * k * 0.8, '#22d3ee', 'T ' + f.T.toFixed(0) + ' N');
+    arrow(R, y2 - 6, 0, -f.T * k * 0.8, '#22d3ee', 'T ' + f.T.toFixed(0) + ' N');
+
+    const vs = Math.min(60, Math.abs(st.v) * 9);
+    if (vs > 1) {
+      arrow(L + 24, y1 + 34, 0, vs, '#34d399', 'v');
+      arrow(R - 24, y2 + 34, 0, -vs, '#34d399', 'v');
+    }
+
+    ctx.fillStyle = '#6b7a99'; ctx.font = '11px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('travel ' + st.d.toFixed(1) + ' m', W / 2, H - 10);
+
+    return f;
+  }
+
+  function sync() {
+    [['s1', 'v1', 1], ['s2', 'v2', 1], ['sc', 'vc', 2]].forEach(([el, o, d]) => {
+      const e = document.getElementById(el);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      document.getElementById(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  function outs(f) {
+    document.getElementById('rA').textContent = f.a.toFixed(2) + ' m/s²';
+    document.getElementById('rT').textContent = f.T.toFixed(1) + ' N';
+    document.getElementById('rW1').textContent = f.w1.toFixed(1) + ' N';
+    document.getElementById('rW2').textContent = f.w2.toFixed(1) + ' N';
+    document.getElementById('rV1').textContent = (-st.v).toFixed(2) + ' m/s';
+    document.getElementById('rV2').textContent = st.v.toFixed(2) + ' m/s';
+    document.getElementById('rA').style.color = Math.abs(f.a) < 0.01 ? '#fbbf24' : '#e8edf7';
+    const v = document.getElementById('v');
+    if (Math.abs(f.drive) < 0.05) {
+      v.innerHTML = '<b style="color:#fbbf24">Balanced.</b> Equal masses, so the driving force is zero and the rope hangs still.';
+      v.style.borderColor = 'rgba(251,191,36,.3)';
+    } else if (Math.abs(f.a) < 0.01) {
+      v.innerHTML = '<b style="color:#fbbf24">Stuck by friction.</b> The bearing loss cancels the imbalance &mdash; no motion at all.';
+      v.style.borderColor = 'rgba(251,191,36,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#34d399">' + (f.a > 0 ? 'm₂ falls' : 'm₁ falls') + '</b> at ' +
+        Math.abs(f.a).toFixed(2) + ' m/s². The system moves as one — the rope never stretches.';
+      v.style.borderColor = 'rgba(52,211,153,.3)';
+    }
+  }
+
+  [s1, s2, sC].forEach(e => e.addEventListener('input', () => { sync(); st.d = 0; st.v = 0; }));
+  document.getElementById('bSwap').addEventListener('click', () => {
+    const t = s1.value; s1.value = s2.value; s2.value = t; sync(); st.d = 0; st.v = 0;
+  });
+  document.getElementById('bGo').addEventListener('click', e => {
+    st.run = !st.run; e.target.textContent = st.run ? 'Pause' : 'Play';
+  });
+  document.getElementById('bRst').addEventListener('click', () => { st.d = 0; st.v = 0; });
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (st.run) step(dt);
+    outs(draw());
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); draw(); });
+  fit(); sync(); draw();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

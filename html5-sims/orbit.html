@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit Simulator — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#6366f1; --acc2:#a78bfa; --onAcc:#ffffff; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:70ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Orbit Simulator</h1>
+    <span class="eq">v<sub>circ</sub> = &radic;GM/r</span>
+  </header>
+  <p class="sub">Falling sideways is orbiting. Change the launch speed and watch a circle turn into an ellipse, a crash, or a permanent escape &mdash; gravity is doing the curving the whole time.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <h2>Launch conditions</h2>
+      <div class="ctl">
+        <label>Central mass <b><span id="vM">6.0</span> &times;10<sup>24</sup> kg</b></label>
+        <input type="range" id="sM" min="1" max="40" step="0.5" value="6">
+      </div>
+      <div class="ctl">
+        <label>Start radius <b><span id="vR">7.0</span> &times;10<sup>6</sup> m</b></label>
+        <input type="range" id="sR" min="2" max="24" step="0.5" value="7">
+      </div>
+      <div class="ctl">
+        <label>Launch speed <b><span id="vV">1.00</span> &times; v<sub>circ</sub></b></label>
+        <input type="range" id="sV" min="0.35" max="1.7" step="0.01" value="1">
+      </div>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Speed</span><b id="rSp">0</b></div>
+        <div class="ro"><span>Altitude</span><b id="rAl">0</b></div>
+        <div class="ro"><span>v circ here</span><b id="rVc">0</b></div>
+        <div class="ro"><span>Eccentricity</span><b id="rE">0</b></div>
+        <div class="ro"><span>Periapsis</span><b id="rPe">0</b></div>
+        <div class="ro"><span>Apoapsis</span><b id="rAp">0</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Pause</button>
+        <button class="ghost" id="bRst">Relaunch</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+
+      <p class="note">Numbers are SI. The planet is drawn at 30% of your chosen start radius so there is always a surface to fall toward &mdash; it is a visual guide, not a real planetary radius.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const G = 6.674e-11;
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const sM = document.getElementById('sM'), sR = document.getElementById('sR'), sV = document.getElementById('sV');
+
+  let W = 0, H = 0, cx = 0, cy = 0, scale = 0, Rp = 0, span = 0;
+  let run = true, crashed = false, trail = [], tsec = 0;
+
+  const b = { x: 0, y: 0, vx: 0, vy: 0 };
+  let GM = 0, r0 = 0, ts = 0;
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    W = Math.max(320, r.width); H = Math.round(W * 0.66);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = W / 2; cy = H / 2;
+  }
+
+  function launch() {
+    GM = G * (+sM.value * 1e24);
+    r0 = +sR.value * 1e6;
+    Rp = 0.30 * r0;
+    span = Math.max(r0 * 1.7, Rp * 3.4);
+    scale = Math.min(W, H) * 0.46 / span;
+    ts = Math.sqrt(Math.pow(r0, 3) / GM) / 140;
+    b.x = 0; b.y = -r0;
+    b.vx = +sV.value * Math.sqrt(GM / r0);
+    b.vy = 0;
+    trail = []; tsec = 0; crashed = false;
+  }
+
+  function acc(x, y) {
+    const r2 = x * x + y * y, r = Math.sqrt(r2), k = -GM / (r2 * r);
+    return { ax: k * x, ay: k * y };
+  }
+
+  function step() {
+    if (crashed) return;
+    const a1 = acc(b.x, b.y);
+    const px = b.x + b.vx * ts + 0.5 * a1.ax * ts * ts;
+    const py = b.y + b.vy * ts + 0.5 * a1.ay * ts * ts;
+    const a2 = acc(px, py);
+    b.vx += 0.5 * (a1.ax + a2.ax) * ts;
+    b.vy += 0.5 * (a1.ay + a2.ay) * ts;
+    b.x = px; b.y = py;
+    tsec += ts;
+    if (Math.hypot(b.x, b.y) <= Rp) { crashed = true; b.x = (b.x / Math.hypot(b.x, b.y)) * Rp; b.y = (b.y / Math.hypot(b.x, b.y)) * Rp; }
+    trail.push(b.x, b.y);
+    if (trail.length > 2600) trail.splice(0, 2);
+  }
+
+  function arrow(x, y, dx, dy, col, label) {
+    if (Math.hypot(dx, dy) < 0.5) return;
+    const ex = x + dx, ey = y + dy;
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+    const a = Math.atan2(dy, dx), h = 8;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - h * Math.cos(a - 0.42), ey - h * Math.sin(a - 0.42));
+    ctx.lineTo(ex - h * Math.cos(a + 0.42), ey - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+    if (label) {
+      ctx.font = '600 11px ui-monospace,Menlo,Consolas,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, (x + ex) / 2, (y + ey) / 2 - 7);
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const bg = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(W, H));
+    bg.addColorStop(0, '#0d1426'); bg.addColorStop(1, '#05080f');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.045)'; ctx.lineWidth = 1;
+    for (let g = 24; g < Math.max(W, H); g += 34) {
+      ctx.beginPath(); ctx.arc(cx, cy, g, 0, 6.284); ctx.stroke();
+    }
+
+    const pr = Rp * scale;
+    const pg = ctx.createRadialGradient(cx - pr * .3, cy - pr * .3, pr * .1, cx, cy, pr);
+    pg.addColorStop(0, '#3b5b8f'); pg.addColorStop(1, '#16233d');
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(cx, cy, pr, 0, 6.284); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,170,255,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = '#5b6b8a';
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('surface', cx, cy + pr + 14);
+
+    if (trail.length > 3) {
+      ctx.lineWidth = 1.8;
+      const n = trail.length / 2;
+      for (let i = 1; i < n; i++) {
+        const a = i / n;
+        ctx.strokeStyle = 'rgba(109,93,246,' + (a * 0.75).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.moveTo(cx + trail[(i - 1) * 2] * scale, cy + trail[(i - 1) * 2 + 1] * scale);
+        ctx.lineTo(cx + trail[i * 2] * scale, cy + trail[i * 2 + 1] * scale);
+        ctx.stroke();
+      }
+    }
+
+    const px = cx + b.x * scale, py = cy + b.y * scale;
+    const gm = Math.hypot(b.x, b.y);
+    const sp = Math.hypot(b.vx, b.vy);
+    const a = acc(b.x, b.y);
+    const am = Math.hypot(a.ax, a.ay);
+    const vk = 1e4;
+    const vlen = Math.min(96, sp / vk * 82);
+    arrow(px, py, b.vx / sp * vlen, b.vy / sp * vlen, '#22d3ee', 'v');
+    arrow(px, py, a.ax / am * 54, a.ay / am * 54, '#f87171', 'g');
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(px, py, 5, 0, 6.284); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    const E = sp * sp / 2 - GM / Math.max(1, gm);
+    const h = Math.abs(b.x * b.vy - b.y * b.vx);
+    const ecc = Math.sqrt(Math.max(0, 1 + 2 * E * h * h / (GM * GM)));
+    const aSemi = E < 0 ? -GM / (2 * E) : Infinity;
+    return { sp, gm, E, ecc, aSemi, vk };
+  }
+
+  function sync() {
+    [['sM', 'vM', 1], ['sR', 'vR', 1], ['sV', 'vV', 2]].forEach(([el, o, d]) => {
+      const e = document.getElementById(el);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      document.getElementById(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  const km = v => (v / 1000).toFixed(2) + ' km/s';
+  const Mm = v => isFinite(v) ? (v / 1e6).toFixed(2) + ' Mm' : '∞';
+
+  function outs(m) {
+    const vc = Math.sqrt(GM / m.gm);
+    document.getElementById('rSp').textContent = km(m.sp);
+    document.getElementById('rAl').textContent = Math.max(0, (m.gm - Rp) / 1000).toFixed(0) + ' km';
+    document.getElementById('rVc').textContent = km(vc);
+    document.getElementById('rE').textContent = m.ecc.toFixed(3);
+    document.getElementById('rPe').textContent = isFinite(m.aSemi) ? Mm(m.aSemi * (1 - m.ecc)) : '—';
+    document.getElementById('rAp').textContent = isFinite(m.aSemi) ? Mm(m.aSemi * (1 + m.ecc)) : '∞';
+
+    const v = document.getElementById('v');
+    if (crashed) {
+      v.innerHTML = '<b style="color:#f87171">Impact.</b> Too slow at that radius &mdash; gravity won before the orbit closed.';
+      v.style.borderColor = 'rgba(248,113,113,.3)';
+    } else if (m.E >= 0) {
+      v.innerHTML = '<b style="color:#fbbf24">Unbound.</b> Total energy is ' +
+        (m.E >= 0 ? 'positive' : 'zero') + ', so it never comes back. Minimum speed to stay was ' +
+        km(Math.sqrt(2 * GM / m.gm)) + '.';
+      v.style.borderColor = 'rgba(251,191,36,.3)';
+    } else if (m.ecc < 0.02) {
+      v.innerHTML = '<b style="color:#34d399">Circular.</b> Launch speed matched v<sub>circ</sub> to within 2%, so the orbit closes on itself.';
+      v.style.borderColor = 'rgba(52,211,153,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#22d3ee">Elliptical.</b> Bound, but off-centre &mdash; it swings between ' +
+        Mm(m.aSemi * (1 - m.ecc)) + ' and ' + Mm(m.aSemi * (1 + m.ecc)) + ' from the centre.';
+      v.style.borderColor = 'rgba(34,211,238,.3)';
+    }
+  }
+
+  [sM, sR, sV].forEach(e => e.addEventListener('input', () => { sync(); launch(); }));
+  document.getElementById('bGo').addEventListener('click', e => {
+    run = !run; e.target.textContent = run ? 'Pause' : 'Play';
+  });
+  document.getElementById('bRst').addEventListener('click', () => launch());
+
+  let last = performance.now();
+  function loop(now) {
+    if (run) step();
+    outs(draw());
+    last = now;
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); draw(); });
+  fit(); sync(); launch();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

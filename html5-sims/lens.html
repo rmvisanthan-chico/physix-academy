@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Converging Lens 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#fbbf24; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(680px,49vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:120px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Converging Lens 3D</h1>
+  <p>Five rays traced through a real glass lens. Drag the object arrow to move it and watch the image slide.</p>
+</div>
+<div class="hud eq">1/f = 1/v + 1/u</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Object dist</span><b id="dU">—</b></div>
+  <div class="chip"><span>Image dist</span><b id="dV">—</b></div>
+  <div class="chip"><span>Magnification</span><b id="dM">—</b></div>
+  <div class="chip"><span>Image</span><b id="dI">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Lens</h2>
+  <div class="ctl">
+    <label>Focal length f <b><span id="vf">5.0</span></b></label>
+    <input type="range" id="sf" min="2" max="12" step="0.1" value="5">
+  </div>
+  <div class="ctl">
+    <label>Refractive index n <b><span id="vn">1.50</span></b></label>
+    <input type="range" id="sn" min="1.2" max="2.2" step="0.01" value="1.5">
+  </div>
+
+  <h2 class="mt">Object</h2>
+  <div class="ctl">
+    <label>Object distance u <b><span id="vu">12.0</span></b></label>
+    <input type="range" id="su" min="3" max="40" step="0.1" value="12">
+  </div>
+  <div class="ctl">
+    <label>Object height <b><span id="vh">2.0</span></b></label>
+    <input type="range" id="sh" min="0.5" max="6" step="0.1" value="2">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="rays">rays</span>
+    <span class="tg on" data-t="image">image arrow</span>
+    <span class="tg" data-t="axis">axis + focal marks</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>1/v</span><b id="rIv">0</b></div>
+    <div class="ro"><span>1/u + 1/f</span><b id="rIuf">0</b></div>
+    <div class="ro"><span>v signed</span><b id="rVs">0</b></div>
+    <div class="ro"><span>Image height</span><b id="rIh">0</b></div>
+    <div class="ro"><span>Power 1/f</span><b id="rP">0</b></div>
+    <div class="ro"><span>Rays traced</span><b id="rN">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">At 2f</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    <b>Drag the yellow object arrow</b> along the axis. Scroll to zoom, right-drag to pan,
+    drag empty space to orbit. A green arrow is a real image, a hollow one is virtual.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xfbbf24,
+    dist: 30, minD: 12, maxD: 110, exposure: 0.95, bg: 0x05070f,
+    preserve: true, hemi: 0.24, key: 2.4, fill: 0.24, rim: 0.36,
+    theta: 0.12, phi: 1.5
+  });
+  const scene = st.scene;
+  const show = { rays: true, image: true, axis: false };
+
+  const glassMat = new T.MeshPhysicalMaterial({
+    color: 0xbfe6ff, transmission: 0.92, thickness: 1.2, roughness: 0.06,
+    metalness: 0, ior: 1.5, transparent: true, opacity: 0.55,
+    clearcoat: 1, clearcoatRoughness: 0.05
+  });
+  const lensGrp = new T.Group(); scene.add(lensGrp);
+  const lensShape = new T.Shape();
+  const R = 5.2, hx = 1.5;
+  lensShape.moveTo(0, R);
+  lensShape.quadraticCurveTo(hx, R, hx, R * 0.55);
+  lensShape.quadraticCurveTo(hx, 0, hx, 0);
+  lensShape.quadraticCurveTo(hx, -R * 0.55, hx, -R * 0.55);
+  lensShape.quadraticCurveTo(hx, -R, 0, -R);
+  lensShape.quadraticCurveTo(-hx, -R, -hx, -R * 0.55);
+  lensShape.quadraticCurveTo(-hx, 0, -hx, 0);
+  lensShape.quadraticCurveTo(-hx, R * 0.55, -hx, R * 0.55);
+  lensShape.quadraticCurveTo(-hx, R, 0, R);
+  const lensGeo = new T.ExtrudeGeometry(lensShape, { depth: 1.1, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 3, curveSegments: 24 });
+  lensGeo.translate(0, 0, -0.55);
+  const lens = new T.Mesh(lensGeo, glassMat);
+  lensGrp.add(lens);
+  const rim = new T.Mesh(lensGeo, new T.MeshBasicMaterial({ color: 0x9fd8ff, wireframe: true, transparent: true, opacity: 0.16 }));
+  lensGrp.add(rim);
+
+  const axisLine = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 60, 8),
+    new T.MeshBasicMaterial({ color: 0x5a6a8e, transparent: true, opacity: 0.5 }));
+  axisLine.rotation.z = Math.PI / 2;
+  axisLine.visible = false;
+  scene.add(axisLine);
+
+  const focalMarks = new T.Group();
+  focalMarks.visible = false;
+  scene.add(focalMarks);
+
+  function arrowMesh(color, headR, shaftR) {
+    const g = new T.Group();
+    const sh = new T.Mesh(new T.CylinderGeometry(shaftR, shaftR, 1, 10),
+      new T.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, roughness: 0.4 }));
+    sh.geometry.translate(0, 0.5, 0);
+    const hd = new T.Mesh(new T.ConeGeometry(headR, headR * 3, 14),
+      new T.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.65, roughness: 0.35 }));
+    g.add(sh); g.add(hd);
+    g.userData = { sh, hd };
+    scene.add(g);
+    return g;
+  }
+  function setArrow(g, x, y, h, flip) {
+    const { sh, hd } = g.userData;
+    const L = Math.abs(h);
+    const head = 1.0;
+    const shaft = Math.max(0.001, L - head);
+    sh.scale.set(1, shaft, 1);
+    sh.position.set(x, flip ? y + head + shaft / 2 : y - head - shaft / 2, 0);
+    hd.position.set(x, flip ? y + head / 2 : y - head / 2, 0);
+    hd.rotation.z = flip ? Math.PI : 0;
+  }
+
+  const objArrow = arrowMesh(0xffd166, 0.34, 0.11);
+  const imgArrow = arrowMesh(0x3ee0a4, 0.34, 0.11);
+  const imgGhost = new T.Mesh(new T.ConeGeometry(0.34, 1.0, 14),
+    new T.MeshBasicMaterial({ color: 0x3ee0a4, wireframe: true, transparent: true, opacity: 0.65 }));
+  scene.add(imgGhost);
+  const objGlow = st.glow(0xffd166, 2.6, 0.6);
+  scene.add(objGlow);
+
+  function seg(color, r) {
+    const g = new T.CylinderGeometry(r, r, 1, 8);
+    g.translate(0, 0.5, 0);
+    const m = new T.Mesh(g, new T.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.1, roughness: 0.4 }));
+    scene.add(m);
+    return m;
+  }
+  function setSeg(m, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-4) { m.visible = false; return; }
+    m.visible = true;
+    m.position.set(x1, y1, 0);
+    m.scale.set(1, L, 1);
+    m.rotation.z = Math.atan2(dy, dx) - Math.PI / 2;
+  }
+
+  const NR = 5;
+  const rays = [];
+  for (let i = 0; i < NR; i++) rays.push({ in: seg(0xffd166, 0.055), out: seg(0x31d7f0, 0.055) });
+
+  const lblF1 = st.label('F', '#31d7f0', 0.007);
+  const lblF2 = st.label("F'", '#31d7f0', 0.007);
+  focalMarks.add(lblF1); focalMarks.add(lblF2);
+
+  function par() { return { f: +el('sf').value, n: +el('sn').value, u: +el('su').value, h: +el('sh').value }; }
+
+  function draw() {
+    const P = par();
+    const f = P.f, u = P.u;
+    const v = 1 / (1 / f - 1 / u);
+    const xObj = -u;
+    const yObj = P.h;
+
+    setArrow(objArrow, xObj, 0, yObj, false);
+    objGlow.position.set(xObj, yObj * 0.5, 0);
+    objGlow.scale.setScalar(2.4);
+
+    axisLine.visible = show.axis;
+    focalMarks.visible = show.axis;
+    if (show.axis) {
+      lblF1.position.set(f, 0.5, 0);
+      lblF2.position.set(-f, 0.5, 0);
+    }
+
+    for (let i = 0; i < NR; i++) {
+      const frac = (i + 0.5) / NR;
+      const hi = yObj * (1 - frac * 0.92);
+      setSeg(rays[i].in, xObj, yObj, 0, hi);
+      const xEnd = isFinite(v) && Math.abs(v) < 60 ? v : (v < 0 ? -60 : 60);
+      const yEnd = hi * (1 - xEnd / f);
+      setSeg(rays[i].out, 0, hi, xEnd, yEnd);
+    }
+
+    for (let i = 0; i < NR; i++) {
+      rays[i].in.visible = show.rays;
+      rays[i].out.visible = show.rays;
+    }
+
+    const mag = isFinite(v) ? -v / u : 0;
+    const yImg = yObj * mag;
+    const real = isFinite(v) && v > 0;
+    imgArrow.visible = show.image && isFinite(v) && Math.abs(v) < 120;
+    imgGhost.visible = show.image && isFinite(v) && Math.abs(v) >= 120;
+    if (imgArrow.visible) setArrow(imgArrow, v, 0, yImg, yImg < 0);
+    if (imgGhost.visible) {
+      imgGhost.position.set(v, yImg, 0);
+      imgGhost.rotation.z = yImg < 0 ? Math.PI : 0;
+    }
+
+    return { v, mag, yImg, real, xObj, yObj };
+  }
+
+  function outs(D) {
+    const P = par();
+    el('dU').textContent = P.u.toFixed(1);
+    el('dV').textContent = isFinite(D.v) ? D.v.toFixed(2) : '∞';
+    el('dM').textContent = isFinite(D.mag) ? D.mag.toFixed(2) + '×' : '∞';
+    const kind = !isFinite(D.v) ? 'Virtual' : D.v > 0 ? 'Real' : 'Virtual';
+    el('dI').textContent = kind;
+    el('dI').style.color = kind === 'Real' ? 'var(--ok)' : 'var(--warn)';
+
+    el('rIv').textContent = isFinite(D.v) ? (1 / D.v).toFixed(4) : '0.0000';
+    el('rIuf').textContent = (1 / P.u + 1 / P.f).toFixed(4);
+    el('rVs').textContent = isFinite(D.v) ? D.v.toFixed(2) : '∞';
+    el('rIh').textContent = D.yImg.toFixed(2);
+    el('rP').textContent = (1 / P.f).toFixed(3);
+    el('rN').textContent = show.rays ? NR : 0;
+
+    const v = el('v'), u = P.u, f = P.f;
+    if (u < f) {
+      v.innerHTML = '<b style="color:var(--bad)">Object inside the focal length.</b> Rays leave the lens still spreading, so no real image forms &mdash; the image is virtual, upright and magnified.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (Math.abs(u - 2 * f) < 0.25) {
+      v.innerHTML = '<b style="color:var(--ok)">At 2f.</b> Image lands at 2f on the far side, same size but inverted. This is the projector arrangement.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (u < f * 1.6) {
+      v.innerHTML = '<b style="color:var(--warn)">Just outside f.</b> Image is far away and strongly magnified (' +
+        (isFinite(D.mag) ? Math.abs(D.mag).toFixed(1) : '∞') + '×) &mdash; a magnifying glass.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--acc2)">Real inverted image at v = ' +
+        (isFinite(D.v) ? D.v.toFixed(1) : '∞') + '.</b> Magnification ' +
+        (isFinite(D.mag) ? D.mag.toFixed(2) : '∞') + '× &mdash; closer to the lens than 2f means bigger and further away.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sf', 'vf', 1], ['sn', 'vn', 2], ['su', 'vu', 1], ['sh', 'vh', 1]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+    glassMat.ior = +el('sn').value;
+  }
+  ['sf', 'sn', 'su', 'sh'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', () => { el('su').value = (+el('sf').value * 2).toFixed(1); syncUI(); });
+  el('bRst').addEventListener('click', () => {
+    el('sf').value = 5; el('sn').value = 1.5; el('su').value = 12; el('sh').value = 2; syncUI();
+  });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  let drag = false;
+
+  cv.addEventListener('pointerdown', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (ray.ray.distanceToPoint(new T.Vector3(-(+el('su').value), +el('sh').value * 0.5, 0)) < 3) {
+      drag = true; st.controls.enabled = false; cv.setPointerCapture(ev.pointerId);
+    }
+  }, true);
+
+  cv.addEventListener('pointermove', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    const p = new T.Vector3(-(+el('su').value), +el('sh').value * 0.5, 0);
+    if (!drag) { cv.style.cursor = ray.ray.distanceToPoint(p) < 3 ? 'grab' : 'default'; return; }
+    const dp = new T.Plane(new T.Vector3(0, 0, 1), 0);
+    const hit = new T.Vector3();
+    if (!ray.ray.intersectPlane(dp, hit)) return;
+    el('su').value = Math.max(3, Math.min(40, -hit.x)).toFixed(1);
+    syncUI();
+  }, true);
+
+  const end = () => { drag = false; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', end, true);
+  cv.addEventListener('pointercancel', end, true);
+
+  syncUI();
+  st.onFrame(() => { outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

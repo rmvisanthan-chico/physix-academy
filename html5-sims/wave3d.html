@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wave Surface 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#38bdf8; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;
+    -webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(660px,48vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:120px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:15px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events-auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:47vh}
+    #view{inset:0 0 47vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Wave Surface 3D</h1>
+  <p>Drag across the water to add your own ripple and watch it interfere.</p>
+</div>
+<div class="hud eq">y = A sin(kx &minus; &omega;t) &nbsp;&nbsp; v = f&lambda;</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Wave speed</span><b id="dV">—</b></div>
+  <div class="chip"><span>Wavelength</span><b id="dL">—</b></div>
+  <div class="chip"><span>Period</span><b id="dT">—</b></div>
+  <div class="chip"><span>Sources</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Driven wave</h2>
+  <div class="ctl">
+    <label>Amplitude A <b><span id="vA">1.00</span></b></label>
+    <input type="range" id="sA" min="0" max="2.4" step="0.05" value="1">
+  </div>
+  <div class="ctl">
+    <label>Wavelength &lambda; <b><span id="vL">7.0</span></b></label>
+    <input type="range" id="sL" min="2.5" max="18" step="0.1" value="7">
+  </div>
+  <div class="ctl">
+    <label>Speed v <b><span id="vV">4.0</span></b></label>
+    <input type="range" id="sV" min="0.4" max="12" step="0.1" value="4">
+  </div>
+  <div class="ctl">
+    <label>Sources <b><span id="vN">1</span></b></label>
+    <input type="range" id="sN" min="1" max="3" step="1" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="wire">wireframe</span>
+    <span class="tg on" data-t="crest">crest markers</span>
+    <span class="tg" data-t="auto">auto-orbit</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Frequency f</span><b id="rF">0</b></div>
+    <div class="ro"><span>&omega;</span><b id="rW">0</b></div>
+    <div class="ro"><span>k</span><b id="rK">0</b></div>
+    <div class="ro"><span>Peak height</span><b id="rH">0</b></div>
+    <div class="ro"><span>Your ripples</span><b id="rR">0</b></div>
+    <div class="ro"><span>Frame</span><b id="rFr">—</b></div>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Calm water</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    <b>Drag across the surface</b> to inject a ripple — it radiates outward, reflects off the
+    basin walls, and interferes with the driven wave. Scroll to zoom, right-drag to pan.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const SIZE = 60, SEG = 110;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x38bdf8,
+    dist: 44, minD: 10, maxD: 150, exposure: 0.82, bg: 0x060a14,
+    preserve: true, hemi: 0.22, key: 2.2, fill: 0.2, rim: 0.34,
+    theta: 0.5, phi: 0.95
+  });
+  const scene = st.scene;
+
+  const show = { wire: false, crest: true, auto: false };
+
+  const geo = new T.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+  geo.rotateX(-Math.PI / 2);
+  const waterMat = new T.MeshStandardMaterial({
+    color: 0x0b3352, roughness: 0.3, metalness: 0.32,
+    transparent: true, opacity: 0.96, side: T.DoubleSide,
+    envMapIntensity: 0.4
+  });
+  const water = new T.Mesh(geo, waterMat);
+  water.receiveShadow = true;
+  scene.add(water);
+
+  const wire = new T.Mesh(geo, new T.MeshBasicMaterial({
+    color: 0x2f7fb8, wireframe: true, transparent: true, opacity: 0.16
+  }));
+  wire.position.y = 0.01;
+  wire.visible = false;
+  scene.add(wire);
+
+  const basin = new T.Mesh(
+    new T.BoxGeometry(SIZE + 2, 5.2, SIZE + 2),
+    new T.MeshStandardMaterial({ color: 0x141c2c, roughness: 0.85, metalness: 0.15 }));
+  basin.position.y = -2.65;
+  basin.receiveShadow = true; basin.castShadow = true;
+  scene.add(basin);
+
+  const grid = st.grid(SIZE + 2, 30, 0x2b3a58, 0x161e2f);
+  grid.material.opacity = 0.45;
+  grid.position.y = -5.2;
+  scene.add(grid);
+
+  const sun = new T.DirectionalLight(0xfff4e0, 1.4);
+  sun.position.set(20, 30, 14);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -34; sun.shadow.camera.right = 34;
+  sun.shadow.camera.top = 34; sun.shadow.camera.bottom = -34;
+  scene.add(sun);
+
+  const crestGeo = new T.SphereGeometry(0.28, 12, 8);
+  const crestMat = new T.MeshBasicMaterial({ color: 0x9fe8ff });
+  const crests = new T.InstancedMesh(crestGeo, crestMat, 64);
+  crests.instanceMatrix.setUsage(T.DynamicDrawUsage);
+  crests.frustumCulled = false;
+  scene.add(crests);
+
+  const drops = [];
+  let t = 0, run = true, lastMs = 0;
+  const dummy = new T.Object3D();
+
+  function par() {
+    const A = +el('sA').value, L = +el('sL').value, V = +el('sV').value, N = Math.round(+el('sN').value);
+    return { A, L, V, N, f: V / L, w: 2 * Math.PI * V / L, k: 2 * Math.PI / L };
+  }
+
+  function srcPos(N) {
+    if (N <= 1) return [[-SIZE * 0.34, 0, 0]];
+    if (N === 2) return [[-SIZE * 0.3, 0, -SIZE * 0.2], [-SIZE * 0.3, 0, SIZE * 0.2]];
+    return [[-SIZE * 0.32, 0, 0], [-SIZE * 0.3, 0, -SIZE * 0.24], [-SIZE * 0.3, 0, SIZE * 0.24]];
+  }
+
+  function heightAt(x, z, P, tt) {
+    const srcs = srcPos(P.N);
+    let h = 0;
+    for (let i = 0; i < P.N; i++) {
+      const s = srcs[i];
+      const dx = x - s[0], dz = z - s[2];
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const ph = 2 * Math.PI * (i * 0.17);
+      h += P.A * Math.sin(P.k * d - P.w * tt + ph) * Math.exp(-d * 0.045);
+    }
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const d = drops[i];
+      const r = Math.hypot(x - d.x, z - d.z);
+      const age = tt - d.t0;
+      if (age > 7) { drops.splice(i, 1); continue; }
+      h += d.a * Math.sin(d.k * r - d.w * age) * Math.exp(-r * 0.16) * Math.exp(-age * 0.42);
+    }
+    return h;
+  }
+
+  function deform() {
+    const P = par();
+    const pos = geo.attributes.position;
+    const arr = pos.array;
+    let peak = 0;
+    for (let i = 0; i < arr.length; i += 3) {
+      const h = heightAt(arr[i], arr[i + 2], P, t);
+      arr[i + 1] = h;
+      const ah = Math.abs(h);
+      if (ah > peak) peak = ah;
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return peak;
+  }
+
+  function updateCrests() {
+    let n = 0;
+    const P = par();
+    const g = 1.4;
+    for (let x = -SIZE / 2 + g; x < SIZE / 2 && n < 64; x += g) {
+      for (let z = -SIZE / 2 + g; z < SIZE / 2 && n < 64; z += g) {
+        const h = heightAt(x, z, P, t);
+        if (h > P.A * 0.86) {
+          dummy.position.set(x, h + 0.2, z);
+          dummy.scale.setScalar(0.8 + h * 0.14);
+          dummy.updateMatrix();
+          crests.setMatrixAt(n++, dummy.matrix);
+        }
+      }
+    }
+    for (let i = n; i < 64; i++) {
+      dummy.position.set(0, -999, 0); dummy.scale.setScalar(0.001); dummy.updateMatrix();
+      crests.setMatrixAt(i, dummy.matrix);
+    }
+    crests.count = 64;
+    crests.instanceMatrix.needsUpdate = true;
+    crests.visible = show.crest;
+  }
+
+  function step(dt) {
+    if (!run) return;
+    t += dt;
+    if (drops.length > 90) drops.splice(0, drops.length - 90);
+  }
+
+  function draw() {
+    const peak = deform();
+    wire.visible = show.wire;
+    updateCrests();
+    return peak;
+  }
+
+  function outs(peak) {
+    const P = par();
+    el('dV').textContent = P.V.toFixed(2) + ' u/s';
+    el('dL').textContent = P.L.toFixed(2) + ' u';
+    el('dT').textContent = (1 / P.f).toFixed(3) + ' s';
+    el('dS').textContent = P.N + ' driven' + (drops.length ? ' + ' + drops.length + ' yours' : '');
+    el('rF').textContent = P.f.toFixed(3) + ' Hz';
+    el('rW').textContent = P.w.toFixed(2) + ' rad/s';
+    el('rK').textContent = P.k.toFixed(3);
+    el('rH').textContent = peak.toFixed(2) + ' u';
+    el('rR').textContent = drops.length;
+    el('rFr').textContent = lastMs.toFixed(1) + ' ms';
+
+    const v = el('v');
+    if (drops.length >= 2) {
+      v.innerHTML = '<b style="color:var(--ok)">' + drops.length + ' of your ripples are interfering.</b> ' +
+        'Where a crest meets a crest they add, crest meets trough they cancel. Superposition means the total is just the sum.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (P.A < 0.15) {
+      v.innerHTML = '<b style="color:var(--warn)">Flat water.</b> Amplitude is near zero, so only the ripples you drag in are visible.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (P.N > 1) {
+      v.innerHTML = '<b style="color:var(--acc2)">' + P.N + ' coherent sources.</b> Phase-locked, so they interfere into a fixed ' +
+        'pattern that travels with the wave rather than a random shimmer.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--acc2)">Single source.</b> Circular wavefronts spreading from one point. ' +
+        'Wave speed is set by v and &lambda; alone — not by how big the waves look.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sA', 'vA', 2], ['sL', 'vL', 1], ['sV', 'vV', 1], ['sN', 'vN', 0]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sA', 'sL', 'sV', 'sN'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+    if (k === 'auto') st.controls.setView(st.controls.getTheta ? 0 : 0, 0.95, show.auto ? 44 : 44);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { drops.length = 0; });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  const plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
+  const hit = new T.Vector3();
+  let painting = false;
+
+  function cast(ev) {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    return ray.ray.intersectPlane(plane, hit) ? hit : null;
+  }
+
+  cv.addEventListener('pointerdown', ev => {
+    const p = cast(ev);
+    if (!p || Math.abs(p.x) > SIZE / 2 || Math.abs(p.z) > SIZE / 2) return;
+    painting = true;
+    st.controls.enabled = false;
+    cv.setPointerCapture(ev.pointerId);
+    drops.push({ x: p.x, z: p.z, a: 0.85, k: 1.5, w: 7.5, t0: t });
+  }, true);
+
+  cv.addEventListener('pointermove', ev => {
+    cv.style.cursor = painting ? 'crosshair' : 'default';
+    if (!painting) return;
+    const p = cast(ev);
+    if (!p) return;
+    if (Math.abs(p.x) > SIZE / 2 || Math.abs(p.z) > SIZE / 2) return;
+    const last = drops[drops.length - 1];
+    if (last && Math.hypot(p.x - last.x, p.z - last.z) < 1.1) return;
+    drops.push({ x: p.x, z: p.z, a: 0.85, k: 1.5, w: 7.5, t0: t });
+  }, true);
+
+  const end = () => { painting = false; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', end, true);
+  cv.addEventListener('pointercancel', end, true);
+
+  syncUI();
+  st.onFrame(dt => {
+    const t0 = performance.now();
+    step(dt);
+    outs(draw());
+    lastMs = performance.now() - t0;
+  });
+  st.start();
+})();
+</script>
+</body>
+</html>

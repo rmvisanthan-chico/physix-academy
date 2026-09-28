@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newton's Second Law 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#f97316; --acc2:#fbbf24; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(640px,47vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:120px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:15px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  .keys{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:11px;color:var(--txt2)}
+  .keys i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+  .dotc{width:9px;height:9px;border-radius:2px;display:inline-block}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:47vh}
+    #view{inset:0 0 47vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Newton's Second Law 3D</h1>
+  <p>Drag the cyan handle to change the push. Drag the cart to move it.</p>
+</div>
+<div class="hud eq">F<sub>net</sub> = ma</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Net force</span><b id="dN">—</b></div>
+  <div class="chip"><span>Acceleration</span><b id="dA">—</b></div>
+  <div class="chip"><span>Velocity</span><b id="dV">—</b></div>
+  <div class="chip"><span>Friction</span><b id="dF">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Controls</h2>
+  <div class="ctl">
+    <label>Applied force <b><span id="vF">40</span> N</b></label>
+    <input type="range" id="sF" min="-120" max="120" step="1" value="40">
+  </div>
+  <div class="ctl">
+    <label>Mass <b><span id="vm">8</span> kg</b></label>
+    <input type="range" id="sm" min="1" max="30" step="0.5" value="8">
+  </div>
+  <div class="ctl">
+    <label>Friction &mu; <b><span id="vu">0.15</span></b></label>
+    <input type="range" id="su" min="0" max="0.8" step="0.01" value="0.15">
+  </div>
+  <div class="ctl">
+    <label>Gravity g <b><span id="vg">9.81</span> m/s&sup2;</b></label>
+    <input type="range" id="sg" min="1.6" max="24.8" step="0.01" value="9.81">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="forces">force diagram</span>
+    <span class="tg on" data-t="trail">trail</span>
+    <span class="tg" data-t="labels">labels</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Weight</span><b id="rW">0 N</b></div>
+    <div class="ro"><span>Normal</span><b id="rN">0 N</b></div>
+    <div class="ro"><span>Friction</span><b id="rF">0 N</b></div>
+    <div class="ro"><span>Net force</span><b id="rNet">0 N</b></div>
+    <div class="ro"><span>Kinetic</span><b id="rKE">0 J</b></div>
+    <div class="ro"><span>Position</span><b id="rX">0 m</b></div>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <div class="keys">
+    <i><span class="dotc" style="background:#31d7f0"></span>applied</i>
+    <i><span class="dotc" style="background:#ffc043"></span>friction</i>
+    <i><span class="dotc" style="background:#3ee0a4"></span>normal</i>
+    <i><span class="dotc" style="background:#ff7a7a"></span>weight</i>
+    <i><span class="dotc" style="background:#ffffff"></span>net</i>
+  </div>
+  <p class="hint">
+    <b>Drag the cyan sphere</b> to push harder or pull the other way. <b>Drag the cart</b> to
+    reposition it. Scroll to zoom, right-drag to pan, drag empty space to orbit.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const TRACK = 24, SCALE = 1.05;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xf97316,
+    dist: 22, minD: 8, maxD: 90, exposure: 0.95, bg: 0x060a12,
+    preserve: true, hemi: 0.24, key: 2.6, fill: 0.24, rim: 0.4,
+    theta: 0.42, phi: 1.24
+  });
+  const scene = st.scene;
+  const show = { forces: true, trail: true, labels: true };
+
+  const floor = st.floor(64, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(TRACK * 2, 48, 0x33415f, 0x1a2133);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  for (let i = 0; i <= 12; i++) {
+    const m = new T.Mesh(
+      new T.BoxGeometry(0.07, 0.34, 0.07),
+      new T.MeshStandardMaterial({ color: i % 6 === 0 ? 0x5c6c92 : 0x2f3b55, roughness: 0.6, metalness: 0.2 }));
+    m.position.set(-TRACK / 2 + i * (TRACK / 12), 0.17, -3.4);
+    m.castShadow = true;
+    scene.add(m);
+  }
+
+  const cart = new T.Group();
+  scene.add(cart);
+  const bodyMat = new T.MeshStandardMaterial({ color: 0x4a3f8f, roughness: 0.42, metalness: 0.35 });
+  const box = new T.Mesh(new T.BoxGeometry(2, 1, 1.5), bodyMat);
+  box.position.y = 1.05;
+  box.castShadow = true; box.receiveShadow = true;
+  cart.add(box);
+  const trim = new T.Mesh(new T.BoxGeometry(2.04, 0.16, 1.54),
+    new T.MeshStandardMaterial({ color: 0x6d5df6, emissive: 0x2a1f7a, emissiveIntensity: 0.6, roughness: 0.3, metalness: 0.4 }));
+  trim.position.y = 1.5;
+  cart.add(trim);
+  const wheelGeo = new T.CylinderGeometry(0.36, 0.36, 0.26, 22);
+  const wheelMat = new T.MeshStandardMaterial({ color: 0x151b28, roughness: 0.75, metalness: 0.3 });
+  const wheels = [];
+  for (const [wx, wz] of [[-0.62, 0.78], [0.62, 0.78], [-0.62, -0.78], [0.62, -0.78]]) {
+    const w = new T.Mesh(wheelGeo, wheelMat);
+    w.rotation.x = Math.PI / 2;
+    w.position.set(wx, 0.36, wz);
+    w.castShadow = true;
+    cart.add(w); wheels.push(w);
+  }
+
+  const cartGlow = st.glow(0x6d5df6, 4.2, 0.3);
+  scene.add(cartGlow);
+
+  const UP = new T.Vector3(0, 1, 0);
+  const fApplied = st.arrow(0x31d7f0, new T.Vector3(), new T.Vector3(1, 0, 0), 4);
+  const fFric = st.arrow(0xffc043, new T.Vector3(), new T.Vector3(-1, 0, 0), 4);
+  const fNorm = st.arrow(0x3ee0a4, new T.Vector3(), new T.Vector3(0, 1, 0), 4);
+  const fGrav = st.arrow(0xff7a7a, new T.Vector3(), new T.Vector3(0, -1, 0), 4);
+  const fNet = st.arrow(0xffffff, new T.Vector3(), new T.Vector3(1, 0, 0), 4);
+  [fApplied, fFric, fNorm, fGrav, fNet].forEach(a => scene.add(a));
+
+  const handle = new T.Mesh(
+    new T.SphereGeometry(0.36, 24, 18),
+    new T.MeshStandardMaterial({ color: 0x31d7f0, emissive: 0x0d6f80, emissiveIntensity: 0.8, roughness: 0.3 }));
+  scene.add(handle);
+  const handleGlow = st.glow(0x31d7f0, 2.8, 0.85);
+  scene.add(handleGlow);
+
+  const lblApp = st.label('F', '#31d7f0', 0.008);
+  const lblFri = st.label('fr', '#ffc043', 0.008);
+  const lblNor = st.label('N', '#3ee0a4', 0.008);
+  const lblGrv = st.label('mg', '#ff7a7a', 0.008);
+  const lblNet = st.label('Fnet', '#ffffff', 0.008);
+  [lblApp, lblFri, lblNor, lblGrv, lblNet].forEach(l => scene.add(l));
+
+  const MAXP = 2000;
+  const tp = new Float32Array(MAXP * 3), tc = new Float32Array(MAXP * 3);
+  const tg = new T.BufferGeometry();
+  tg.setAttribute('position', new T.BufferAttribute(tp, 3));
+  tg.setAttribute('color', new T.BufferAttribute(tc, 3));
+  tg.setDrawRange(0, 0);
+  const trail = new T.Points(tg, new T.PointsMaterial({
+    size: 2.4, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending
+  }));
+  trail.frustumCulled = false;
+  scene.add(trail);
+  let tn = 0;
+
+  const p = { x: 0, v: 0 };
+  let run = true, applied = 40;
+
+  function par() {
+    const m = +el('sm').value, F = applied, u = +el('su').value, g = +el('sg').value;
+    const N = m * g, Wt = m * g, fr = u * N;
+    const dir = p.v > 0.02 ? 1 : p.v < -0.02 ? -1 : (Math.sign(F) || 1);
+    const net = F - fr * dir;
+    return { m, F, u, g, N, Wt, fr, net, a: net / m };
+  }
+
+  function reset() {
+    p.x = 0; p.v = 0; tn = 0; tg.setDrawRange(0, 0);
+  }
+
+  function step(dt) {
+    if (!run) return;
+    const P = par();
+    p.v += P.a * dt;
+    p.x += p.v * dt;
+    if (p.x < -TRACK / 2) { p.x = -TRACK / 2; p.v = 0; }
+    if (p.x > TRACK / 2) { p.x = TRACK / 2; p.v = 0; }
+    if (show.trail) {
+      if (tn < MAXP) {
+        const i = tn++;
+        tp[i * 3] = p.x * SCALE; tp[i * 3 + 1] = 0.06; tp[i * 3 + 2] = 0;
+      } else {
+        tp.copyWithin(0, 3);
+        tp[(MAXP - 1) * 3] = p.x * SCALE; tp[(MAXP - 1) * 3 + 1] = 0.06; tp[(MAXP - 1) * 3 + 2] = 0;
+      }
+      for (let i = 0; i < tn; i++) {
+        const a = 0.12 + 0.8 * Math.pow(i / Math.max(1, tn - 1), 2.4);
+        tc[i * 3] = 0.42 * a; tc[i * 3 + 1] = 0.36 * a; tc[i * 3 + 2] = 1.0 * a;
+      }
+      tg.attributes.position.needsUpdate = true;
+      tg.attributes.color.needsUpdate = true;
+      tg.setDrawRange(0, tn);
+    }
+  }
+
+  const tmp = new T.Vector3();
+  const camTarget = new T.Vector3();
+  function arrowLen(N) { return N / 90 * 2.6; }
+
+  function placeArrow(a, base, dirv, mag, lbl, lblOff) {
+    const L = arrowLen(mag);
+    if (L < 0.12) { a.visible = false; if (lbl) lbl.visible = false; return; }
+    a.visible = true;
+    a.position.copy(base);
+    a.quaternion.setFromUnitVectors(UP, dirv);
+    a.scale.set(1, L / 4, 1);
+    if (lbl) {
+      lbl.visible = show.labels;
+      lbl.position.copy(base).addScaledVector(dirv, L + 0.55);
+      if (lblOff) lbl.position.y += lblOff;
+    }
+  }
+
+  function draw() {
+    const P = par();
+    cart.position.x = p.x * SCALE;
+    cartGlow.position.set(cart.position.x, 1.0, 0);
+    const spin = -p.v * dtSafe() * 2.6;
+    wheels.forEach(w => { w.rotation.y += spin; });
+
+    const base = new T.Vector3(cart.position.x, 1.05, 0);
+    const right = new T.Vector3(1, 0, 0), up = UP, left = new T.Vector3(-1, 0, 0), down = new T.Vector3(0, -1, 0);
+
+    placeArrow(fApplied, base, P.F >= 0 ? right : left, Math.abs(P.F), lblApp, 0.3);
+    placeArrow(fFric, base, left, P.fr, lblFri, 0.3);
+    placeArrow(fNorm, base, up, P.N, lblNor, 0);
+    placeArrow(fGrav, base, down, P.Wt, lblGrv, 0);
+    placeArrow(fNet, new T.Vector3(cart.position.x, 2.55, 0), P.net >= 0 ? right : left, Math.abs(P.net), lblNet, 0.25);
+
+    const hLen = arrowLen(Math.abs(P.F)) * Math.sign(P.F || 1);
+    handle.position.set(cart.position.x + hLen, 1.05, 0);
+    handleGlow.position.copy(handle.position);
+    handleGlow.scale.setScalar(2.6 + Math.sin(performance.now() * 0.004) * 0.18);
+
+    fApplied.visible = fFric.visible = fNorm.visible = fGrav.visible = fNet.visible = show.forces;
+    [lblApp, lblFri, lblNor, lblGrv, lblNet].forEach(l => { if (l) l.visible = show.forces && show.labels; });
+    trail.visible = show.trail;
+    const want = new T.Vector3(cart.position.x, 1.1, 0);
+    if (Math.abs(want.x) > TRACK * 0.34) want.x = Math.sign(want.x) * TRACK * 0.34;
+    camTarget.lerp(want, 0.05);
+    st.controls.frame(undefined, camTarget);
+    return P;
+  }
+
+  let lastT = performance.now();
+  function dtSafe() { const n = performance.now(); const d = (n - lastT) / 1000; lastT = n; return Math.min(0.05, d); }
+
+  function outs(P) {
+    el('dN').textContent = P.net.toFixed(1) + ' N';
+    el('dA').textContent = P.a.toFixed(2) + ' m/s²';
+    el('dV').textContent = p.v.toFixed(2) + ' m/s';
+    el('dF').textContent = P.fr.toFixed(1) + ' N';
+    el('rW').textContent = P.Wt.toFixed(1) + ' N';
+    el('rN').textContent = P.N.toFixed(1) + ' N';
+    el('rF').textContent = P.fr.toFixed(1) + ' N';
+    const n = el('rNet');
+    n.textContent = P.net.toFixed(1) + ' N';
+    n.style.color = P.net > 0.5 ? 'var(--ok)' : P.net < -0.5 ? 'var(--bad)' : 'var(--txt)';
+    el('rKE').textContent = (0.5 * P.m * p.v * p.v).toFixed(1) + ' J';
+    el('rX').textContent = p.x.toFixed(2) + ' m';
+
+    const v = el('v');
+    if (Math.abs(P.F) < P.fr - 0.01) {
+      v.innerHTML = '<b style="color:var(--warn)">Friction wins.</b> A push of ' + Math.abs(P.F).toFixed(0) +
+        ' N cannot overcome ' + P.fr.toFixed(0) + ' N of friction, so the net force points backwards.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (Math.abs(P.net) < 1) {
+      v.innerHTML = '<b style="color:var(--warn)">Balanced.</b> Push and friction almost cancel — that ' +
+        P.net.toFixed(1) + ' N left over is all that accelerates the cart.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">It accelerates.</b> ' + Math.abs(P.F).toFixed(0) +
+        ' N minus ' + P.fr.toFixed(0) + ' N friction leaves ' + P.net.toFixed(1) + ' N, so a = F/m = ' +
+        P.a.toFixed(2) + ' m/s&sup2;.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sm', 'vm', 1], ['su', 'vu', 2], ['sg', 'vg', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+    const f = el('sF');
+    f.style.setProperty('--p', ((f.value - f.min) / (f.max - f.min) * 100) + '%');
+    el('vF').textContent = (+f.value).toFixed(0);
+  }
+
+  el('sF').addEventListener('input', () => { applied = +el('sF').value; syncUI(); });
+  ['sm', 'su', 'sg'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { applied = 40; el('sF').value = 40; syncUI(); reset(); });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  let drag = null;
+
+  function pick(ev) {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (ray.ray.distanceToPoint(handle.position) < 1.4) return 'handle';
+    if (ray.ray.distanceToPoint(new T.Vector3(cart.position.x, 1.05, 0)) < 1.7) return 'cart';
+    return null;
+  }
+
+  const dragPlane = new T.Plane();
+  const hit = new T.Vector3();
+
+  cv.addEventListener('pointerdown', ev => {
+    const m = pick(ev);
+    if (!m) return;
+    drag = m;
+    st.controls.enabled = false;
+    cv.setPointerCapture(ev.pointerId);
+  }, true);
+
+  cv.addEventListener('pointermove', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (!drag) { cv.style.cursor = pick(ev) ? 'grab' : 'default'; return; }
+    const n = st.camera.getWorldDirection(new T.Vector3()).negate();
+    dragPlane.setFromNormalAndCoplanarPoint(n, drag === 'cart' ? new T.Vector3(p.x, 1.05, 0) : handle.position);
+    if (!ray.ray.intersectPlane(dragPlane, hit)) return;
+    if (drag === 'cart') {
+      p.x = Math.max(-TRACK / 2, Math.min(TRACK / 2, hit.x / SCALE));
+      p.v *= 0.2;
+      tn = 0; tg.setDrawRange(0, 0);
+    } else {
+      const dx = (hit.x - cart.position.x) / SCALE;
+      applied = Math.max(-120, Math.min(120, dx / 2.4 * 130));
+      el('sF').value = applied; syncUI();
+    }
+  }, true);
+
+  const end = () => { drag = null; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', end, true);
+  cv.addEventListener('pointercancel', end, true);
+
+  syncUI();
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

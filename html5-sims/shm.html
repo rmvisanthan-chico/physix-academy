@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring-Mass SHM — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#22c55e; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:70ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Spring-Mass SHM</h1>
+    <span class="eq">x(t) = A cos&omega;t &nbsp;&nbsp; &omega; = &radic;(k/m)</span>
+  </header>
+  <p class="sub">A restoring force that grows with displacement produces perfect simple harmonic motion &mdash; energy swings between the spring and the mass, never quite leaving the system.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <h2>Controls</h2>
+      <div class="ctl">
+        <label>Spring constant k <b><span id="vk">20</span> N/m</b></label>
+        <input type="range" id="sk" min="2" max="120" step="1" value="20">
+      </div>
+      <div class="ctl">
+        <label>Mass m <b><span id="vm">2</span> kg</b></label>
+        <input type="range" id="sm" min="0.2" max="12" step="0.1" value="2">
+      </div>
+      <div class="ctl">
+        <label>Initial displacement <b><span id="va">40</span> cm</b></label>
+        <input type="range" id="sa" min="0" max="100" step="1" value="40">
+      </div>
+      <div class="ctl">
+        <label>Damping b <b><span id="vb">0.00</span></b></label>
+        <input type="range" id="sb" min="0" max="2" step="0.01" value="0">
+      </div>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Displacement</span><b id="rX">0</b></div>
+        <div class="ro"><span>Period T</span><b id="rT">0 s</b></div>
+        <div class="ro"><span>Frequency</span><b id="rF">0 Hz</b></div>
+        <div class="ro"><span>Angular &omega;</span><b id="rW">0</b></div>
+        <div class="ro"><span>Kinetic</span><b id="rKE">0 J</b></div>
+        <div class="ro"><span>Potential</span><b id="rPE">0 J</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Pause</button>
+        <button class="ghost" id="bRst">Reset</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+
+      <p class="note">Stiffer spring or lighter mass, faster oscillation. Notice that the period never depends on how far you pull &mdash; only on k and m.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const sk = document.getElementById('sk'), sm = document.getElementById('sm');
+  const sa = document.getElementById('sa'), sb = document.getElementById('sb');
+  const st = { x: 0, v: 0, run: true, t: 0 };
+
+  let W = 0, H = 0, wallX = 0, restY = 0, pxm = 0, hist = [];
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    W = Math.max(320, r.width); H = Math.round(W * 0.5);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    wallX = W * 0.20;
+    restY = H * 0.42;
+    pxm = (W * 0.58) / 1.0;
+  }
+
+  function reset() {
+    st.x = +sa.value / 100;
+    st.v = 0; st.t = 0; hist = [];
+  }
+
+  function step(dt) {
+    const k = +sk.value, m = +sm.value, b = +sb.value;
+    const a = (-k * st.x - b * st.v) / m;
+    st.v += a * dt;
+    st.x += st.v * dt;
+    st.t += dt;
+    hist.push(st.x);
+    if (hist.length > 400) hist.shift();
+  }
+
+  function draw() {
+    const k = +sk.value, m = +sm.value, b = +sb.value;
+    const w0 = Math.sqrt(k / m);
+    ctx.clearRect(0, 0, W, H);
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a1020'); bg.addColorStop(1, '#070b16');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    for (let gx = 0; gx < W; gx += 30) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1;
+    for (let gy = 0; gy < H; gy += 30) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+
+    ctx.fillStyle = '#26324c';
+    for (let y = 10; y < H - 10; y += 16) ctx.fillRect(wallX - 11, y, 22, 9);
+
+    const massX = wallX + 58 + st.x * pxm;
+    const coil = Math.max(8, Math.round((massX - wallX - 46) / 9));
+    const y0 = restY - 26, y1 = restY + 26;
+    ctx.strokeStyle = b > 0.02 ? '#fbbf24' : '#6d5df6';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(wallX, y0);
+    const spanX = (massX - 46) - wallX;
+    for (let i = 0; i < coil; i++) {
+      const x1 = wallX + (i / coil) * spanX;
+      const x2 = wallX + ((i + 0.5) / coil) * spanX;
+      const x3 = wallX + ((i + 1) / coil) * spanX;
+      ctx.lineTo(x1, y0);
+      ctx.lineTo(x2, i % 2 ? y0 + 11 : y0 - 11);
+      ctx.lineTo(x3, y0);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < coil; i++) {
+      const x1 = wallX + (i / coil) * spanX;
+      const x2 = wallX + ((i + 0.5) / coil) * spanX;
+      const x3 = wallX + ((i + 1) / coil) * spanX;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, i % 2 ? y1 - 11 : y1 + 11);
+      ctx.lineTo(x3, y1);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(wallX + 46, restY); ctx.lineTo(W - 20, restY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#6b7a99';
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('rest position', wallX + 52, restY - 8);
+
+    const mw = 34 + m * 3.2, mh = 30;
+    const mg = ctx.createLinearGradient(0, restY - mh / 2, 0, restY + mh / 2);
+    mg.addColorStop(0, '#3d2f6d'); mg.addColorStop(1, '#241a44');
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.roundRect(massX - mw / 2, restY - mh / 2, mw, mh, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.26)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#e8edf7';
+    ctx.font = '600 12px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.toFixed(1) + ' kg', massX, restY + 4);
+
+    if (b > 0.02) {
+      const vk = Math.min(60, Math.abs(st.v) * 6);
+      if (vk > 2) {
+        ctx.strokeStyle = '#fbbf24'; ctx.fillStyle = '#fbbf24'; ctx.lineWidth = 2.4;
+        const ax = massX + mw / 2 + 12, ay = restY, sgn = -Math.sign(st.v);
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + sgn * vk, ay); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax + sgn * vk, ay);
+        ctx.lineTo(ax + sgn * (vk - 8), ay - 4.5);
+        ctx.lineTo(ax + sgn * (vk - 8), ay + 4.5);
+        ctx.closePath(); ctx.fill();
+        ctx.font = '600 11px ui-monospace,Menlo,Consolas,monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('damping', ax + sgn * (vk + 8) * (sgn > 0 ? 1 : 1), ay + 4);
+      }
+    }
+
+    const gy = H - 16, gh = 46;
+    ctx.fillStyle = 'rgba(255,255,255,.04)';
+    ctx.beginPath(); ctx.roundRect(20, gy - gh, W - 40, gh, 7); ctx.fill();
+    const A = Math.max(0.05, +sa.value / 100);
+    ctx.strokeStyle = 'rgba(255,255,255,.14)';
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(20, gy - gh / 2); ctx.lineTo(W - 20, gy - gh / 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#6d5df6'; ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    hist.forEach((v, i) => {
+      const px = 20 + (i / 399) * (W - 40);
+      const py = gy - gh / 2 - (v / A) * (gh / 2 - 5);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    });
+    ctx.stroke();
+    ctx.fillStyle = '#6b7a99';
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('x(t) — one full cycle every ' + (2 * Math.PI / w0).toFixed(2) + ' s', 28, gy - gh + 12);
+
+    return { w0, k, m, b };
+  }
+
+  function sync() {
+    [['sk', 'vk', 0], ['sm', 'vm', 1], ['sa', 'va', 0], ['sb', 'vb', 2]].forEach(([el, o, d]) => {
+      const e = document.getElementById(el);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      document.getElementById(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  function outs(P) {
+    const T = 2 * Math.PI / P.w0;
+    const ke = 0.5 * P.m * st.v * st.v;
+    const pe = 0.5 * P.k * st.x * st.x;
+    document.getElementById('rX').textContent = (st.x * 100).toFixed(1) + ' cm';
+    document.getElementById('rT').textContent = T.toFixed(3) + ' s';
+    document.getElementById('rF').textContent = (1 / T).toFixed(3) + ' Hz';
+    document.getElementById('rW').textContent = P.w0.toFixed(2) + ' rad/s';
+    document.getElementById('rKE').textContent = ke.toFixed(3) + ' J';
+    document.getElementById('rPE').textContent = pe.toFixed(3) + ' J';
+    document.getElementById('rKE').style.color = ke > pe ? '#22d3ee' : '#e8edf7';
+    document.getElementById('rPE').style.color = pe > ke ? '#fbbf24' : '#e8edf7';
+
+    const v = document.getElementById('v');
+    const E = ke + pe;
+    if (P.b < 0.02) {
+      v.innerHTML = '<b style="color:#34d399">Ideal SHM.</b> Total energy is holding steady at ' +
+        E.toFixed(3) + ' J, sliding between kinetic and potential. Amplitude never decays.';
+      v.style.borderColor = 'rgba(52,211,153,.3)';
+    } else if (E > 0.0004) {
+      v.innerHTML = '<b style="color:#fbbf24">Damped.</b> Energy is bleeding away through the damper &mdash; now ' +
+        E.toFixed(3) + ' J, down from ' + (0.5 * P.k * Math.pow(+sa.value / 100, 2)).toFixed(3) + ' J. The motion will die away.';
+      v.style.borderColor = 'rgba(251,191,36,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#f87171">Stopped.</b> The damper has taken all the energy. Raise the displacement or lower b to restart it.';
+      v.style.borderColor = 'rgba(248,113,113,.3)';
+    }
+  }
+
+  [sk, sm, sa, sb].forEach(e => e.addEventListener('input', sync));
+  sa.addEventListener('input', reset);
+  document.getElementById('bGo').addEventListener('click', e => {
+    st.run = !st.run; e.target.textContent = st.run ? 'Pause' : 'Play';
+  });
+  document.getElementById('bRst').addEventListener('click', reset);
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.016, (now - last) / 1000); last = now;
+    if (st.run) step(dt);
+    outs(draw());
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); draw(); });
+  fit(); sync(); reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

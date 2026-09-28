@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysiX Academy — HTML5 Simulation Set</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99; --acc:#6d5df6; --acc2:#22d3ee;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);margin:0;padding:26px 18px 60px;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--txt2);font-size:13.5px;margin:0 0 8px;max-width:70ch;line-height:1.55}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 22px;
+    padding:10px 12px;background:var(--panel);border:1px solid var(--brd);border-radius:11px}
+  .bar b{font-family:var(--mono);font-size:12.5px;color:var(--acc2)}
+  .bar span{font-size:12px;color:var(--txt3)}
+  h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:26px 0 12px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
+  a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);
+    border:1px solid var(--brd);border-radius:13px;padding:14px;transition:.14s}
+  a.card:hover{border-color:rgba(109,93,246,.55);transform:translateY(-2px);background:var(--panel2)}
+  a.card .ic{font-size:22px;line-height:1}
+  a.card h3{margin:8px 0 4px;font-size:14.5px;letter-spacing:-.01em}
+  a.card p{margin:0;font-size:12px;color:var(--txt2);line-height:1.45}
+  a.card code{display:block;margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
+  .todo{color:var(--txt3);font-size:12.5px;line-height:1.6}
+  .todo code{font-family:var(--mono);color:var(--txt2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>HTML5 Simulation Set</h1>
+  <p class="sub">Standalone rebuilds using plain HTML5 Canvas and WebGL. No build step, no framework, and nothing fetched from the network &mdash; the 3D set loads Three.js from your own <code>js/vendor/</code> folder plus one shared helper, <code>lib/physix3d.js</code>, both committed alongside. Open any one directly with <code>file://</code> and it works.</p>
+
+  <div class="bar">
+    <b id="count">—</b>
+    <span>built so far &nbsp;·&nbsp; 40 in scope (PhET and the embedded PHYSIX LAB site excluded)</span>
+  </div>
+
+  <h2>True 3D set &mdash; new standard</h2>
+  <p class="sub" style="margin-bottom:14px">WebGL scenes with real lighting, soft shadows, ACES tone mapping, a procedural environment for reflections, and direct manipulation &mdash; grab the probe and the velocity handle instead of only moving sliders.</p>
+  <div class="grid" id="g3"></div>
+
+  <h2>Earlier 2D set</h2>
+  <h2 style="margin-top:26px">Batch 1 &mdash; core mechanics and motion</h2>
+  <div class="grid" id="g1"></div>
+
+  <h2>Tier 1 &mdash; particle and statistical models</h2>
+  <div class="grid" id="g2"></div>
+
+  <h2>All 40 built</h2>
+  <p class="todo">
+    Every simulation in scope now has a self-contained 3D rebuild, named after the original simulation id.
+    The original 2D sources are still intact in <code>js/sims-*.js</code> and remain the physics reference
+    &mdash; several of the checks in the new files were derived directly from them.
+  </p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const BATCH1 = [
+    ['atwood.html', '⚖️', 'Atwood Machine', 'Two masses, one rope. Shows that tension is not m₁g, plus optional bearing friction.'],
+    ['orbit.html', '🛰️', 'Orbit Simulator', 'Real two-body integration. Launch speed decides circular, elliptical, escape or impact.'],
+    ['collision.html', '🎱', 'Collision Lab', 'Before/after momentum and kinetic energy tables, with a restitution slider.'],
+    ['projectile.html', '🎯', 'Projectile Motion', 'Range, apex and flight time, with an optional quadratic air-drag model.'],
+    ['wave.html', '🌊', 'Travelling Wave', 'Amplitude, frequency, wavelength and phase. A pinned particle shows the rope is not the traveller.'],
+    ['shm.html', '⏱️', 'Spring-Mass SHM', 'x(t) with live kinetic/potential energy swap and an optional damper.']
+  ];
+
+  const TIER1 = [
+    ['atom-3d.html', '🧊', '3D Atom (simple)', 'Rotatable WebGL version using the Three.js already vendored in js/vendor. No CDN.']
+  ];
+
+  const THREE_D = [
+    ['orbit3d.html', '🪐', 'Gravity Orbit 3D', 'Real two-body integration in a lit 3D scene. Drag the cyan handle to swing the velocity vector and re-shape the orbit live.'],
+    ['efield3d.html', '⚡', 'Electric Fields 3D', 'Field grid plus integrated streamlines between draggable charges, with a probe you drop into the field.'],
+    ['bfield.html', '🧭', 'Charge in a B Field 3D', 'Helical path in a magnetic field. Set the angle to 0° for straight, 90° for a flat circle, anything between for a helix.'],
+    ['wave3d.html', '🌊', 'Wave Surface 3D', 'A real water surface you can drag ripples into. Watch them reflect off the basin and interfere with the driven wave.'],
+    ['newton.html', '🛒', "Newton's Second Law 3D", 'A cart on a lit 3D track with all five forces drawn. Drag the cyan sphere to change the push, or drag the cart itself.'],
+    ['incline.html', '📐', 'Inclined Plane 3D', 'Force decomposition on a 3D ramp. Includes the tanθ > μ threshold where the block breaks free on its own.'],
+    ['collision2d.html', '🎱', '2D Collision Lab 3D', 'Two spheres on a frictionless plane. Drag either one to change the line of centres — that sets the scattering angle.'],
+    ['energy.html', '🎢', 'Energy Conservation 3D', 'A ball rolling a 3D track, with live PE / KE / lost bars. The total never moves when friction is zero.'],
+    ['refraction.html', '🔆', 'Refraction 3D', 'Snell\'s law with two real media, angle arcs, and total internal reflection past the critical angle.'],
+    ['lens.html', '🔭', 'Converging Lens 3D', 'A glass lens traced with five rays. Move the object through f and 2f and watch the image change kind.'],
+    ['ncert10-mirror.html', '🪞', 'Spherical Mirror 3D', 'Concave and convex with true spherical reflection. Signs follow f &lt; 0 for concave, as in the textbook.'],
+    ['ncert10-eye.html', '👁️', 'Human Eye Defects 3D', 'Focus lands on the retina when the eye is right. Too strong is myopia, too weak is hypermetropia — and Auto-correct finds the lens.'],
+    ['thermo-engine.html', '🔥', 'Heat Engine Cycle 3D', 'A real Carnot cycle in a real cylinder. The four legs close properly, and the shaded PV loop is literally the work you get.'],
+    ['cooling.html', '❄️', 'Newton’s Cooling 3D', 'Exponential decay with a live marker on the curve. Move the room temperature and watch the half-life and the colour both shift.'],
+    ['ncert11-pv.html', '📈', 'Brayton PV Cycle 3D', 'Work is the enclosed area, and the sim proves it: it integrates ∮P dV and checks it against Q(in) − Q(out) live.'],
+    ['ktg-gas.html', '💨', 'Kinetic Gas 3D', 'Molecules bounce off real walls and the pressure is nothing but summed impulse. It lands on NkT/V, and all three axes agree.'],
+    ['fluid.html', '🌊', 'Fluid Particles 3D', 'A real pool: repulsion plus neighbour drag, grid-bucketed so 900 particles cost 5% of an O(n²) pass.'],
+    ['atoms-bohr.html', '⚛️', 'Bohr Atom 3D', 'True n² shells, each in its own orbital plane. Every spectral line is computed from λ = hc/ΔE, not looked up.'],
+    ['standing.html', '〰️', 'Standing Waves 3D', 'A real string pinned at both ends. Only whole numbers of half-wavelengths fit — switch on the component waves to see why.'],
+    ['interference.html', '🌐', 'Wave Interference 3D', 'Two sources on a real water surface. Click to move a probe; the verdict uses the actual path difference, not a lookup.'],
+    ['doppler.html', '🚑', 'Doppler Effect 3D', 'Watch the emitted wavefronts pile up ahead of a moving source. The speed of sound never changes — only the spacing.'],
+    ['circuit.html', '🔌', "Ohm's Law Circuit 3D", 'A closed loop with a real battery, resistor and bulb. The graph is the straight line I = V/R, and I²R = VI is checked live.'],
+    ['rc.html', '🔋', 'RC Circuit 3D', 'Charge piles onto the plates as the current fades. The panel checks the energy balance: source = heat + d(½CV²)/dt.'],
+    ['induction.html', '🌀', "Faraday's Induction 3D", 'EMF is zero when the magnet rests — and also zero at dead centre, where the flux is maximal. Watch the sign flip as it passes.'],
+    ['efield.html', '🗺️', 'Electric Field Mapper 3D', 'Equipotentials on a slice, with a probe. The check compares Coulomb\'s field against the numerical gradient of the plotted map.'],
+    ['kin1d.html', '🚗', '1-D Motion Lab 3D', 'A car on a road with distance markers, tracing x(t) and v(t) live. The panel tests v² = u² + 2ax every frame.'],
+    ['buoyancy.html', '🛟', 'Buoyancy 3D', 'Five fluids, and a block that floats at exactly ρb/ρf submerged. Drag sideways; a dense one settles at terminal velocity.'],
+    ['ncert11-rotation.html', '🌀', 'Spinning Skater 3D', 'Arms in, spin up — L never changes but K jumps 6.6×. That difference is the work your arms actually did.'],
+    ['ncert9-echo.html', '📡', 'Echo & Sonar 3D', 'A pulse leaves, reflects off a wall and comes back. d = 34 m and v = 344 m/s means 198 ms — and the faint 1/(4d²) return is why you only hear a faint echo.'],
+    ['ncert10-heating.html', '🔌', 'Joule Heating 3D', 'P = V²/R, energy = P × t, and the bill at 3.6 MJ per kWh. A 1500 W kettle on 230 V draws 6.5 A, which is why it needs its own socket.'],
+    ['ncert11-solids.html', '🧵', 'Stress–Strain 3D', 'A real rod to its true length. Steel yields at 250 MPa and necks; glass snaps at 0.05%; rubber is J-shaped. Only the area below the elastic limit comes back.'],
+    ['ncert11-measure.html', '📐', 'Vernier Callipers 3D', 'Main scale plus vernier, least count 0.1 mm, with a zero error you have to subtract. Clamp the rod, find the coinciding mark.'],
+    ['ncert11-venturi.html', '🎯', 'Venturi Meter 3D', 'Watch the particles pack into the throat, then read the mercury. All four of continuity, Bernoulli, the manometer and the discharge formula are checked live.']
+  ];
+
+  const card = ([f, ic, t, d]) =>
+    '<a class="card" href="' + f + '"><div class="ic">' + ic + '</div><h3>' + t +
+    '</h3><p>' + d + '</p><code>' + f + '</code></a>';
+
+  document.getElementById('g3').innerHTML = THREE_D.map(card).join('');
+  document.getElementById('g1').innerHTML = BATCH1.map(card).join('');
+  document.getElementById('g2').innerHTML = TIER1.map(card).join('');
+  const all = [...BATCH1, ...TIER1, ...THREE_D].map(c => c[0]);
+  const unique = new Set(all);
+  document.getElementById('count').textContent = unique.size + ' of 40';
+  const dead = [...unique].filter(f => !THREE_D.concat(TIER1, BATCH1).some(c => c[0] === f));
+  if (dead.length) console.warn('unlinked sims', dead);
+})();
+</script>
+</body>
+</html>

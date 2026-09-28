@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charge in a B Field 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#10b981; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;
+    -webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(640px,47vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:120px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:15px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:47vh}
+    #view{inset:0 0 47vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Charge in a B Field 3D</h1>
+  <p>The magnetic force is always perpendicular to velocity — so it bends the path without ever changing the speed.</p>
+</div>
+<div class="hud eq">r = mv/(|q|B) &nbsp;&nbsp; T = 2&pi;m/(|q|B) &nbsp;&nbsp; F = qv&times;B</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Speed</span><b id="dV">—</b></div>
+  <div class="chip"><span>Radius r</span><b id="dR">—</b></div>
+  <div class="chip"><span>Period T</span><b id="dT">—</b></div>
+  <div class="chip"><span>Shape</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Particle</h2>
+  <div class="ctl">
+    <label>Speed v <b><span id="vV">6.0</span> u/s</b></label>
+    <input type="range" id="sV" min="0.5" max="16" step="0.1" value="6">
+  </div>
+  <div class="ctl">
+    <label>Charge |q| <b><span id="vQ">1.0</span> C</b></label>
+    <input type="range" id="sQ" min="0.2" max="4" step="0.05" value="1">
+  </div>
+  <div class="ctl">
+    <label>Mass m <b><span id="vM">1.0</span></b></label>
+    <input type="range" id="sM" min="0.2" max="5" step="0.05" value="1">
+  </div>
+
+  <h2 class="mt">Field</h2>
+  <div class="ctl">
+    <label>Field strength B <b><span id="vB">1.0</span> T</b></label>
+    <input type="range" id="sB" min="0.1" max="3" step="0.05" value="1">
+  </div>
+  <div class="ctl">
+    <label>Angle to B <b><span id="vA">75</span>&deg;</b></label>
+    <input type="range" id="sA" min="0" max="180" step="1" value="75">
+  </div>
+  <div class="ctl">
+    <label>Charge sign <b><span id="vSg">+</span></b></label>
+    <input type="range" id="sSg" min="0" max="1" step="1" value="1">
+  </div>
+  <div class="ctl">
+    <label>Time rate <b><span id="vTr">3.0</span>&times;</b></label>
+    <input type="range" id="sTr" min="0.25" max="12" step="0.25" value="3">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="trail">trail</span>
+    <span class="tg on" data-t="bfield">field lines</span>
+    <span class="tg" data-t="force">force vector</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Kinetic</span><b id="rKE">0</b></div>
+    <div class="ro"><span>|F| = qvB</span><b id="rF">0</b></div>
+    <div class="ro"><span>Pitch</span><b id="rPi">0</b></div>
+    <div class="ro"><span>Gyroradius</span><b id="rR">0</b></div>
+    <div class="ro"><span>Helix turns</span><b id="rT">0</b></div>
+    <div class="ro"><span>Frame</span><b id="rFr">—</b></div>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Re-launch</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Set the angle to exactly <b>0&deg;</b> for a straight line and <b>90&deg;</b> for a flat circle.
+    Anything between gives a helix. Scroll to zoom, right-drag to pan, drag empty space to orbit.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x10b981,
+    dist: 30, minD: 8, maxD: 140, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.2, key: 2.6, fill: 0.22, rim: 0.36,
+    theta: 0.7, phi: 1.15
+  });
+  const scene = st.scene;
+  const show = { trail: true, bfield: true, force: false };
+
+  const B_FIELD = new T.Vector3(0, 1, 0);
+  const p = { pos: new T.Vector3(), vel: new T.Vector3() };
+  let acc = 0, tSim = 0, run = true, lastMs = 0, turns = 0;
+
+  const grid = st.grid(40, 20, 0x2a3a5c, 0x161d2e);
+  grid.material.opacity = 0.35;
+  scene.add(grid);
+
+  const axisMat = new T.MeshStandardMaterial({ color: 0x3a4c72, emissive: 0x141f38, emissiveIntensity: 0.4, roughness: 0.5, metalness: 0.4 });
+  const axis = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 28, 10), axisMat);
+  scene.add(axis);
+  const axisGlow = st.glow(0x6f8dff, 1.6, 0.32);
+  scene.add(axisGlow);
+  const axisLbl = st.label('B field', '#9fb4e8', 0.009);
+  scene.add(axisLbl);
+
+  const bGrp = new T.Group(); scene.add(bGrp);
+  function buildField() {
+    while (bGrp.children.length) { const c = bGrp.children.pop(); c.geometry.dispose(); c.material.dispose(); }
+    if (!show.bfield) return;
+    for (let i = -3; i <= 3; i++) {
+      for (let k = -3; k <= 3; k++) {
+        if (i === 0 && k === 0) continue;
+        const x = i * 3.6, z = k * 3.6;
+        const g = new T.BufferGeometry().setFromPoints([
+          new T.Vector3(x, -13, z), new T.Vector3(x, 13, z)
+        ]);
+        bGrp.add(new T.Line(g, new T.LineBasicMaterial({
+          color: 0x35518f, transparent: true, opacity: 0.16, blending: T.AdditiveBlending, depthWrite: false
+        })));
+      }
+    }
+  }
+
+  const part = new T.Mesh(
+    new T.SphereGeometry(0.58, 28, 20),
+    new T.MeshStandardMaterial({ color: 0x7b6cff, emissive: 0x3a2f9e, emissiveIntensity: 0.8, roughness: 0.3, metalness: 0.25 }));
+  part.castShadow = true;
+  scene.add(part);
+  const partGlow = st.glow(0x8f7dff, 4.4, 0.9);
+  scene.add(partGlow);
+
+  const fArrow = st.arrow(0xff7a7a, new T.Vector3(), new T.Vector3(1, 0, 0), 4);
+  scene.add(fArrow);
+  const UP = new T.Vector3(0, 1, 0);
+
+  const trailGeo = new T.BufferGeometry();
+  const MAXP = 3000;
+  const tp = new Float32Array(MAXP * 3), tc = new Float32Array(MAXP * 3);
+  trailGeo.setAttribute('position', new T.BufferAttribute(tp, 3));
+  trailGeo.setAttribute('color', new T.BufferAttribute(tc, 3));
+  trailGeo.setDrawRange(0, 0);
+  const trail = new T.Points(trailGeo, new T.PointsMaterial({
+    size: 2.8, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending
+  }));
+  trail.frustumCulled = false;
+  scene.add(trail);
+  let trailN = 0;
+
+  function par() {
+    const v = +el('sV').value, q = +el('sQ').value, m = +el('sM').value;
+    const B = +el('sB').value, ang = (+el('sA').value) * Math.PI / 180;
+    const sgn = +el('sSg').value === 1 ? 1 : -1;
+    return { v, q: q * sgn, m, B, ang };
+  }
+
+  function launch() {
+    const P = par();
+    const speed = P.v;
+    const vpar = speed * Math.sin(P.ang);
+    const vperp = speed * Math.cos(P.ang);
+    p.pos.set(-9, -vpar / P.B * 2, 0);
+    p.vel.copy(B_FIELD).multiplyScalar(-vpar).add(new T.Vector3(vperp, 0, 0));
+    tSim = 0; acc = 0; trailN = 0; trailGeo.setDrawRange(0, 0);
+  }
+
+  const F = new T.Vector3();
+  function accel(pos, vel, out) {
+    out.crossVectors(vel, B_FIELD).multiplyScalar(PAR().q * PAR().B);
+    return out.multiplyScalar(1 / PAR().m);
+  }
+  let _c = null;
+  function PAR() { return _c || (_c = par()); }
+
+  function step(dt) {
+    const P = par();
+    _c = P;
+    if (!run) return;
+    const omega = Math.abs(P.q) * P.B / P.m;
+    if (omega < 1e-6) return;
+    const h = Math.min(dt, 0.02) * 0.9 * (+el('sTr').value);
+    const a1 = new T.Vector3().crossVectors(p.vel, B_FIELD).multiplyScalar(P.q * P.B / P.m);
+    p.pos.addScaledVector(p.vel, h).addScaledVector(a1, 0.5 * h * h);
+    const a2 = new T.Vector3().crossVectors(p.vel, B_FIELD).multiplyScalar(P.q * P.B / P.m);
+    p.vel.addScaledVector(a1.add(a2), 0.5 * h);
+    tSim += h;
+    turns = tSim * omega / (2 * Math.PI);
+    if (show.trail) {
+      if (trailN < MAXP) {
+        const i = trailN++;
+        tp[i * 3] = p.pos.x; tp[i * 3 + 1] = p.pos.y; tp[i * 3 + 2] = p.pos.z;
+      } else {
+        tp.copyWithin(0, 3); tp[(MAXP - 1) * 3] = p.pos.x; tp[(MAXP - 1) * 3 + 1] = p.pos.y; tp[(MAXP - 1) * 3 + 2] = p.pos.z;
+      }
+      const nn = trailN;
+      for (let i = 0; i < nn; i++) {
+        const a = Math.pow(i / Math.max(1, nn - 1), 2.0) * 0.95 + 0.05;
+        tc[i * 3] = 0.42 * a; tc[i * 3 + 1] = 0.34 * a; tc[i * 3 + 2] = 1.0 * a;
+      }
+      trailGeo.attributes.position.needsUpdate = true;
+      trailGeo.attributes.color.needsUpdate = true;
+      trailGeo.setDrawRange(0, nn);
+    }
+  }
+
+  function draw() {
+    part.position.copy(p.pos);
+    partGlow.position.copy(p.pos);
+    partGlow.scale.setScalar(4.2 + Math.sin(tSim * 4) * 0.3);
+    const P = par();
+    part.material.color.set(P.q > 0 ? 0x7b6cff : 0x4db8ff);
+    part.material.emissive.set(P.q > 0 ? 0x3a2f9e : 0x1a5f9e);
+
+    F.crossVectors(p.vel, B_FIELD).multiplyScalar(P.q * P.B);
+    const fm = F.length();
+    const flen = Math.max(0.7, Math.min(7, Math.pow(fm, 0.42) * 1.5));
+    fArrow.position.copy(p.pos);
+    fArrow.scale.set(1, flen / 4, 1);
+    fArrow.quaternion.setFromUnitVectors(UP, F.clone().normalize());
+    fArrow.visible = show.force && fm > 1e-9;
+
+    trail.visible = show.trail;
+    bGrp.visible = show.bfield;
+    axisLbl.position.set(0, 16, 0);
+    return { fm, turns, P };
+  }
+
+  function outs(d) {
+    const P = d.P;
+    const r = P.m * P.v / (Math.abs(P.q) * P.B);
+    const T = 2 * Math.PI * P.m / (Math.abs(P.q) * P.B);
+    const pitch = (P.v * Math.cos(P.ang)) * T;
+    el('dV').textContent = P.v.toFixed(2) + ' u/s';
+    el('dR').textContent = r.toFixed(2) + ' u';
+    el('dT').textContent = T.toFixed(3) + ' s';
+    const deg = +el('sA').value;
+    const shape = deg < 4 || deg > 176 ? 'Straight' : (deg > 86 && deg < 94) ? 'Circle' : 'Helix';
+    el('dS').textContent = shape;
+    el('rKE').textContent = (0.5 * P.m * P.v * P.v).toFixed(2);
+    el('rF').textContent = d.fm.toFixed(2);
+    el('rPi').textContent = pitch.toFixed(2) + ' u';
+    el('rR').textContent = r.toFixed(3) + ' u';
+    el('rT').textContent = d.turns.toFixed(2);
+    el('rFr').textContent = lastMs.toFixed(1) + ' ms';
+
+    const v = el('v');
+    if (shape === 'Straight') {
+      v.innerHTML = '<b style="color:var(--warn)">Parallel to B.</b> v &times; B is zero, so the magnetic force vanishes entirely and the particle coasts straight.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (shape === 'Circle') {
+      v.innerHTML = '<b style="color:var(--ok)">Perpendicular to B.</b> The force turns the velocity a full circle of radius ' +
+        r.toFixed(2) + ' u every ' + T.toFixed(2) + ' s. Speed never changes — only direction.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--acc2)">Helix.</b> The ' + (P.v * Math.cos(P.ang)).toFixed(2) +
+        ' u/s component along B never changes, so the particle also climbs ' + pitch.toFixed(2) + ' u per turn.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sV', 'vV', 1], ['sQ', 'vQ', 2], ['sM', 'vM', 2], ['sB', 'vB', 2], ['sA', 'vA', 0], ['sSg', 'vSg', 0], ['sTr', 'vTr', 2]]
+      .forEach(([i, o, d]) => {
+        const e = el(i);
+        e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+        el(o).textContent = (+e.value).toFixed(d);
+      });
+    el('vSg').textContent = +el('sSg').value === 1 ? 'positive' : 'negative';
+  }
+
+  ['sV', 'sQ', 'sM', 'sB', 'sA', 'sSg'].forEach(i => {
+    el(i).addEventListener('input', () => { syncUI(); _c = null; launch(); });
+  });
+  el('sTr').addEventListener('input', syncUI);
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+    if (k === 'bfield') buildField();
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { _c = null; launch(); });
+
+  syncUI(); buildField(); launch();
+  st.onFrame(dt => {
+    const t0 = performance.now();
+    step(dt);
+    outs(draw());
+    lastMs = performance.now() - t0;
+  });
+  st.start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Echo &amp; SONAR 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#2dd4bf; --acc2:#67e8f9; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,192,67,.40);background:rgba(255,192,67,.08);color:var(--warn)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Echo &amp; SONAR 3D</h1>
+  <p>Sound goes out at the speed you choose, comes back off the wall, and arrives late. If the wait
+     is under a tenth of a second your ear merges it with the original clap &mdash; no echo at all.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">t = 2d / v</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Round trip</span><b id="dT">—</b></div>
+  <div class="chip"><span>One way</span><b id="dT1">—</b></div>
+  <div class="chip"><span>Heard as</span><b id="dH">—</b></div>
+  <div class="chip"><span>Return strength</span><b id="dI">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Sound path</h2>
+  <div class="ctl">
+    <label>Distance to wall d <b><span id="vD">34.0</span> m</b></label>
+    <input type="range" id="sD" min="2" max="90" step="0.5" value="34">
+  </div>
+  <div class="ctl">
+    <label>Speed of sound v <b><span id="vV">344</span> m/s</b></label>
+    <input type="range" id="sV" min="150" max="1600" step="1" value="344">
+  </div>
+  <div class="ctl">
+    <label>Ping rate <b><span id="vR">1.0</span> Hz</b></label>
+    <input type="range" id="sR" min="0.2" max="6" step="0.1" value="1">
+  </div>
+  <div class="ctl">
+    <label>Playback <b><span id="vTs">1.0</span>&times;</b></label>
+    <input type="range" id="sTs" min="0.05" max="3" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="fronts">wavefronts</span>
+    <span class="tg on" data-t="spheres">spherical spread</span>
+    <span class="tg" data-t="line">path line</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Path 2d</span><b id="rP">0</b></div>
+    <div class="ro"><span>Echo delay</span><b id="rE">0</b></div>
+    <div class="ro"><span>Min d for echo</span><b id="rMin">0</b></div>
+    <div class="ro"><span>I ratio (1/r²)</span><b id="rIr">0</b></div>
+    <div class="ro"><span>Intensity at wall</span><b id="rIw">0</b></div>
+    <div class="ro"><span>Intensity back</span><b id="rIb">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Ping now</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    The 0.1&nbsp;s figure is not arbitrary &mdash; it is roughly how long your ear fuses a sound into
+    one. It is why a cliff face a few metres away gives no echo, while one across a valley does.
+    Drag empty space to orbit, scroll to zoom.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const SPAN = 20, SRC_X = -SPAN / 2 + 1.2, MAXD = 90;
+  const ECHO_MIN = 0.1;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x2dd4bf,
+    dist: 22, minD: 10, maxD: 80, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.28, key: 2.3, fill: 0.28, rim: 0.32,
+    theta: 0.30, phi: 1.30, target: new T.Vector3(2.2, 0.6, 0)
+  });
+  const scene = st.scene;
+  const show = { fronts: true, spheres: true, line: false };
+
+  const grid = st.grid(30, 30, 0x1a2338, 0x111726);
+  grid.position.y = -2.4;
+  scene.add(grid);
+
+  const ground = new T.Mesh(new T.PlaneGeometry(60, 40),
+    new T.MeshStandardMaterial({ color: 0x0b1120, roughness: 0.95 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -2.4;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  const wall = new T.Group();
+  scene.add(wall);
+  const wallMat = new T.MeshStandardMaterial({ color: 0x39445e, roughness: 0.75, metalness: 0.15 });
+  const wallMesh = new T.Mesh(new T.BoxGeometry(0.7, 11, 13), wallMat);
+  wallMesh.position.y = 3.1;
+  wallMesh.castShadow = true;
+  wall.add(wallMesh);
+  for (let i = 0; i < 9; i++) {
+    const b = new T.Mesh(new T.BoxGeometry(0.1, 11, 13.4),
+      new T.MeshBasicMaterial({ color: 0x1b2436, transparent: true, opacity: 0.5 }));
+    b.position.set(0.4, 3.1, -6 + i * 1.5);
+    wall.add(b);
+  }
+  const lblW = st.label('WALL', '#9fb0d8', 0.0028);
+  scene.add(lblW);
+
+  const src = new T.Group();
+  const sBody = new T.Mesh(new T.SphereGeometry(0.36, 24, 18),
+    new T.MeshStandardMaterial({ color: 0x31d7f0, emissive: 0x0e5a6a, emissiveIntensity: 0.9, roughness: 0.3 }));
+  const sDish = new T.Mesh(new T.ConeGeometry(0.6, 0.5, 20, 1, true),
+    new T.MeshStandardMaterial({ color: 0x1f6a80, roughness: 0.4, metalness: 0.5, side: T.DoubleSide }));
+  sDish.rotation.z = -Math.PI / 2;
+  sDish.position.x = 0.45;
+  const sGlow = st.glow(0x31d7f0, 2.6, 0.5);
+  src.add(sBody, sDish, sGlow);
+  scene.add(src);
+  const lblS = st.label('SOURCE', '#7fe0ff', 0.0026);
+  scene.add(lblS);
+
+  const det = new T.Group();
+  const dCone = new T.Mesh(new T.ConeGeometry(0.3, 0.6, 16),
+    new T.MeshBasicMaterial({ color: 0x3ee0a4 }));
+  dCone.rotation.z = -Math.PI / 2;
+  dCone.position.x = -0.5;
+  const dGlow = st.glow(0x3ee0a4, 2.2, 0.35);
+  det.add(dCone, dGlow);
+  scene.add(det);
+  const lblD = st.label('ear / mic', '#3ee0a4', 0.0022);
+  scene.add(lblD);
+
+  const RSEG = 64;
+  const ringPts = [];
+  for (let i = 0; i < RSEG; i++) {
+    const a = (i / RSEG) * Math.PI * 2;
+    ringPts.push(new T.Vector3(Math.cos(a), 0, Math.sin(a)));
+  }
+  const MAXF = 14;
+  const fronts = [];
+  for (let i = 0; i < MAXF; i++) {
+    const ring = new T.Line(new T.BufferGeometry().setFromPoints(ringPts),
+      new T.LineBasicMaterial({ color: 0x31d7f0, transparent: true, opacity: 0.6 }));
+    const sph = new T.Mesh(new T.SphereGeometry(1, 20, 14),
+      new T.MeshBasicMaterial({ color: 0x31d7f0, transparent: true, opacity: 0.06,
+        side: T.BackSide, depthWrite: false }));
+    ring.visible = sph.visible = false;
+    scene.add(ring, sph);
+    fronts.push({ ring, sph, r: 0, alive: false, back: false });
+  }
+
+  const pathLine = new T.Line(
+    new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]),
+    new T.LineDashedMaterial({ color: 0xffe066, dashSize: 0.3, gapSize: 0.22, transparent: true, opacity: 0.8 }));
+  pathLine.computeLineDistances();
+  scene.add(pathLine);
+
+  let tSim = 0, run = true, pingAcc = 0, fi = 0, flash = 0;
+
+  const phys = () => ({ d: +el('sD').value, v: +el('sV').value, rate: +el('sR').value, ts: +el('sTs').value });
+
+  function step(dt) {
+    const P = phys();
+    const dtv = dt * P.ts;
+    tSim += dtv;
+    pingAcc += dtv;
+    const period = 1 / P.rate;
+    if (pingAcc >= period) { pingAcc -= period; emit(); }
+    const dS = scene_d();
+    const vs = dS / Math.max(0.05, P.d);
+    for (const f of fronts) {
+      if (!f.alive) continue;
+      f.r += vs * dtv;
+      if (f.r > 2 * dS + 0.4) f.alive = false;
+    }
+    flash = Math.max(0, flash - dt * 3);
+  }
+  function scene_d() { return Math.max(0.6, (+el('sD').value / MAXD) * (SPAN - 2.4)); }
+  function emit() {
+    const f = fronts[fi % MAXF];
+    fi++;
+    f.r = 0.12; f.alive = true; f.back = false;
+  }
+
+  let lastSceneD = -1;
+
+  function draw() {
+    const P = phys();
+    const dScene = scene_d();
+    const wallX = SRC_X + dScene;
+
+    // Keep the source and the reflecting wall both in shot. The camera looks
+    // at the midpoint between them and backs off as they separate, otherwise
+    // a large d leaves the action off-frame behind a wall of geometry.
+    if (Math.abs(dScene - lastSceneD) > 1e-3) {
+      lastSceneD = dScene;
+      st.controls.frame(15 + dScene * 1.25, new T.Vector3((SRC_X + wallX) / 2, 1.4, 0));
+    }
+
+    wall.position.x = wallX;
+    wallMesh.position.y = 3.1;
+    lblW.position.set(wallX, 9.0, 0);
+    src.position.set(SRC_X, 0, 0);
+    lblS.position.set(SRC_X, 1.0, 0);
+    det.position.set(SRC_X - 0.9, -0.2, 0);
+    lblD.position.set(SRC_X - 0.9, -1.2, 0);
+
+    const t1 = P.d / P.v;
+    const t2 = 2 * t1;
+    const phase = tSim % Math.max(0.05, 1 / P.rate);
+    const echoHere = Math.abs(phase - t2) < 0.16;
+    if (echoHere) flash = 1;
+    dGlow.material.opacity = 0.3 + flash * 0.6;
+    sGlow.material.opacity = 0.4 + 0.3 * Math.max(0, 1 - phase * 6);
+
+    for (const f of fronts) {
+      // wavefronts are only meaningful out to the round trip; past that they
+      // are retired, otherwise they keep expanding around the camera and
+      // stack up as a permanent haze
+      const LIM = 2 * dScene + 0.4;
+      const fade = 1 - f.r / LIM;
+      if (f.alive && fade <= 0.02) f.alive = false;
+      const on = show.fronts && f.alive && f.r > 0.14;
+      f.ring.visible = on;
+      f.sph.visible = on && show.spheres;
+      if (!on) continue;
+      const passed = f.r > dScene;
+      f.ring.position.set(SRC_X, 0, 0);
+      f.ring.scale.setScalar(f.r);
+      f.ring.material.color.set(passed ? 0xffb057 : 0x31d7f0);
+      f.ring.material.opacity = Math.max(0, 0.7 * fade);
+      f.sph.position.set(SRC_X, 0, 0);
+      f.sph.scale.setScalar(f.r);
+      f.sph.material.color.set(passed ? 0xffb057 : 0x31d7f0);
+      f.sph.material.opacity = Math.max(0, 0.10 * fade);
+    }
+
+    pathLine.visible = show.line;
+    if (show.line) {
+      const a = pathLine.geometry.attributes.position.array;
+      a[0] = SRC_X; a[1] = 0.02; a[2] = 0;
+      a[3] = wallX; a[4] = 0.02; a[5] = 0;
+      pathLine.geometry.attributes.position.needsUpdate = true;
+      pathLine.computeLineDistances();
+    }
+
+    const iw = 1 / (P.d * P.d);
+    const ib = 1 / (2 * P.d * 2 * P.d);
+    return { P, dScene, t1, t2, iw, ib };
+  }
+
+  function outs(R) {
+    const { P, dScene, t1, t2, iw, ib } = R;
+    const echo = t2 >= ECHO_MIN;
+    el('dT').textContent = (t2 * 1000).toFixed(0) + ' ms';
+    el('dT1').textContent = (t1 * 1000).toFixed(0) + ' ms';
+    const h = el('dH');
+    h.textContent = echo ? 'distinct echo' : 'reverberation';
+    h.style.color = echo ? 'var(--ok)' : 'var(--warn)';
+    el('dI').textContent = (ib / iw * 100).toFixed(2) + '%';
+    el('rP').textContent = (2 * P.d).toFixed(1) + ' m';
+    el('rE').textContent = (t2 * 1000).toFixed(0) + ' ms';
+    el('rMin').textContent = (ECHO_MIN * P.v / 2).toFixed(1) + ' m';
+    el('rIr').textContent = '1 / ' + (4 * P.d * P.d).toFixed(0);
+    el('rIw').textContent = (iw * 1e4).toFixed(2) + 'e-4 /m²';
+    el('rIb').textContent = (ib * 1e4).toFixed(3) + 'e-4 /m²';
+
+    const chk = el('chk');
+    const ok = Math.abs(t2 - 2 * P.d / P.v) < 1e-12;
+    chk.className = 'check' + (ok ? '' : ' bad');
+    chk.innerHTML = ok
+      ? '&#10003; 2d/v = 2&times;' + P.d + '/' + P.v + ' = ' + (t2 * 1000).toFixed(1) +
+        ' ms, which is ' + (t2 / ECHO_MIN).toFixed(2) + '&times; the 0.1 s ear-fusion limit'
+      : '&#10007; round trip mismatch';
+
+    const v = el('v');
+    if (!echo) {
+      v.innerHTML = '<b style="color:var(--warn)">Too close to hear an echo.</b> The return arrives only ' +
+        (t2 * 1000).toFixed(0) + ' ms after the original &mdash; under the 0.1 s your ear needs to tell ' +
+        'two sounds apart, so they merge into one loud clap. You need at least ' +
+        (ECHO_MIN * P.v / 2).toFixed(1) + ' m of wall.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (P.d > 60) {
+      v.innerHTML = '<b style="color:var(--acc2)">A long wait.</b> ' + (2 * P.d).toFixed(0) +
+        ' m of travel at ' + P.v + ' m/s takes ' + (t2 * 1000).toFixed(0) +
+        ' ms, so the echo arrives ' + (t2 / ECHO_MIN).toFixed(0) +
+        '&times; later than the original. It is also ' + (4 * dScene * dScene).toFixed(0) +
+        '&times; weaker on the way back, because sound spreads over the surface of a sphere &mdash; intensity goes as 1/r&sup2;.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">A clear echo after ' + (t2 * 1000).toFixed(0) +
+        ' ms.</b> The sound covered ' + (2 * P.d).toFixed(0) + ' m and came back, spreading over a sphere ' +
+        'of radius ' + (2 * P.d).toFixed(0) + ' m, so only ' + (100 / (4 * P.d * P.d)).toFixed(3) +
+        '% of the intensity that reached the wall makes it back. This is exactly how sonar and echo-sounding work.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sD', 'vD', 1], ['sV', 'vV', 0], ['sR', 'vR', 1], ['sTs', 'vTs', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sD', 'sV', 'sR', 'sTs'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { fronts.forEach(f => f.alive = false); emit(); });
+
+  syncUI();
+  st.onFrame(dt => { if (run) step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

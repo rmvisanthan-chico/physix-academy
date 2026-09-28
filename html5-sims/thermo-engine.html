@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heat Engine Cycle 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#f97316; --acc2:#fbbf24; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:304px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  .keys{display:flex;flex-wrap:wrap;gap:11px;margin-top:9px;font-size:11px;color:var(--txt2)}
+  .keys i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+  .dotc{width:9px;height:9px;border-radius:2px;display:inline-block}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Heat Engine Cycle 3D</h1>
+  <p>A real gas in a real cylinder. Watch it climb the piston, expand, cool and compress &mdash; the loop it traces is the work you get.</p>
+</div>
+<div class="hud eq">&eta; = 1 &minus; T<sub>c</sub>/T<sub>h</sub></div>
+
+<div class="hud dock">
+  <div class="chip"><span>Efficiency</span><b id="dE">—</b></div>
+  <div class="chip"><span>Work out</span><b id="dW">—</b></div>
+  <div class="chip"><span>Heat in</span><b id="dQin">—</b></div>
+  <div class="chip"><span>Stage</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Reservoirs</h2>
+  <div class="ctl">
+    <label>Hot T<sub>h</sub> <b><span id="vTh">600</span> K</b></label>
+    <input type="range" id="sTh" min="320" max="1200" step="5" value="600">
+  </div>
+  <div class="ctl">
+    <label>Cold T<sub>c</sub> <b><span id="vTc">430</span> K</b></label>
+    <input type="range" id="sTc" min="200" max="600" step="5" value="430">
+  </div>
+  <div class="ctl">
+    <label>Cycle rate <b><span id="vR">0.22</span> cycles/s</b></label>
+    <input type="range" id="sR" min="0.05" max="1" step="0.01" value="0.22">
+  </div>
+  <div class="ctl">
+    <label>Friction &amp; losses <b><span id="vIr">0.30</span></b></label>
+    <input type="range" id="sIr" min="0" max="1" step="0.01" value="0.3">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="pv">PV diagram</span>
+    <span class="tg on" data-t="piston">cylinder</span>
+    <span class="tg" data-t="heat">heat arrows</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Carnot &eta;</span><b id="rEc">0</b></div>
+    <div class="ro"><span>Actual &eta;</span><b id="rEa">0</b></div>
+    <div class="ro"><span>P now</span><b id="rP">0</b></div>
+    <div class="ro"><span>V now</span><b id="rV">0</b></div>
+    <div class="ro"><span>T now</span><b id="rT">0</b></div>
+    <div class="ro"><span>Q out</span><b id="rQo">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <div class="keys">
+    <i><span class="dotc" style="background:#ff7a7a"></span>isothermal in</i>
+    <i><span class="dotc" style="background:#ffc043"></span>adiabatic out</i>
+    <i><span class="dotc" style="background:#3ee0a4"></span>isothermal out</i>
+    <i><span class="dotc" style="background:#31d7f0"></span>adiabatic in</i>
+  </div>
+  <p class="hint">
+    Drag empty space to orbit, scroll to zoom, right-drag to pan. Heat flowing in is red, heat
+    leaving is green, and the shaded area on the PV diagram is the work delivered.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const GAMMA = 1.4, V1 = 2, V2 = 6, EX = 5.5;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xf97316,
+    dist: 20, minD: 12, maxD: 110, exposure: 0.95, bg: 0x05070f,
+    preserve: true, hemi: 0.26, key: 2.4, fill: 0.24, rim: 0.38,
+    theta: 0.60, phi: 1.30, target: new T.Vector3(3.65, 4.2, 0)
+  });
+  const scene = st.scene;
+  const show = { pv: true, piston: true, heat: false };
+
+  const floor = st.floor(48, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(34, 34, 0x2c3852, 0x171e2d);
+  scene.add(grid);
+
+  const engine = new T.Group();
+  engine.position.x = EX;
+  scene.add(engine);
+
+  const cyl = new T.Mesh(
+    new T.CylinderGeometry(3.0, 3.0, 7.4, 48, 1, true),
+    new T.MeshStandardMaterial({ color: 0xa8dcff, roughness: 0.08, metalness: 0,
+      transparent: true, opacity: 0.13, side: T.DoubleSide, depthWrite: false }));
+  cyl.position.y = 3.7;
+  cyl.renderOrder = 3;
+  engine.add(cyl);
+
+  const base = new T.Mesh(new T.CylinderGeometry(3.05, 3.05, 0.55, 48),
+    new T.MeshStandardMaterial({ color: 0x1b2436, roughness: 0.45, metalness: 0.7 }));
+  base.position.y = 0.28;
+  base.receiveShadow = true;
+  engine.add(base);
+
+  const gasMat = new T.MeshStandardMaterial({
+    color: 0xff6a3a, emissive: 0xff5a20, emissiveIntensity: 0.85,
+    roughness: 0.5, metalness: 0 });
+  const gas = new T.Mesh(new T.CylinderGeometry(2.82, 2.82, 1, 40), gasMat);
+  gas.renderOrder = 1;
+  engine.add(gas);
+  const gasGlow = st.glow(0xff6a3a, 4, 0.5);
+  engine.add(gasGlow);
+
+  const piston = new T.Group();
+  const plate = new T.Mesh(new T.CylinderGeometry(2.5, 2.5, 0.42, 48),
+    new T.MeshStandardMaterial({ color: 0x6b7896, roughness: 0.3, metalness: 0.8 }));
+  plate.castShadow = true;
+  piston.add(plate);
+  const rod = new T.Mesh(new T.CylinderGeometry(0.26, 0.26, 4.0, 16),
+    new T.MeshStandardMaterial({ color: 0x93a0be, roughness: 0.28, metalness: 0.88 }));
+  rod.position.y = 2.2;
+  piston.add(rod);
+  engine.add(piston);
+
+  const hotLbl = st.label('hot', '#ff9a7a', 0.006);
+  const coldLbl = st.label('cold', '#7ff0cc', 0.006);
+  engine.add(hotLbl, coldLbl);
+
+  const qIn = st.arrow(0xff7a7a, new T.Vector3(), new T.Vector3(0, 1, 0), 4);
+  const qOut = st.arrow(0x3ee0a4, new T.Vector3(), new T.Vector3(0, -1, 0), 4);
+  engine.add(qIn, qOut);
+
+  const LEGS = [
+    { col: 0xff7a7a, name: 'isothermal expansion', tag: '1→2' },
+    { col: 0xffc043, name: 'adiabatic expansion', tag: '2→3' },
+    { col: 0x3ee0a4, name: 'isothermal compression', tag: '3→4' },
+    { col: 0x31d7f0, name: 'adiabatic compression', tag: '4→1' }
+  ];
+  const B = [0.00, 0.40, 0.58, 0.80, 1.00];
+  const PER = 150;
+
+  const PX = -8.6, XW = 8.6, YH = 7.8, OY = 0.05;
+  const axV = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, XW + 0.8, 8),
+    new T.MeshBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.7 }));
+  axV.rotation.z = Math.PI / 2; axV.position.set(PX + (XW + 0.8) / 2, OY, 0);
+  const axP = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, YH + 2.0, 8),
+    new T.MeshBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.7 }));
+  axP.position.set(PX, OY + (YH + 2.0) / 2, 0);
+  const lblV = st.label('V', '#9fb0d8', 0.0065);
+  const lblP = st.label('P', '#9fb0d8', 0.0065);
+  lblV.position.set(PX + XW + 1.0, OY, 0);
+  lblP.position.set(PX, OY + YH + 2.2, 0);
+  const pvPivot = new T.Group();
+  pvPivot.position.set(PX + XW / 2, 0, 0);
+  const pvGroup = new T.Group();
+  pvGroup.position.set(-(PX + XW / 2), 0, 0);
+  pvPivot.add(pvGroup);
+  scene.add(pvPivot);
+  pvGroup.add(axV, axP, lblV, lblP);
+
+  const legLines = LEGS.map(L => {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array(PER * 3), 3));
+    const l = new T.Line(g, new T.LineBasicMaterial({ color: L.col }));
+    l.frustumCulled = false;
+    pvGroup.add(l);
+    return l;
+  });
+
+  const LOOP = PER * 4;
+  const fillGeo = new T.BufferGeometry();
+  fillGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(LOOP * 3), 3));
+  const fidx = [];
+  for (let i = 1; i < LOOP - 1; i++) fidx.push(0, i, i + 1);
+  fillGeo.setIndex(fidx);
+  const pvFill = new T.Mesh(fillGeo, new T.MeshBasicMaterial({
+    color: 0x9b8bff, transparent: true, opacity: 0.19, side: T.DoubleSide, depthWrite: false }));
+  pvFill.frustumCulled = false;
+  pvGroup.add(pvFill);
+
+  const marks = [1, 2, 3, 4].map(n => {
+    const g = new T.Group();
+    const m = new T.Mesh(new T.SphereGeometry(0.2, 16, 12), new T.MeshBasicMaterial({ color: 0xffffff }));
+    const gl = st.glow(0xffffff, 1.0, 0.38);
+    const lbl = st.label(String(n), '#e8edf7', 0.0055);
+    lbl.position.y = 0.62;
+    g.add(m, gl, lbl);
+    pvGroup.add(g);
+    return g;
+  });
+
+  const dot = new T.Mesh(new T.SphereGeometry(0.17, 16, 12), new T.MeshBasicMaterial({ color: 0xffffff }));
+  const dotGlow = st.glow(0xffffff, 1.5, 0.85);
+  pvGroup.add(dot, dotGlow);
+
+  function par() {
+    const Th = Math.max(1, +el('sTh').value);
+    let Tc = +el('sTc').value;
+    if (Tc > Th - 15) Tc = Math.max(20, Th - 15);
+    return { Th, Tc, rate: +el('sR').value, irr: +el('sIr').value };
+  }
+
+  function cycle() {
+    const P = par();
+    const T1 = P.Th, T3 = P.Tc;
+    const r = Math.pow(T1 / T3, 1 / (GAMMA - 1));
+    const nR = T1 * V1;
+    const p = (V, T) => nR * T / V;
+    return {
+      P, r, nR, vmax: V2 * r, ptop: p(V1, T1),
+      st: [
+        { n: 1, V: V1, T: T1, p: p(V1, T1) },
+        { n: 2, V: V2, T: T1, p: p(V2, T1) },
+        { n: 3, V: V2 * r, T: T3, p: p(V2 * r, T3) },
+        { n: 4, V: V1 * r, T: T3, p: p(V1 * r, T3) }
+      ]
+    };
+  }
+
+  const sx = (V, C) => PX + ((V - V1) / (C.vmax - V1)) * XW;
+  const sy = (p, C) => OY + (p / C.ptop) * YH;
+
+  function legPoints(C, i) {
+    const S = C.st, out = [];
+    const a = S[i], b = S[(i + 1) % 4];
+    const iso = (i === 0 || i === 2);
+    for (let j = 0; j < PER; j++) {
+      const u = j / (PER - 1);
+      const V = a.V + (b.V - a.V) * u;
+      const p = iso ? a.p : a.p * Math.pow(a.V / V, GAMMA);
+      out.push({ V, p, T: p * V / C.nR });
+    }
+    return out;
+  }
+
+  function energy(C) {
+    const S = C.st;
+    const Qin = C.nR * S[0].T * Math.log(S[1].V / S[0].V);
+    const Qout = C.nR * S[2].T * Math.log(S[2].V / S[3].V);
+    return { Qin, Qout, Wideal: Qin - Qout };
+  }
+
+  function sample(s, C) {
+    const i = Math.min(3, Math.max(0, Math.floor(s * 4) - (s >= 1 ? 1 : 0)));
+    const u = Math.min(0.999999, Math.max(0, s * 4 - i));
+    const pts = legPoints(C, i);
+    const a = pts[Math.floor(u * (PER - 1))];
+    return { seg: i, V: a.V, p: a.p, T: a.T };
+  }
+
+  let s = 0, run = true;
+  function step(dt) {
+    if (!run) return;
+    s = (s + dt * (+el('sR').value)) % 1;
+    if (s < 0) s += 1;
+  }
+
+  function draw() {
+    const C = cycle();
+    const E = energy(C);
+    const W = E.Wideal * (1 - C.P.irr);
+    const effCarnot = 1 - C.P.Tc / C.P.Th;
+    const effActual = W / E.Qin;
+
+    const vSpan = C.vmax - V1;
+    const h = 2.0 + (sample(s, C).V - V1) / vSpan * 4.6;
+    const gh = Math.max(0.12, h - 0.55);
+    piston.position.y = h;
+    gas.scale.set(1, gh, 1);
+    gas.position.y = gh / 2 + 0.55;
+    gasGlow.position.y = gh / 2 + 0.55;
+    gasGlow.scale.setScalar(5.5 + gh * 0.4);
+
+    const cur = sample(s, C);
+    const hot = cur.seg === 0, cold = cur.seg === 2;
+    gasMat.color.set(hot ? 0xff5a24 : cold ? 0x1f9e7c : 0xff8a24);
+    gasMat.emissive.set(hot ? 0xd83c08 : cold ? 0x0d7a5c : 0xc26a10);
+    gasMat.emissiveIntensity = 0.30 + 0.30 * (hot ? 1 : cold ? 0.4 : 0.7);
+    gasGlow.material.color.copy(gasMat.color);
+    gasGlow.material.opacity = 0.22 + 0.30 * (hot ? 1 : 0.4);
+    hotLbl.position.set(0, 7.9, 0);
+    coldLbl.position.set(4.3, 0.35, 0);
+
+    qIn.visible = show.heat && hot;
+    qOut.visible = show.heat && cold;
+    if (qIn.visible) { qIn.position.set(3.9, 1.4, 0); qIn.scale.set(1, 1.5, 1); }
+    if (qOut.visible) { qOut.position.set(-3.9, 6.4, 0); qOut.scale.set(1, 1.5, 1); }
+
+    const loop = [];
+    for (let i = 0; i < 4; i++) {
+      const pts = legPoints(C, i);
+      const arr = legLines[i].geometry.attributes.position.array;
+      for (let j = 0; j < PER; j++) {
+        arr[j * 3] = sx(pts[j].V, C);
+        arr[j * 3 + 1] = sy(pts[j].p, C);
+        arr[j * 3 + 2] = 0;
+      }
+      legLines[i].geometry.attributes.position.needsUpdate = true;
+      loop.push(...pts);
+    }
+    const farr = fillGeo.attributes.position.array;
+    for (let j = 0; j < LOOP; j++) {
+      farr[j * 3] = sx(loop[j].V, C);
+      farr[j * 3 + 1] = sy(loop[j].p, C);
+      farr[j * 3 + 2] = -0.03;
+    }
+    fillGeo.attributes.position.needsUpdate = true;
+
+    C.st.forEach((S, i) => marks[i].position.set(sx(S.V, C), sy(S.p, C), 0.05));
+    dot.position.set(sx(cur.V, C), sy(cur.p, C), 0.12);
+    dotGlow.position.copy(dot.position);
+    dot.material.color.set(LEGS[cur.seg].col);
+
+    pvGroup.visible = show.pv;
+    plate.visible = show.piston;
+    rod.visible = show.piston;
+    hotLbl.visible = show.piston;
+    coldLbl.visible = show.piston;
+
+    if (show.pv) {
+      pvGroup.rotation.y = Math.atan2(st.camera.position.x - (PX + XW / 2), st.camera.position.z);
+    }
+
+    return { C, E, W, effCarnot, effActual, cur };
+  }
+
+  function outs(R) {
+    const { C, E, W, effCarnot, effActual, cur } = R;
+    const kJ = x => (x / 1000).toFixed(0) + ' kJ';
+    const Qout = E.Qin - W;
+    el('dE').textContent = (effActual * 100).toFixed(1) + '%';
+    el('dW').textContent = kJ(W);
+    el('dQin').textContent = kJ(E.Qin);
+    el('dS').textContent = LEGS[cur.seg].name.split(' ')[0];
+    el('rEc').textContent = (effCarnot * 100).toFixed(1) + '%';
+    el('rEa').textContent = (effActual * 100).toFixed(1) + '%';
+    el('rP').textContent = (cur.p / 1000).toFixed(1) + ' kPa';
+    el('rV').textContent = cur.V.toFixed(2) + ' m³';
+    el('rT').textContent = cur.T.toFixed(0) + ' K';
+    el('rQo').textContent = kJ(Qout);
+
+    const v = el('v');
+    const gap = C.P.Th - C.P.Tc;
+    if (gap < 25) {
+      v.innerHTML = '<b style="color:var(--warn)">Reservoirs nearly equal.</b> The Carnot limit is only ' +
+        (effCarnot * 100).toFixed(1) + '% here, so the engine has almost nothing to work with.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (C.P.irr > 0.75) {
+      v.innerHTML = '<b style="color:var(--bad)">Very lossy.</b> Friction and turbulence take most of the work, so you deliver ' +
+        (effActual * 100).toFixed(1) + '% against a Carnot ceiling of ' + (effCarnot * 100).toFixed(1) + '%.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + LEGS[cur.seg].name + '.</b> Gas at ' + cur.T.toFixed(0) +
+        ' K, ' + cur.V.toFixed(1) + ' m³. Each adiabatic leg swells the volume by ' +
+        C.r.toFixed(2) + '&times;, and the shaded loop is worth ' + kJ(W) + ' per cycle.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sTh', 'vTh', 0], ['sTc', 'vTc', 0], ['sR', 'vR', 2], ['sIr', 'vIr', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sTh', 'sTc', 'sR', 'sIr'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { s = 0; });
+
+  syncUI();
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

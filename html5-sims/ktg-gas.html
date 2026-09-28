@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kinetic Gas 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#e879f9; --acc2:#c084fc; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,192,67,.40);background:rgba(255,192,67,.08);color:var(--warn)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Kinetic Gas 3D</h1>
+  <p>Every molecule is a real billiard ball bouncing off real walls. The pressure on the glass is
+     nothing but the sum of their collisions &mdash; and it lands on NkT/V every time.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">P = &sum;<sub>walls</sub> F/A = NkT/V</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Measured P</span><b id="dPm">—</b></div>
+  <div class="chip"><span>Theory NkT/V</span><b id="dPt">—</b></div>
+  <div class="chip"><span>Agreement</span><b id="dAg">—</b></div>
+  <div class="chip"><span>v<sub>rms</sub> measured</span><b id="dVr">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Gas</h2>
+  <div class="ctl">
+    <label>Temperature T <b><span id="vT">300</span> K</b></label>
+    <input type="range" id="sT" min="50" max="900" step="5" value="300">
+  </div>
+  <div class="ctl">
+    <label>Molecules N <b><span id="vN">240</span></b></label>
+    <input type="range" id="sN" min="40" max="500" step="10" value="240">
+  </div>
+  <div class="ctl">
+    <label>Molar mass <b><span id="vM">28.0</span> u</b></label>
+    <input type="range" id="sM" min="1" max="132" step="0.5" value="28">
+  </div>
+  <div class="ctl">
+    <label>Slow motion <b><span id="vS">1.0</span>&times;</b></label>
+    <input type="range" id="sS" min="0.1" max="4" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="hist">speed histogram</span>
+    <span class="tg on" data-t="walls">glass box</span>
+    <span class="tg on" data-t="iso">per-axis gauges</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>v<sub>rms</sub> theory</span><b id="rVt">0</b></div>
+    <div class="ro"><span>v<sub>mean</sub></span><b id="rVm">0</b></div>
+    <div class="ro"><span>P<sub>x</sub></span><b id="rPx">0</b></div>
+    <div class="ro"><span>P<sub>y</sub></span><b id="rPy">0</b></div>
+    <div class="ro"><span>P<sub>z</sub></span><b id="rPz">0</b></div>
+    <div class="ro"><span>Total KE</span><b id="rKE">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Re-seed</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Motion is slowed about a thousandfold so you can see it &mdash; real nitrogen crosses this box in
+    under a millisecond. Slowing playback does not change the physics: the pressure is impulse divided
+    by area and <em>real</em> elapsed time, so the ratio survives. Scroll to zoom, right-drag to pan.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const K_B = 1.380649e-23, U = 1.66053906660e-27;
+  const SIDE = 0.24, SU = 38, SLOW = 8e-4;
+  const LIM = SIDE / 2 - 0.0025;
+  const SPAN = 2 * LIM;
+  const A = SPAN * SPAN, VOL = SPAN * SPAN * SPAN;
+  const HB = 12;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xe879f9,
+    dist: 30, minD: 12, maxD: 120, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.2, fill: 0.3, rim: 0.3,
+    theta: 0.60, phi: 1.20, target: new T.Vector3(3.5, 4.0, 0)
+  });
+  const scene = st.scene;
+  const show = { hist: true, walls: true, iso: true };
+
+  const floor = st.floor(48, 0x080c14, 0.96);
+  scene.add(floor);
+  const grid = st.grid(30, 30, 0x2c3852, 0x171e2d);
+  scene.add(grid);
+
+  const BOX = new T.Group();
+  BOX.position.set(-4.5, SIDE * SU / 2, 0);
+  scene.add(BOX);
+  const HALF = SIDE * SU / 2;
+
+  const glass = new T.Mesh(
+    new T.BoxGeometry(SIDE * SU, SIDE * SU, SIDE * SU),
+    new T.MeshStandardMaterial({ color: 0x9fd8ff, roughness: 0.06, metalness: 0,
+      transparent: true, opacity: 0.055, side: T.DoubleSide, depthWrite: false }));
+  glass.position.y = SIDE * SU / 2;
+  glass.renderOrder = 4;
+  BOX.add(glass);
+  const edges = new T.LineSegments(
+    new T.EdgesGeometry(new T.BoxGeometry(SIDE * SU, SIDE * SU, SIDE * SU)),
+    new T.LineBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.5 }));
+  edges.position.y = SIDE * SU / 2;
+  BOX.add(edges);
+
+  const wallMeshes = [];
+  const wallGeo = new T.PlaneGeometry(SIDE * SU, SIDE * SU);
+  const mkWall = (col, rot, pos) => {
+    const m = new T.Mesh(wallGeo, new T.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false }));
+    m.rotation.set(rot[0], rot[1], rot[2]);
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.renderOrder = 3;
+    BOX.add(m);
+    wallMeshes.push(m);
+    return m;
+  };
+  const wy = SIDE * SU / 2;
+  mkWall(0x5b7bd6, [-Math.PI / 2, 0, 0], [0, 0, 0]);
+  mkWall(0x5b7bd6, [Math.PI / 2, 0, 0], [0, SIDE * SU, 0]);
+  mkWall(0xc2607f, [0, Math.PI / 2, 0], [-HALF, wy, 0]);
+  mkWall(0xc2607f, [0, -Math.PI / 2, 0], [HALF, wy, 0]);
+  mkWall(0x4fa88a, [0, 0, 0], [0, wy, -HALF]);
+  mkWall(0x4fa88a, [0, Math.PI, 0], [0, wy, HALF]);
+
+  const dots = new THREE.InstancedMesh(
+    new T.SphereGeometry(1, 12, 9),
+    new T.MeshStandardMaterial({ roughness: 0.35, metalness: 0.1,
+      emissive: 0xffffff, emissiveIntensity: 0.35 }),
+    600);
+  dots.frustumCulled = false;
+  dots.castShadow = false;
+  BOX.add(dots);
+
+  const PR = 0.22;
+  const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(),
+    tmpP = new T.Vector3(), tmpS = new T.Vector3(PR, PR, PR), tmpC = new T.Color();
+
+  let N = 240, parts = [], run = true, realClock = 0;
+  let Pm = 0, Px = 0, Py = 0, Pz = 0;
+  let jxTot = 0, jyTot = 0, jzTot = 0, tTot = 0, totHits = 0;
+  let hitFlash = [0, 0, 0, 0, 0, 0];
+
+  function gauss() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  const mass = () => (+el('sM').value) * U;
+  const vrmsTh = () => Math.sqrt(3 * K_B * (+el('sT').value) / mass());
+
+  function seed() {
+    N = Math.round(+el('sN').value);
+    const sd = Math.sqrt(K_B * (+el('sT').value) / mass());
+    parts = [];
+    for (let i = 0; i < N; i++) {
+      parts.push({
+        x: (Math.random() - 0.5) * (SIDE - 0.012),
+        y: (Math.random() - 0.5) * (SIDE - 0.012),
+        z: (Math.random() - 0.5) * (SIDE - 0.012),
+        vx: gauss() * sd, vy: gauss() * sd, vz: gauss() * sd
+      });
+    }
+    realClock = 0; Pm = Px = Py = Pz = 0;
+    jxTot = jyTot = jzTot = 0; tTot = 0; totHits = 0;
+  }
+
+  function rescale() {
+    const sd = Math.sqrt(K_B * (+el('sT').value) / mass());
+    let s2 = 0;
+    for (let i = 0; i < N; i++) {
+      const p = parts[i];
+      s2 += p.vx * p.vx + p.vy * p.vy + p.vz * p.vz;
+    }
+    const cur = Math.sqrt(s2 / N);
+    if (cur < 1e-12) return;
+    const f = sd / cur;
+    for (let i = 0; i < N; i++) {
+      const p = parts[i];
+      p.vx *= f; p.vy *= f; p.vz *= f;
+    }
+  }
+
+  function step(dtFrame) {
+    const m = mass();
+    const tScale = (+el('sS').value) * SLOW;
+    const dtReal = dtFrame * tScale;
+    realClock += dtReal;
+    const e = 0.0025, lim = SIDE / 2 - e;
+    let jx = 0, jy = 0, jz = 0, hits = 0;
+
+    for (let i = 0; i < N; i++) {
+      const p = parts[i];
+      p.x += p.vx * dtReal; p.y += p.vy * dtReal; p.z += p.vz * dtReal;
+      if (p.x < -lim) { p.x = -lim; p.vx = Math.abs(p.vx); jx += 2 * m * Math.abs(p.vx); hitFlash[2]++; hits++; }
+      else if (p.x > lim) { p.x = lim; p.vx = -Math.abs(p.vx); jx += 2 * m * Math.abs(p.vx); hitFlash[3]++; hits++; }
+      if (p.y < -lim) { p.y = -lim; p.vy = Math.abs(p.vy); jy += 2 * m * Math.abs(p.vy); hitFlash[0]++; hits++; }
+      else if (p.y > lim) { p.y = lim; p.vy = -Math.abs(p.vy); jy += 2 * m * Math.abs(p.vy); hitFlash[1]++; hits++; }
+      if (p.z < -lim) { p.z = -lim; p.vz = Math.abs(p.vz); jz += 2 * m * Math.abs(p.vz); hitFlash[4]++; hits++; }
+      else if (p.z > lim) { p.z = lim; p.vz = -Math.abs(p.vz); jz += 2 * m * Math.abs(p.vz); hitFlash[5]++; hits++; }
+    }
+    totHits += hits;
+
+    if (dtReal > 1e-12) {
+      jxTot += jx; jyTot += jy; jzTot += jz; tTot += dtReal;
+      if (tTot > 1e-11) {
+        const k = 1 / (2 * A * tTot);
+        Px = jxTot * k; Py = jyTot * k; Pz = jzTot * k;
+        Pm = (Px + Py + Pz) / 3;
+      }
+    }
+  }
+
+  const BINS = HB;
+  const histGeo = new T.BufferGeometry();
+  const hpos = new Float32Array((BINS + 1) * 3);
+  const hcol = new Float32Array((BINS + 1) * 3);
+  histGeo.setAttribute('position', new T.BufferAttribute(hpos, 3));
+  histGeo.setAttribute('color', new T.BufferAttribute(hcol, 3));
+  const hist = new T.Line(histGeo, new T.LineBasicMaterial({ vertexColors: true }));
+  hist.frustumCulled = false;
+  const hbars = [];
+  for (let i = 0; i < BINS; i++) {
+    const b = new T.Mesh(new T.BoxGeometry(0.5, 1, 0.5),
+      new T.MeshBasicMaterial({ color: 0x31d7f0, transparent: true, opacity: 0.42 }));
+    scene.add(b);
+    hbars.push(b);
+  }
+  const hGroup = new T.Group();
+  hGroup.position.set(3.6, 0.2, 0);
+  scene.add(hGroup);
+  hGroup.add(hist, ...hbars);
+  const hAxis = new T.Line(
+    new T.BufferGeometry().setFromPoints([new T.Vector3(-0.6, 0, 0), new T.Vector3(6.6, 0, 0)]),
+    new T.LineBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.6 }));
+  hGroup.add(hAxis);
+  const hLbl = st.label('speed  →', '#9fb0d8', 0.0055);
+  hLbl.position.set(3.0, -0.55, 0);
+  hGroup.add(hLbl);
+  const hLbl2 = st.label('N', '#9fb0d8', 0.0055);
+  hLbl2.position.set(-1.5, 3.6, 0);
+  hGroup.add(hLbl2);
+  const hBase = new T.Group();
+  hBase.position.set(-0.6, 0, 0);
+  hGroup.add(hBase);
+  for (const b of hbars) hBase.add(b);
+
+  const isoG = new T.Group();
+  isoG.position.set(3.6, 0.2, 7.5);
+  scene.add(isoG);
+  const isoLabels = ['Px', 'Py', 'Pz'].map((s, i) => {
+    const l = st.label(s, ['#ff7a7a', '#3ee0a4', '#31d7f0'][i], 0.0055);
+    l.position.set(i * 1.5, -0.4, 0);
+    isoG.add(l);
+    return l;
+  });
+  const isoArrows = [];
+  for (let i = 0; i < 3; i++) {
+    const a = st.arrow([0xff7a7a, 0x3ee0a4, 0x31d7f0][i], new T.Vector3(), new T.Vector3(0, 1, 0), 3);
+    isoG.add(a);
+    isoArrows.push(a);
+  }
+
+  function draw() {
+    const vt = vrmsTh();
+    const vmax = vt * 2.2;
+    const counts = new Array(BINS).fill(0);
+    let s2 = 0, s1 = 0;
+    for (let i = 0; i < N; i++) {
+      const p = parts[i];
+      const sp = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz);
+      s2 += sp * sp; s1 += sp;
+      const b = Math.min(BINS - 1, Math.max(0, Math.floor(sp / vmax * BINS)));
+      counts[b]++;
+      const f = Math.min(1, sp / (vt * 1.8));
+      if (f < 0.42) tmpC.setHSL(0.52, 0.85, 0.55);
+      else if (f < 0.78) tmpC.setHSL(0.12, 0.9, 0.55);
+      else tmpC.setHSL(0.0, 0.9, 0.58);
+      tmpP.set(p.x * SU, p.y * SU, p.z * SU);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      dots.setMatrixAt(i, tmpM);
+      dots.setColorAt(i, tmpC);
+    }
+    dots.count = N;
+    dots.instanceMatrix.needsUpdate = true;
+    if (dots.instanceColor) dots.instanceColor.needsUpdate = true;
+
+    let mx = 1;
+    for (let i = 0; i < BINS; i++) if (counts[i] > mx) mx = counts[i];
+    const bw = 6.6 / BINS;
+    for (let i = 0; i < BINS; i++) {
+      const hgt = (counts[i] / mx) * 3.4;
+      const b = hbars[i];
+      b.scale.set(1, Math.max(0.02, hgt), 1);
+      b.position.set(i * bw + bw / 2, hgt / 2, 0);
+      const lo = i / BINS * vmax, hi = (i + 1) / BINS * vmax;
+      const pdf = v => 4 * Math.PI * Math.pow(mass() / (2 * Math.PI * K_B * (+el('sT').value)), 1.5)
+        * v * v * Math.exp(-mass() * v * v / (2 * K_B * (+el('sT').value)));
+      const exp = (pdf((lo + hi) / 2) * (hi - lo)) * N;
+      hpos[i * 3] = i * bw + bw / 2;
+      hpos[i * 3 + 1] = (exp / mx) * 3.4;
+      hpos[i * 3 + 2] = 0;
+    }
+    hpos[BINS * 3] = 6.6;
+    hpos[BINS * 3 + 1] = 0;
+    hpos[BINS * 3 + 2] = 0;
+    for (let i = 0; i <= BINS; i++) {
+      const th = i / BINS * vmax;
+      const c = th < vt ? [0.24, 0.88, 0.64] : [1, 0.75, 0.26];
+      const idx = i * 3;
+      hcol[idx] = c[0];
+      hcol[idx + 1] = c[1];
+      hcol[idx + 2] = c[2];
+    }
+    histGeo.attributes.position.needsUpdate = true;
+    histGeo.attributes.color.needsUpdate = true;
+    hGroup.visible = show.hist;
+
+    glass.visible = show.walls;
+    edges.visible = show.walls;
+    for (let i = 0; i < 6; i++) {
+      hitFlash[i] *= 0.90;
+      wallMeshes[i].material.opacity = Math.min(0.30, hitFlash[i] * 0.012) * (show.walls ? 1 : 0);
+    }
+
+    isoG.visible = show.iso;
+    if (show.iso) {
+      const pmax = Math.max(Px, Py, Pz, 1e-30);
+      [Px, Py, Pz].forEach((v, i) => {
+        const hgt = Math.max(0.05, (v / pmax) * 2.2);
+        const a = isoArrows[i];
+        a.position.set(i * 1.5, hgt / 2, 0);
+        a.scale.set(1, hgt, 1);
+      });
+    }
+
+    const vrms = Math.sqrt(s2 / N), vmean = s1 / N;
+    const ke = 0.5 * N * mass() * s2;
+    const Pth = N * K_B * (+el('sT').value) / VOL;
+    return { vrms, vmean, ke, Pth, vt };
+  }
+
+  function outs(D) {
+    const sci = x => {
+      if (!(x > 0)) return '0 Pa';
+      const e = Math.floor(Math.log10(x));
+      return (x / Math.pow(10, e)).toFixed(3) + 'e' + e + ' Pa';
+    };
+    const ag = D.Pth > 0 ? (Pm / D.Pth) * 100 : 0;
+    el('dPm').textContent = sci(Pm);
+    el('dPt').textContent = sci(D.Pth);
+    el('dAg').textContent = ag.toFixed(0) + '%';
+    el('dVr').textContent = D.vrms.toFixed(0) + ' m/s';
+    el('rVt').textContent = D.vt.toFixed(0) + ' m/s';
+    el('rVm').textContent = D.vmean.toFixed(0) + ' m/s';
+    el('rPx').textContent = sci(Px);
+    el('rPy').textContent = sci(Py);
+    el('rPz').textContent = sci(Pz);
+    el('rKE').textContent = D.ke.toExponential(2) + ' J';
+
+    const chk = el('chk');
+    const eff = Math.max(N, totHits / 6);
+    const tol = Math.max(3, 100 / Math.sqrt(eff));
+    if (totHits < 500) {
+      chk.className = 'check bad';
+      chk.innerHTML = 'sampling&hellip; ' + totHits + ' wall collisions so far (500 needed before the ' +
+        'average means anything)';
+    } else if (ag > 100 - 2.5 * tol && ag < 100 + 2.5 * tol) {
+      chk.className = 'check';
+      chk.innerHTML = '&#10003; collisions alone give ' + ag.toFixed(0) + '% of NkT/V over ' +
+        totHits.toLocaleString() + ' impacts. Sampling noise here is &plusmn;' + tol.toFixed(1) + '%.';
+    } else {
+      chk.className = 'check bad';
+      chk.innerHTML = '&#9888; ' + ag.toFixed(0) + '% of NkT/V over ' + totHits.toLocaleString() +
+        ' impacts, outside the &plusmn;' + (2.5 * tol).toFixed(1) + '% expected. Let it run longer.';
+    }
+
+    const spread = () => {
+      const vals = [Px, Py, Pz].filter(v => v > 0);
+      if (vals.length < 2) return 0;
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return Math.max(...vals.map(v => Math.abs(v - mean) / mean)) * 100;
+    };
+    const iso = spread();
+    const v = el('v');
+    if (totHits < 500) {
+      v.innerHTML = '<b style="color:var(--warn)">Measuring.</b> Pressure here is not assumed &mdash; it is the ' +
+        'accumulated impulse from every wall collision, divided by wall area and real elapsed time.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (iso > 12) {
+      v.innerHTML = '<b style="color:var(--warn)">Not isotropic yet.</b> The three axes disagree by ' +
+        iso.toFixed(0) + '%. With few molecules the walls have not been hit evenly yet &mdash; give it a moment.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if ((+el('sM').value) > 80) {
+      v.innerHTML = '<b style="color:var(--acc2)">Heavy molecules at ' + (+el('sT').value) +
+        ' K.</b> v<sub>rms</sub> is only ' + D.vt.toFixed(0) + ' m/s, so the same temperature gives a far ' +
+        'quieter gas. That is why a gas cools when it expands.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + N + ' molecules, ' + (+el('sT').value) +
+        ' K.</b> Pressure from collisions is ' + ag.toFixed(0) + '% of NkT/V, and the three axes agree to ' +
+        iso.toFixed(1) + '% &mdash; a gas pushes equally in every direction.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sT', 'vT', 0], ['sN', 'vN', 0], ['sM', 'vM', 1], ['sS', 'vS', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  el('sT').addEventListener('input', () => { syncUI(); rescale(); });
+  el('sM').addEventListener('input', () => { syncUI(); rescale(); });
+  el('sN').addEventListener('input', () => { syncUI(); seed(); });
+  el('sS').addEventListener('input', syncUI);
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', seed);
+
+  syncUI(); seed();
+  st.onFrame(dt => { if (run) step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

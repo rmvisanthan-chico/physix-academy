@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human Eye Defects 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#fbbf24; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(680px,49vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:126px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .seg2{display:flex;gap:8px;margin-bottom:14px}
+  .seg2 .tg{flex:1;text-align:center;padding:9px 8px;border-radius:10px}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Human Eye Defects 3D</h1>
+  <p>Where the rays land on the retina is the whole story. Add a spectacle lens and watch it correct.</p>
+</div>
+<div class="hud eq">P = 1/f (dioptres)</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Focus lands</span><b id="dW">—</b></div>
+  <div class="chip"><span>Defect</span><b id="dD">—</b></div>
+  <div class="chip"><span>Correction</span><b id="dC">—</b></div>
+  <div class="chip"><span>With lens</span><b id="dF">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Eye</h2>
+  <div class="seg2">
+    <span class="tg on" data-e="normal">Emmetropic</span>
+    <span class="tg" data-e="myopia">Myopia</span>
+    <span class="tg" data-e="hyper">Hypermetropia</span>
+  </div>
+  <div class="ctl">
+    <label>Eye power <b><span id="vP">45.5</span> D</b></label>
+    <input type="range" id="sP" min="32" max="70" step="0.1" value="45.5">
+  </div>
+  <div class="ctl">
+    <label>Near point <b><span id="vN">25</span> cm</b></label>
+    <input type="range" id="sN" min="10" max="100" step="1" value="25">
+  </div>
+  <div class="ctl">
+    <label>Object distance <b><span id="vD">25</span> cm</b></label>
+    <input type="range" id="sD" min="15" max="120" step="1" value="25">
+  </div>
+
+  <h2 class="mt">Spectacles</h2>
+  <div class="ctl">
+    <label>Lens power <b><span id="vL">0.0</span> D</b></label>
+    <input type="range" id="sL" min="-25" max="25" step="0.5" value="0">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="rays">rays</span>
+    <span class="tg on" data-t="retina">retina</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Retina distance</span><b id="rR">0 mm</b></div>
+    <div class="ro"><span>Focus position</span><b id="rFp">0 mm</b></div>
+    <div class="ro"><span>Error</span><b id="rE">0 mm</b></div>
+    <div class="ro"><span>Magnification</span><b id="rS">0</b></div>
+    <div class="ro"><span>Lens type</span><b id="rLt">—</b></div>
+    <div class="ro"><span>Corrected</span><b id="rC">—</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bFix">Auto-correct</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Drag <b>Eye power</b> to make the eye too strong or too weak and watch the focus point slide off
+    the retina. Press <b>Auto-correct</b> for the spectacle power that fixes it.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const EYE_X = 12, CORNEA_R = 4.2, LENS_X = 10.2, LENS_P = 55, RETINA_X = 19;
+  const MM_PER_U = 22 / (RETINA_X - LENS_X);
+  const st = Physix3D.stage(cv, {
+      accent: 0xfbbf24,
+    dist: 24, minD: 10, maxD: 90, exposure: 0.95, bg: 0x05070f,
+    preserve: true, hemi: 0.26, key: 2.4, fill: 0.24, rim: 0.4,
+    theta: 0.06, phi: 1.5
+  });
+  const scene = st.scene;
+  const show = { rays: true, retina: true };
+
+  const eyeGrp = new T.Group(); scene.add(eyeGrp);
+  const sclera = new T.Mesh(
+    new T.SphereGeometry(CORNEA_R, 48, 32),
+    new T.MeshPhysicalMaterial({ color:0xf3f7ff, roughness:0.22, metalness:0, transmission:0.55,
+      thickness:1.4, transparent:true, opacity:0.62, ior:1.376, clearcoat:1, side:T.DoubleSide }));
+  sclera.scale.set(1.25, 1, 1);
+  sclera.position.x = EYE_X;
+  eyeGrp.add(sclera);
+
+  const cornea = new T.Mesh(
+    new T.SphereGeometry(CORNEA_R * 0.42, 40, 26, 0, Math.PI),
+    new T.MeshPhysicalMaterial({ color:0xdff0ff, roughness:0.03, metalness:0, transmission:0.94,
+      thickness:0.4, transparent:true, opacity:0.7, ior:1.376, clearcoat:1 }));
+  cornea.rotation.z = Math.PI / 2;
+  cornea.position.x = EYE_X + CORNEA_R * 1.25 - CORNEA_R * 0.42;
+  eyeGrp.add(cornea);
+
+  const eyeLens = new T.Mesh(
+    new T.SphereGeometry(1.5, 32, 22),
+    new T.MeshPhysicalMaterial({ color:0xd6f2ff, roughness:0.04, metalness:0, transmission:0.9,
+      thickness:1.0, transparent:true, opacity:0.6, ior:1.41, clearcoat:1 }));
+  eyeLens.scale.set(0.42, 1, 1);
+  eyeLens.position.x = LENS_X;
+  eyeGrp.add(eyeLens);
+
+  const retina = new T.Mesh(
+    new T.SphereGeometry(CORNEA_R * 0.99, 40, 26, Math.PI / 2, Math.PI),
+    new T.MeshStandardMaterial({ color:0xd94a5a, emissive:0x7a1c28, emissiveIntensity:0.9,
+      roughness:0.6, side:T.BackSide }));
+  retina.scale.set(1.24, 1, 1);
+  retina.position.x = EYE_X;
+  eyeGrp.add(retina);
+
+  const specMat = new T.MeshPhysicalMaterial({
+    color:0xbfe6ff, roughness:0.05, metalness:0, transmission:0.92, thickness:0.6,
+    transparent:true, opacity:0.5, ior:1.5, clearcoat:1 });
+  const spec = new T.Mesh(new T.SphereGeometry(2.2, 34, 22), specMat);
+  spec.scale.set(0.22, 1, 1);
+  spec.position.x = 1.5;
+  scene.add(spec);
+  const specRim = new T.Mesh(new T.SphereGeometry(2.25, 34, 22),
+    new T.MeshBasicMaterial({ color:0x9fd8ff, wireframe:true, transparent:true, opacity:0.2 }));
+  specRim.scale.set(0.22, 1, 1);
+  specRim.position.x = 1.5;
+  scene.add(specRim);
+
+  function seg(color, r) {
+    const g = new T.CylinderGeometry(r, r, 1, 8);
+    g.translate(0, 0.5, 0);
+    const m = new T.Mesh(g, new T.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.1, roughness: 0.4 }));
+    scene.add(m);
+    return m;
+  }
+  function setSeg(m, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-4) { m.visible = false; return; }
+    m.visible = true;
+    m.position.set(x1, y1, 0);
+    m.scale.set(1, L, 1);
+    m.rotation.z = Math.atan2(dy, dx) - Math.PI / 2;
+  }
+
+  const NR = 6;
+  const rays = [];
+  for (let i = 0; i < NR; i++) rays.push({ s: seg(0xffd166, 0.05) });
+
+  const focusDot = new T.Mesh(new T.SphereGeometry(0.3, 20, 14),
+    new T.MeshBasicMaterial({ color: 0xffffff }));
+  scene.add(focusDot);
+  const focusGlow = st.glow(0xffffff, 3.4, 0.9);
+  scene.add(focusGlow);
+  const lblRet = st.label('retina', '#ff8a94', 0.006);
+  const lblFocus = st.label('focus', '#ffffff', 0.006);
+  scene.add(lblRet); scene.add(lblFocus);
+
+  const specP = +el('sL').value;
+  const D_MM = (RETINA_X - LENS_X) * MM_PER_U;
+  const NORMAL_P = 1000 / (D_MM - 1000 / (+el('sD').value * 1000));
+
+  function trace() {
+    const P = +el('sP').value, Dcm = +el('sD').value, Pl = specP;
+    const u = Dcm * 1000;
+    const f = 1000 / (P + Pl);
+    const v = 1 / (1 / f + 1 / u);
+    const objX = -Dcm * 0.22;
+    const yObj = 3.2;
+    const out = [];
+    for (let i = 0; i < NR; i++) {
+      const frac = (i + 0.5) / NR;
+      const yIn = yObj * (1 - frac * 0.95);
+      const aimX = 1.5;
+      const dx = aimX - objX, dy = -yIn;
+      const L = Math.hypot(dx, dy);
+      const ux = dx / L, uy = dy / L;
+      const tSpec = (1.5 - objX) / ux;
+      const ySpec = yIn + uy * tSpec;
+      const tLens = (LENS_X - 1.5) / ux;
+      const yLens = ySpec + uy * tLens;
+      const focusFromLens = v * MM_PER_U;
+      const slope = -yLens / focusFromLens;
+      out.push({ x1: objX, y1: yIn, xs: 1.5, ys: ySpec, xl: LENS_X, yl: yLens, slope });
+    }
+    return { out, v, objX, yObj, P, Pl, u, f, Dcm };
+  }
+
+  function focusXof(R) {
+    return isFinite(R.v) ? LENS_X + R.v * MM_PER_U : Infinity;
+  }
+
+  function draw() {
+    const R = trace();
+    const focusX = focusXof(R);
+    const specOn = Math.abs(R.Pl) > 0.05;
+    spec.visible = specOn; specRim.visible = specOn;
+    if (specOn) {
+      const conv = R.Pl > 0;
+      spec.scale.set(conv ? 0.34 : 0.18, 1, 1);
+      specRim.scale.set(conv ? 0.34 : 0.18, 1, 1);
+    }
+
+    for (let i = 0; i < NR; i++) {
+      const r = R.out[i];
+      const ray = rays[i].s;
+      if (!show.rays) { ray.visible = false; continue; }
+      ray.visible = true;
+      const yEnd = isFinite(focusX) ? r.yl + r.slope * (focusX - LENS_X) : r.yl + r.slope * 40;
+      const xEnd = isFinite(focusX) ? focusX : LENS_X + 40;
+      setSeg(ray, r.x1, r.y1, r.xs, r.ys);
+      if (specOn) setSeg(ray, r.xs, r.ys, r.xl, r.yl);
+      else setSeg(ray, r.x1, r.y1, r.xl, r.yl);
+      setSeg(ray, r.xl, r.yl, xEnd, yEnd);
+    }
+
+    focusDot.visible = show.retina && isFinite(focusX);
+    focusGlow.visible = focusDot.visible;
+    if (focusDot.visible) {
+      focusDot.position.set(focusX, 0, 0);
+      focusGlow.position.set(focusX, 0, 0);
+      focusGlow.scale.setScalar(2.2 + Math.sin(performance.now() * 0.006) * 0.22);
+      lblFocus.position.set(focusX, 0.7, 0);
+    }
+    lblFocus.visible = focusDot.visible;
+    retina.visible = show.retina;
+    lblRet.position.set(RETINA_X, -CORNEA_R * 1.5, 0);
+    lblRet.visible = show.retina;
+
+    const want = new T.Vector3(R.objX * 0.35 + RETINA_X * 0.85, 0, 0);
+    camTarget.lerp(want, 0.05);
+    st.controls.frame(undefined, camTarget);
+    return R;
+  }
+
+  const camTarget = new T.Vector3(6, 0, 0);
+  st.controls.frame(undefined, camTarget);
+
+  function outs(R) {
+    const v = R.v;
+    const err = isFinite(v) ? v - D_MM : Infinity;
+    const onRetina = Math.abs(err) < 0.35;
+    const base = R.P;
+    const need = 1000 / D_MM + 1000 / R.u - base;
+
+    el('dW').textContent = isFinite(v) ? (err > 0 ? 'behind' : 'in front of') + ' retina' : 'at ∞';
+    const defect = !isFinite(v) ? 'Hyper' : err < -0.35 ? 'Myopia' : err > 0.35 ? 'Hyper' : 'None';
+    el('dD').textContent = defect;
+    el('dD').style.color = defect === 'None' ? 'var(--ok)' : defect === 'Myopia' ? 'var(--warn)' : 'var(--bad)';
+    el('dC').textContent = Math.abs(R.Pl) < 0.05 ? 'none' : R.Pl.toFixed(1) + ' D';
+    el('dF').textContent = onRetina ? 'on retina' : !isFinite(v) ? 'no focus' : (err > 0 ? 'long' : 'short');
+    el('dF').style.color = onRetina ? 'var(--ok)' : 'var(--bad)';
+
+    el('rR').textContent = D_MM.toFixed(1) + ' mm';
+    el('rFp').textContent = isFinite(v) ? v.toFixed(1) + ' mm' : '∞';
+    el('rE').textContent = isFinite(err) ? err.toFixed(2) + ' mm' : '∞';
+    const imgH = isFinite(v) ? Math.abs(v / R.u) : Infinity;
+    el('rS').textContent = isFinite(imgH) ? imgH.toFixed(3) + '×' : '∞';
+    el('rLt').textContent = Math.abs(R.Pl) < 0.05 ? 'none' : R.Pl < 0 ? 'Concave' : 'Convex';
+    el('rC').textContent = onRetina ? 'fixed' : 'not yet';
+
+    const v2 = el('v');
+    if (onRetina) {
+      v2.innerHTML = '<b style="color:var(--ok)">Focused on the retina.</b> At ' + R.Dcm +
+        ' cm the image lands at exactly ' + v.toFixed(1) + ' mm, where the photoreceptors are.';
+      v2.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (err < 0) {
+      v2.innerHTML = '<b style="color:var(--warn)">Focus in front of the retina.</b> The eye is too strong for its length &mdash; <b>myopia</b>. A concave lens of about ' +
+        (-need).toFixed(1) + ' D weakens the system so the focus falls back onto the retina.';
+      v2.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v2.innerHTML = '<b style="color:var(--bad)">Focus behind the retina.</b> The eye is too weak for its length &mdash; <b>hypermetropia</b>. A convex lens of about ' +
+        need.toFixed(1) + ' D strengthens it so the focus arrives on the retina.';
+      v2.style.borderColor = 'rgba(255,122,122,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sP', 'vP', 1], ['sN', 'vN', 0], ['sD', 'vD', 0], ['sL', 'vL', 1]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sP', 'sN', 'sD', 'sL'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('[data-e]').forEach(x => x.addEventListener('click', () => {
+    document.querySelectorAll('[data-e]').forEach(y => y.classList.toggle('on', y === x));
+    const k = x.dataset.e;
+    const D = +el('sD').value * 1000;
+    const Pnorm = 1000 / D_MM + 1000 / D;
+    if (k === 'normal') { el('sP').value = Pnorm.toFixed(1); el('sL').value = 0; }
+    else if (k === 'myopia') { el('sP').value = (Pnorm + 5).toFixed(1); el('sL').value = 0; }
+    else { el('sP').value = (Pnorm - 5).toFixed(1); el('sL').value = 0; }
+    syncUI();
+  }));
+  document.querySelectorAll('[data-t]').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bFix').addEventListener('click', () => {
+    const D = +el('sD').value * 1000;
+    el('sL').value = (1000 / D_MM + 1000 / D - (+el('sP').value)).toFixed(1);
+    syncUI();
+  });
+  el('bRst').addEventListener('click', () => {
+    const D = +el('sD').value * 1000;
+    el('sN').value = 25; el('sD').value = 25; el('sL').value = 0;
+    el('sP').value = (1000 / D_MM + 1000 / D).toFixed(1);
+    document.querySelectorAll('[data-e]').forEach((y, i) => y.classList.toggle('on', i === 0));
+    syncUI();
+  });
+
+  syncUI();
+  st.onFrame(() => { outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Atom — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#a78bfa; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:72ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none;cursor:grab}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.55;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+  .hint{font-size:11.5px;color:var(--txt3);margin-top:10px;text-align:center}
+  .warn{display:none;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08);color:#fecaca}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>3D Atom</h1>
+    <span class="eq">r<sub>n</sub> = n&sup2;r<sub>1</sub> &nbsp;&nbsp; E<sub>n</sub> = &minus;13.6/n&sup2; eV</span>
+  </header>
+  <p class="sub">A rotatable 3D version of the same quantised shells, with a real environment-mapped metal sphere for the nucleus. Drag to spin, scroll to zoom.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <div class="warn" id="warn">Three.js could not be loaded from <code>../js/vendor/three.min.js</code>. Run this file from inside the project folder, or open <code>atoms-bohr.html</code> instead &mdash; it has no dependencies at all.</div>
+
+      <h2 style="margin-top:0">Controls</h2>
+      <div class="ctl">
+        <label>Principal quantum n <b><span id="vN">3</span></b></label>
+        <input type="range" id="sN" min="1" max="6" step="1" value="3">
+      </div>
+      <div class="ctl">
+        <label>Element Z <b><span id="vZ">11</span> (Na)</b></label>
+        <input type="range" id="sZ" min="1" max="18" step="1" value="11">
+      </div>
+      <div class="ctl">
+        <label>Orbit speed <b><span id="vS">1.0</span>&times;</b></label>
+        <input type="range" id="sS" min="0" max="3" step="0.05" value="1">
+      </div>
+      <div class="ctl">
+        <label>Nucleus detail <b><span id="vQ">48</span></b></label>
+        <input type="range" id="sQ" min="8" max="96" step="4" value="48">
+      </div>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Shell radius</span><b id="rRn">0 pm</b></div>
+        <div class="ro"><span>Binding energy</span><b id="rEn">0 eV</b></div>
+        <div class="ro"><span>Electrons</span><b id="rE">0</b></div>
+        <div class="ro"><span>Render calls</span><b id="rR">0</b></div>
+        <div class="ro"><span>Triangles</span><b id="rT">0</b></div>
+        <div class="ro"><span>Frame</span><b id="rF">—</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Pause</button>
+        <button class="ghost" id="bRst">Reset view</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+      <p class="hint">drag to spin &nbsp;·&nbsp; scroll to zoom</p>
+
+      <p class="note">This is the one file in the set with a dependency, and it is a deliberate exception: it loads <code>three.min.js</code> from your own <code>js/vendor/</code> folder, which is already committed to this repo. So there is still no CDN call &mdash; it works offline. The original site version pulled the same library from a CDN, which is why it needed a network.</p>
+    </aside>
+  </div>
+</div>
+
+<script src="../js/vendor/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const A0 = 52.9, KEV = 13.605693;
+  const ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg',
+    'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K'];
+  const SHELL_C = ['#f87171', '#fbbf24', '#34d399', '#22d3ee', '#a78bfa', '#f472b6'];
+
+  const el = id => document.getElementById(id);
+  if (typeof THREE === 'undefined') {
+    el('warn').style.display = 'block';
+    ['sN', 'sZ', 'sS', 'sQ'].forEach(i => { el(i).disabled = true; });
+    return;
+  }
+
+  const cv = el('c');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
+  } catch (e) {
+    el('warn').style.display = 'block';
+    el('warn').textContent = 'WebGL is unavailable in this browser, so the 3D view cannot start. Open atoms-bohr.html for the 2D version.';
+    return;
+  }
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 2), 3));
+  renderer.setClearColor(0x070b16, 1);
+
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+  let dist = 520, angY = 0.6, angX = 0.35, spin = 1, run = true, t = 0;
+
+  scene.add(new THREE.AmbientLight(0x33415c, 1.1));
+  const key = new THREE.DirectionalLight(0xffffff, 1.5);
+  key.position.set(120, 200, 260);
+  key.castShadow = true;
+  key.shadow.mapSize.set(4096, 4096);
+  const sc = key.shadow.camera;
+  sc.left = -700; sc.right = 700; sc.top = 700; sc.bottom = -700; sc.near = 1; sc.far = 1400;
+  key.shadow.bias = -0.0006;
+  scene.add(key);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const rim = new THREE.DirectionalLight(0xa78bfa, 0.7);
+  rim.position.set(-180, -80, -140); scene.add(rim);
+
+  const NUC = new THREE.Group(); scene.add(NUC);
+  const shells = [];
+  for (let k = 1; k <= 6; k++) {
+    const g = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(A0 * k * k, 0.5, 8, 128),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14 })
+    );
+    g.add(ring);
+    g.userData.ring = ring;
+    scene.add(g); shells.push(g);
+  }
+
+  const eGeo = new THREE.SphereGeometry(1.5, 12, 12);
+  const electrons = [];
+  for (let i = 0; i < 18; i++) {
+    const m = new THREE.Mesh(eGeo, new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+    scene.add(m); electrons.push(m);
+  }
+
+  const nucMat = new THREE.MeshStandardMaterial({ color: 0x9aa8c3, metalness: 0.95, roughness: 0.28 });
+  let nucleus = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 16), nucMat);
+  NUC.add(nucleus);
+
+  const pGeo = new THREE.SphereGeometry(1.7, 10, 10);
+  const pMat = new THREE.MeshStandardMaterial({ color: 0xf87171, roughness: 0.4 });
+  const nMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 });
+  const protos = [], neutrons = [];
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const W = Math.max(320, r.width), H = Math.round(W * 0.56);
+    renderer.setSize(W, H, false);
+    cv.style.height = H + 'px';
+    cam.aspect = W / H; cam.updateProjectionMatrix();
+  }
+
+  const shellOf = n => ({ r: A0 * n * n, e: -KEV / (n * n) });
+
+  function assign(Z) {
+    const cap = [2, 8, 8];
+    let left = Z;
+    const shellsOf = [[], [], []];
+    for (let n = 1; n <= 3; n++) {
+      const take = Math.min(cap[n - 1], left);
+      for (let i = 0; i < take; i++) shellsOf[n - 1].push({ a: (i / take) * 6.283185, sp: (n % 2 ? 1 : -1) * (1.0 / Math.pow(n, 1.5)) });
+      left -= take;
+    }
+    return shellsOf;
+  }
+
+  function buildNucleus(Z, Q) {
+    while (NUC.children.length) {
+      const c = NUC.children.pop();
+      if (c.geometry) c.geometry.dispose();
+    }
+    nucleus = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 16), nucMat);
+    NUC.add(nucleus);
+    const total = Math.min(Z + Math.max(0, Z - 2), 40);
+    const nP = Math.min(Z, 20), nN = Math.min(Math.max(0, Z - 2), 20);
+    protos.length = 0; neutrons.length = 0;
+    for (let i = 0; i < nP; i++) {
+      const m = new THREE.Mesh(pGeo, pMat);
+      NUC.add(m); protos.push(m);
+    }
+    for (let i = 0; i < nN; i++) {
+      const m = new THREE.Mesh(pGeo, nMat);
+      NUC.add(m); neutrons.push(m);
+    }
+    const gseed = 12345 + Z * 7;
+    const place = (arr, off) => {
+      let s = gseed + off;
+      const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+      arr.forEach((m, i) => {
+        const u = rnd() * 2 - 1, th = rnd() * 6.283185;
+        const r = Math.cbrt(rnd()) * 7.4;
+        const sp = Math.sqrt(1 - u * u);
+        m.position.set(r * sp * Math.cos(th), r * u, r * sp * Math.sin(th));
+      });
+    };
+    place(protos, 0); place(neutrons, 99);
+    return total;
+  }
+
+  function draw() {
+    const n = +el('sN').value, Z = +el('sZ').value, S = +el('sS').value;
+    const groups = assign(Z);
+    const sh = shellOf(n);
+
+    shells.forEach((g, i) => {
+      const active = (i + 1) === n;
+      g.visible = (i + 1) <= Math.max(n, 3);
+      g.userData.ring.material.color.set(active ? SHELL_C[i] : 0xffffff);
+      g.userData.ring.material.opacity = active ? 0.75 : 0.12;
+      g.rotation.x = Math.PI / 2 + (i * 0.34);
+      g.rotation.z = t * 0.12 * (i % 2 ? 1 : -1);
+      g.scale.setScalar(1);
+      g.children.forEach(c => { c.scale.set(1, 1, 1); });
+      g.userData.ring.scale.setScalar(1);
+    });
+
+    let idx = 0;
+    for (let s = 1; s <= 3; s++) {
+      const rr = shellOf(s).r;
+      for (const e of groups[s - 1]) {
+        if (idx >= electrons.length) break;
+        const m = electrons[idx++];
+        const a = e.a + t * e.sp * S;
+        m.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
+        m.visible = true;
+        m.material.color.set(s === n ? SHELL_C[n - 1] : 0x3a4a6b);
+        const grp = shells[s - 1];
+        m.position.applyEuler(grp.rotation);
+      }
+    }
+    for (let i = idx; i < electrons.length; i++) electrons[i].visible = false;
+
+    NUC.rotation.y = t * 0.5;
+    protos.forEach(p => p.rotation.y = t * 1.2);
+    neutrons.forEach(p => p.rotation.y = -t * 1.1);
+
+    renderer.render(scene, cam);
+
+    const info = renderer.info.render;
+    return { sh, n, Z, calls: info.calls, tris: info.triangles, shown: idx };
+  }
+
+  function camPos() {
+    cam.position.set(
+      dist * Math.cos(angX) * Math.sin(angY),
+      dist * Math.sin(angX),
+      dist * Math.cos(angX) * Math.cos(angY)
+    );
+    cam.lookAt(0, 0, 0);
+  }
+
+  function sync() {
+    [['sN', 'vN', 0], ['sZ', 'vZ', 0], ['sS', 'vS', 1], ['sQ', 'vQ', 0]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  let lastBuild = -1, lastQ = -1;
+  function outs(info) {
+    const Z = +el('sZ').value, Q = +el('sQ').value;
+    if (Z !== lastBuild || Q !== lastQ) { buildNucleus(Z, Q); lastBuild = Z; lastQ = Q; }
+    el('rRn').textContent = info.sh.r.toFixed(1) + ' pm';
+    el('rEn').textContent = info.sh.e.toFixed(2) + ' eV';
+    el('rE').textContent = info.shown;
+    el('rR').textContent = info.calls;
+    el('rT').textContent = info.tris.toLocaleString();
+    el('rF').textContent = lastMs.toFixed(1) + ' ms';
+
+    const v = el('v'), n = info.n;
+    if (n === 1) {
+      v.innerHTML = '<b style="color:#f87171">Ground shell.</b> Binding ' + info.sh.e.toFixed(2) +
+        ' eV &mdash; the tightest, smallest orbit. Scroll out to compare it with n=6.';
+      v.style.borderColor = 'rgba(248,113,113,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#22d3ee">n = ' + n + '.</b> Radius ' + (n * n) +
+        '× larger than the ground shell but bound only ' + Math.abs(info.sh.e).toFixed(2) +
+        ' eV &mdash; bigger <em>and</em> more weakly held.';
+      v.style.borderColor = 'rgba(34,211,238,.3)';
+    }
+  }
+
+  el('sN').addEventListener('input', sync);
+  el('sS').addEventListener('input', sync);
+  el('sZ').addEventListener('input', () => { sync(); lastBuild = -1; });
+  el('sQ').addEventListener('input', () => { sync(); lastQ = -1; });
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { angY = 0.6; angX = 0.35; dist = 520; camPos(); });
+
+  let drag = null;
+  cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ay: angY, ax: angX }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    if (!drag) return;
+    angY = drag.ay + (e.clientX - drag.x) * 0.008;
+    angX = Math.max(-1.4, Math.min(1.4, drag.ax + (e.clientY - drag.y) * 0.006));
+    camPos();
+  });
+  const rel = () => { drag = null; };
+  cv.addEventListener('pointerup', rel);
+  cv.addEventListener('pointercancel', rel);
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    dist = Math.max(120, Math.min(2400, dist * (1 + Math.sign(e.deltaY) * 0.12)));
+    camPos();
+  }, { passive: false });
+
+  let last = performance.now(), lastMs = 0;
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t0 = performance.now();
+    if (run) t += dt;
+    camPos();
+    const info = draw();
+    outs(info);
+    lastMs = performance.now() - t0;
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); camPos(); });
+  fit(); sync(); camPos(); buildNucleus(+el('sZ').value, +el('sQ').value);
+  lastBuild = +el('sZ').value; lastQ = +el('sQ').value;
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

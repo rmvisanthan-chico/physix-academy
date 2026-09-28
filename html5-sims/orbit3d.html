@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Orbit 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --panel:#0d1322; --panel2:#141c2f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#6366f1; --acc2:#a78bfa; --onAcc:#ffffff; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;
+    -webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;
+    text-shadow:0 2px 18px rgba(0,0,0,.8)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);
+    padding:5px 11px;border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(560px,44vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:132px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:15px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;
+      max-height:47vh}
+    #view{inset:0 0 47vh 0}
+    .dock{display:none}
+    .eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Gravity Orbit 3D</h1>
+  <p>Grab the orbit handle and throw the probe into a new trajectory</p>
+</div>
+<div class="hud eq">v<sub>circ</sub> = &radic;GM/r &nbsp;&nbsp; v<sub>esc</sub> = &radic;2GM/r</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Speed</span><b id="dV">—</b></div>
+  <div class="chip"><span>Altitude</span><b id="dA">—</b></div>
+  <div class="chip"><span>Classification</span><b id="dC">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Central body</h2>
+  <div class="ctl">
+    <label>Mass M <b><span id="vM">1.00</span> M<sub>&Earth;</sub></b></label>
+    <input type="range" id="sM" min="0.05" max="12" step="0.05" value="1">
+  </div>
+  <div class="ctl">
+    <label>Body radius <b><span id="vR">1.00</span> R<sub>&Earth;</sub></b></label>
+    <input type="range" id="sR" min="0.3" max="2.4" step="0.05" value="1">
+  </div>
+
+  <h2 class="mt">Probe launch</h2>
+  <div class="ctl">
+    <label>Start radius <b><span id="vA">20.0</span> &times;10<sup>6</sup> m</b></label>
+    <input type="range" id="sA" min="10" max="44" step="0.5" value="20">
+  </div>
+  <div class="ctl">
+    <label>Launch speed <b><span id="vV">1.00</span> &times; v<sub>circ</sub></b></label>
+    <input type="range" id="sV" min="0.25" max="1.9" step="0.01" value="1">
+  </div>
+  <div class="ctl">
+    <label>Launch inclination <b><span id="vTi">22</span>&deg;</b></label>
+    <input type="range" id="sTi" min="0" max="70" step="1" value="22">
+  </div>
+  <div class="ctl">
+    <label>Time warp <b><span id="vTw">1.0</span>&times;</b></label>
+    <input type="range" id="sTw" min="0.1" max="4" step="0.1" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="trail">trail</span>
+    <span class="tg on" data-t="grid">grid</span>
+    <span class="tg on" data-t="apsides">apsides</span>
+    <span class="tg" data-t="force">gravity vector</span>
+    <span class="tg" data-t="starfield">starfield</span>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bNew">New orbit</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    <b>Drag the glowing handle</b> to swing the velocity vector and set speed by length.
+    <b>Drag the probe</b> to reposition it. Scroll to zoom, right-drag to pan, drag the sky to orbit the camera.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const RE = 6.371e6, GM0 = 3.986004418e14, G = 6.674e-11;
+  const SC = 1.0e6;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x6366f1,
+    dist: 52, minD: 6, maxD: 340, exposure: 0.95, bg: 0x04060d,
+    autoRotate: 0.05, preserve: true, hemi: 0.14, key: 3.0, fill: 0.14, rim: 0.26,
+    theta: 0.85, phi: 1.32
+  });
+  const scene = st.scene;
+
+  const show = { trail: true, grid: true, apsides: true, force: false, starfield: true };
+
+  let GM = GM0, RpS = RE / SC, r0 = 12;
+  const probe = { p: new T.Vector3(), v: new T.Vector3() };
+  let E = 0, h = 0, aSemi = Infinity, ecc = 0, crashed = false, tSim = 0;
+  let trailPts = [], apG = null, apP = null;
+  const UP = new T.Vector3(0, 1, 0);
+  const camTarget = new T.Vector3();
+  const scenePos = new T.Vector3();
+
+  const starG = new T.BufferGeometry();
+  {
+    const N = 2600, arr = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const u = Math.random() * 2 - 1, th = Math.random() * 6.283185;
+      const s = Math.sqrt(1 - u * u), R = 700 + Math.random() * 500;
+      arr[i * 3] = R * s * Math.cos(th);
+      arr[i * 3 + 1] = R * u * 0.7;
+      arr[i * 3 + 2] = R * s * Math.sin(th);
+      const c = 0.55 + Math.random() * 0.45, warm = Math.random();
+      col[i * 3] = c * (0.85 + warm * 0.15);
+      col[i * 3 + 1] = c * 0.92;
+      col[i * 3 + 2] = c * (1.0 - warm * 0.12);
+    }
+    starG.setAttribute('position', new T.BufferAttribute(arr, 3));
+    starG.setAttribute('color', new T.BufferAttribute(col, 3));
+  }
+  const stars = new T.Points(starG, new T.PointsMaterial({
+    size: 2.4, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.85, depthWrite: false, blending: T.AdditiveBlending
+  }));
+  scene.add(stars);
+
+  const bodyMat = new T.MeshStandardMaterial({ color: 0x1e5fc4, roughness: 0.72, metalness: 0.03 });
+  bodyMat.envMapIntensity = 0.3;
+  const body = new T.Mesh(new T.SphereGeometry(1, 96, 64), bodyMat);
+  body.castShadow = true; body.receiveShadow = true;
+  scene.add(body);
+
+  const atmo = new T.Mesh(
+    new T.SphereGeometry(1.16, 96, 64),
+    new T.ShaderMaterial({
+      uniforms: { c: { value: new T.Color(0x6cb6ff) }, pw: { value: 3.1 } },
+      vertexShader: [
+        'varying vec3 vN; varying vec3 vV;',
+        'void main() {',
+        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+        '  vN = normalize(normalMatrix * normal);',
+        '  vV = normalize(-mv.xyz);',
+        '  gl_Position = projectionMatrix * mv;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 c; uniform float pw;',
+        'varying vec3 vN; varying vec3 vV;',
+        'void main() {',
+        '  float f = pow(1.0 - abs(dot(vN, vV)), pw);',
+        '  gl_FragColor = vec4(c * f, f * 0.92);',
+        '}'
+      ].join('\n'),
+      transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.FrontSide
+    }));
+  scene.add(atmo);
+
+  const probeMesh = new T.Mesh(
+    new T.SphereGeometry(0.42, 28, 20),
+    new T.MeshStandardMaterial({ color: 0xffb347, emissive: 0xff7a18, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.2 }));
+  probeMesh.castShadow = true;
+  scene.add(probeMesh);
+  const probeGlow = st.glow(0xffa23c, 4.4, 0.9);
+  scene.add(probeGlow);
+
+  const handle = new T.Mesh(
+    new T.SphereGeometry(0.55, 24, 18),
+    new T.MeshStandardMaterial({ color: 0x31d7f0, emissive: 0x0e7f92, emissiveIntensity: 0.7, roughness: 0.28 }));
+  scene.add(handle);
+  const handleGlow = st.glow(0x31d7f0, 2.6, 0.9);
+  scene.add(handleGlow);
+
+  const vArrow = st.arrow(0x31d7f0, new T.Vector3(), new T.Vector3(1, 0, 0), 4);
+  scene.add(vArrow);
+  const gArrow = st.arrow(0xff7a7a, new T.Vector3(), new T.Vector3(0, -1, 0), 4);
+  scene.add(gArrow);
+
+  const trailGeo = new T.BufferGeometry();
+  const trailPos = new Float32Array(2600 * 3);
+  const trailCol = new Float32Array(2600 * 3);
+  trailGeo.setAttribute('position', new T.BufferAttribute(trailPos, 3));
+  trailGeo.setAttribute('color', new T.BufferAttribute(trailCol, 3));
+  trailGeo.setDrawRange(0, 0);
+  const trail = new T.Points(trailGeo, new T.PointsMaterial({
+    size: 2.6, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending
+  }));
+  trail.frustumCulled = false;
+  scene.add(trail);
+
+  const apMatP = new T.MeshBasicMaterial({ color: 0x3ee0a4 });
+  const apMatA = new T.MeshBasicMaterial({ color: 0xffc043 });
+  apP = new T.Mesh(new T.SphereGeometry(0.5, 20, 14), apMatP); scene.add(apP);
+  apG = new T.Mesh(new T.SphereGeometry(0.5, 20, 14), apMatA); scene.add(apG);
+  const lblP = st.label('periapsis', '#3ee0a4', 0.010); scene.add(lblP);
+  const lblA = st.label('apoapsis', '#ffc043', 0.010); scene.add(lblA);
+  const lblC = st.label('focus', '#8fa3c8', 0.009); scene.add(lblC);
+  const velLbl = st.label('v', '#31d7f0', 0.010); scene.add(velLbl);
+  const grid = st.grid(90, 30, 0x46598a, 0x222d47);
+  grid.material.opacity = 0.4;
+  scene.add(grid);
+  const sun = new T.DirectionalLight(0xfff0d8, 0.9); sun.position.set(40, 26, 20);
+  scene.add(sun);
+
+  function syncGrid() {
+    grid.visible = show.grid;
+    stars.visible = show.starfield;
+    trail.visible = show.trail;
+    lblC.visible = show.apsides;
+    gArrow.visible = show.force;
+  }
+
+  function launch() {
+    GM = GM0 * (+el('sM').value);
+    RpS = RE * (+el('sR').value) / SC;
+    r0 = Math.max(+el('sA').value, RpS * 1.7);
+    el('sA').value = Math.min(40, r0);
+    syncUI();
+    const vcirc = Math.sqrt(GM / (r0 * SC));
+    const inc = (+el('sTi').value) * Math.PI / 180;
+    const sp = +el('sV').value * vcirc;
+
+    probe.p.set(0, 0, -r0 * SC);
+    probe.v.set(sp * Math.cos(inc), sp * Math.sin(inc), 0);
+
+    body.scale.setScalar(RpS);
+    atmo.scale.setScalar(RpS);
+    camTarget.set(0, 0, 0);
+    tSim = 0; crashed = false;
+    trailPts = [];
+    recompute();
+  }
+
+  function recompute() {
+    const r = probe.p.length() || 1;
+    const sp = probe.v.length();
+    E = sp * sp / 2 - GM / r;
+    h = new T.Vector3().crossVectors(probe.p, probe.v).length();
+    ecc = Math.sqrt(Math.max(0, 1 + 2 * E * h * h / (GM * GM)));
+    aSemi = E < 0 ? -GM / (2 * E) : Infinity;
+  }
+
+  function accel(p, out) {
+    const r2 = p.lengthSq() || 1e-9;
+    const k = -GM / (r2 * Math.sqrt(r2));
+    return out.copy(p).multiplyScalar(k);
+  }
+
+  const a1 = new T.Vector3(), a2 = new T.Vector3(), tmp = new T.Vector3();
+
+  function step(dt) {
+    if (crashed) return;
+    const ts = Math.sqrt(Math.pow(r0 * SC, 3) / GM) / 900 * (+el('sTw').value);
+    accel(probe.p, a1);
+    probe.p.addScaledVector(probe.v, ts).addScaledVector(a1, 0.5 * ts * ts);
+    accel(probe.p, a2);
+    probe.v.addScaledVector(a1.add(a2), 0.5 * ts);
+    tSim += ts;
+
+    const r = probe.p.length();
+    if (r <= RpS * SC) { probe.p.multiplyScalar(RpS * SC / r); crashed = true; }
+    if (show.trail) {
+      trailPts.push(probe.p.clone().divideScalar(SC));
+      if (trailPts.length > 2600) trailPts.shift();
+    }
+    recompute();
+  }
+
+  function draw() {
+    const ps = scenePos.copy(probe.p).divideScalar(SC);
+    probeMesh.position.copy(ps);
+    probeGlow.position.copy(ps);
+    probeGlow.scale.setScalar(4.2 + Math.sin(tSim * 2.2) * 0.35);
+
+    const sp = probe.v.length();
+    const vcircScene = Math.sqrt(GM / (r0 * SC)) / SC;
+    const vlen = Math.max(1.8, Math.min(8.5, sp / vcircScene * 0.0026));
+    const vdir = tmp.copy(probe.v).normalize();
+    handle.position.copy(ps).addScaledVector(vdir, vlen);
+    handleGlow.position.copy(handle.position);
+    vArrow.position.copy(ps);
+    vArrow.scale.set(1, vlen / 4, 1);
+    vArrow.quaternion.setFromUnitVectors(UP, vdir);
+    velLbl.position.copy(handle.position);
+    velLbl.position.y += 1.7;
+
+    if (show.force) {
+      accel(probe.p, tmp);
+      const gm = tmp.length();
+      const gl = Math.max(1.5, Math.min(16, 5.0 / Math.max(0.2, gm * 1e-6)));
+      gArrow.position.copy(ps);
+      gArrow.scale.set(1, gl / 4, 1);
+      gArrow.quaternion.setFromUnitVectors(UP, tmp.normalize());
+    }
+
+    if (show.trail && trailPts.length > 1) {
+      const n = Math.min(trailPts.length, 2600);
+      const off = trailPts.length - n;
+      for (let i = 0; i < n; i++) {
+        const q = trailPts[off + i];
+        trailPos[i * 3] = q.x; trailPos[i * 3 + 1] = q.y; trailPos[i * 3 + 2] = q.z;
+        const a = Math.pow(i / n, 2.2);
+        const c = crashed ? [1, 0.42, 0.42] : [0.58 + 0.4 * a, 0.48 + 0.3 * a, 1.0];
+        trailCol[i * 3] = c[0] * a; trailCol[i * 3 + 1] = c[1] * a; trailCol[i * 3 + 2] = c[2] * a;
+      }
+      trailGeo.attributes.position.needsUpdate = true;
+      trailGeo.attributes.color.needsUpdate = true;
+      trailGeo.setDrawRange(0, n);
+    } else {
+      trailGeo.setDrawRange(0, 0);
+    }
+
+    const apOK = show.apsides && isFinite(aSemi) && ecc >= 0.03 && ecc < 0.985 &&
+      aSemi * (1 + ecc) / SC < 400;
+    apP.visible = apG.visible = lblP.visible = lblA.visible = apOK;
+    if (apOK) {
+      const rp = aSemi * (1 - ecc) / SC, ra = aSemi * (1 + ecc) / SC;
+      apP.position.set(0, 0, -rp); apG.position.set(0, 0, ra);
+      lblP.position.set(0, 1.7, -rp); lblA.position.set(0, 1.7, ra);
+    }
+    lblC.position.set(0, RpS * 0.55 + 1.7, 0);
+
+    const clamped = tmp.copy(ps);
+    if (clamped.length() > 38) clamped.setLength(38);
+    camTarget.lerp(clamped, 0.05);
+    st.controls.frame(undefined, camTarget);
+
+    return { sp, r: probe.p.length() };
+  }
+
+  function classify() {
+    if (crashed) return ['Impact', 'bad'];
+    if (E >= 0) return [E < 1e-4 ? 'Parabolic' : 'Hyperbolic', 'warn'];
+    if (ecc < 0.03) return ['Circular', 'ok'];
+    if (ecc < 0.9) return ['Elliptical', 'acc2'];
+    return ['Eccentric', 'warn'];
+  }
+
+  function outs(m) {
+    el('dV').textContent = (m.sp / 1000).toFixed(2) + ' km/s';
+    el('dA').textContent = Math.max(0, (m.r - RpS * SC) / 1000).toFixed(0) + ' km';
+    const [cls, tone] = classify();
+    const c = el('dC');
+    c.textContent = cls;
+    c.style.color = 'var(--' + tone + ')';
+
+    const vcirc = Math.sqrt(GM / (r0 * SC));
+    const vesc = Math.sqrt(2) * vcirc;
+    const v = el('v');
+    const pe = aSemi * (1 - ecc) / SC / RpS, ae = aSemi * (1 + ecc) / SC / RpS;
+    if (crashed) {
+      v.innerHTML = '<b style="color:var(--bad)">Surface impact.</b> Launched below circular speed at that radius, so gravity won before the orbit could close. Circular speed here was ' +
+        (vcirc / 1000).toFixed(2) + ' km/s.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (E >= 0) {
+      v.innerHTML = '<b style="color:var(--warn)">' + cls + ' escape.</b> Total energy is non-negative, so it never returns. Escape speed from here is ' +
+        (vesc / 1000).toFixed(2) + ' km/s and you are doing ' + (m.sp / 1000).toFixed(2) + ' km/s.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (ecc < 0.03) {
+      v.innerHTML = '<b style="color:var(--ok)">Circular orbit.</b> Radius held steady at ' +
+        (m.r / 1000).toFixed(0) + ' km. Drag the cyan handle sideways to break the circle into an ellipse.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--acc2)">Elliptical, e = ' + ecc.toFixed(3) + '.</b> Swings between periapsis ' +
+        pe.toFixed(2) + ' and apoapsis ' + ae.toFixed(2) +
+        ' body radii. The body sits at one focus, not the middle.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    }
+  }
+
+  let run = true;
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bNew').addEventListener('click', () => { st.controls.nudgeTheta(0); launch(); });
+
+  document.querySelectorAll('.tg').forEach(t => t.addEventListener('click', () => {
+    const k = t.dataset.t;
+    show[k] = !show[k];
+    t.classList.toggle('on', show[k]);
+    syncGrid();
+  }));
+
+  function syncUI() {
+    [['sM', 'vM', 2], ['sR', 'vR', 2], ['sA', 'vA', 1], ['sV', 'vV', 2], ['sTi', 'vTi', 0], ['sTw', 'vTw', 1]]
+      .forEach(([i, o, d]) => {
+        const e = el(i);
+        e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+        el(o).textContent = (+e.value).toFixed(d);
+      });
+  }
+  ['sM', 'sR', 'sA', 'sV', 'sTi'].forEach(i => el(i).addEventListener('input', () => { syncUI(); launch(); }));
+  el('sTw').addEventListener('input', syncUI);
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  let dragMode = null;
+
+  function pick(ev) {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    const h = ray.ray.distanceToPoint(handle.position);
+    const p = ray.ray.distanceToPoint(probeMesh.position);
+    if (ev.shiftKey) return 'probe';
+    if (h < 1.8) return 'handle';
+    if (p < 1.8) return 'probe';
+    return null;
+  }
+
+  cv.addEventListener('pointerdown', ev => {
+    const m = pick(ev);
+    if (!m) return;
+    dragMode = m;
+    st.controls.enabled = false;
+    cv.setPointerCapture(ev.pointerId);
+  }, true);
+
+  const plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
+  const hitPt = new T.Vector3();
+
+  cv.addEventListener('pointermove', ev => {
+    if (!dragMode) {
+      cv.style.cursor = pick(ev) ? 'grab' : 'default';
+      return;
+    }
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (!ray.ray.intersectPlane(plane, hitPt)) return;
+    const ps = new T.Vector3(probe.p.x, 0, probe.p.z).divideScalar(SC);
+
+    if (dragMode === 'probe') {
+      const d = new T.Vector3(hitPt.x, 0, hitPt.z);
+      const len = d.length();
+      if (len < RpS * 1.25) return;
+      d.multiplyScalar(Math.min(len, 34) / len);
+      probe.p.copy(d.multiplyScalar(SC));
+      trailPts = [];
+      recompute();
+    } else {
+      const off = new T.Vector3(hitPt.x - ps.x, 0, hitPt.z - ps.z);
+      const vc = Math.sqrt(GM / probe.p.length());
+      const want = Math.max(0.25, Math.min(1.9, off.length() / 6.5));
+      const dir = off.length() > 0.01 ? off.normalize() : new T.Vector3(1, 0, 0);
+      probe.v.copy(dir).multiplyScalar(want * vc);
+      el('sV').value = want; syncUI();
+      trailPts = [];
+      recompute();
+    }
+  }, true);
+
+  const endDrag = () => { dragMode = null; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', endDrag, true);
+  cv.addEventListener('pointercancel', endDrag, true);
+
+  syncUI(); launch(); syncGrid();
+  st.onFrame(dt => { if (run) step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

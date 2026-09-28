@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buoyancy 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#38bdf8; --acc2:#2dd4bf; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .fluids{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .fl{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .fl.on{background:rgba(49,215,240,.22);border-color:rgba(49,215,240,.6);color:#bff0ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Buoyancy 3D</h1>
+  <p>Archimedes: the upthrust equals the weight of fluid displaced. Float the block and the
+     displaced volume is fixed by &rho;<sub>block</sub>/&rho;<sub>fluid</sub> &mdash; nothing else.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">B = &rho;<sub>fluid</sub> g V<sub>disp</sub></div>
+
+<div class="hud dock">
+  <div class="chip"><span>Weight W</span><b id="dW">—</b></div>
+  <div class="chip"><span>Buoyant B</span><b id="dB">—</b></div>
+  <div class="chip"><span>Net</span><b id="dN">—</b></div>
+  <div class="chip"><span>Status</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Block</h2>
+  <div class="ctl">
+    <label>Block density &rho;<sub>b</sub> <b><span id="vRB">600</span> kg/m&sup3;</b></label>
+    <input type="range" id="sRB" min="100" max="3000" step="10" value="600">
+  </div>
+  <div class="ctl">
+    <label>Block side <b><span id="vS">0.40</span> m</b></label>
+    <input type="range" id="sS" min="0.2" max="0.7" step="0.01" value="0.4">
+  </div>
+
+  <h2 class="mt">Fluid</h2>
+  <div class="fluids" id="fl"></div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>&rho;<sub>fluid</sub></span><b id="rRF">0</b></div>
+    <div class="ro"><span>V<sub>block</sub></span><b id="rV">0</b></div>
+    <div class="ro"><span>V<sub>disp</sub></span><b id="rVd">0</b></div>
+    <div class="ro"><span>Submerged</span><b id="rSub">0</b></div>
+    <div class="ro"><span>Mass</span><b id="rM">0</b></div>
+    <div class="ro"><span>Terminal v</span><b id="rVt">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Drop again</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Drag the block sideways or the fluid surface. A submerged block also feels drag, so a dense one
+    does not accelerate forever &mdash; it settles at a terminal velocity where drag exactly balances
+    weight minus upthrust. Scroll to zoom, right-drag to pan.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const G = 9.81, CD = 0.9;
+  const TW = 2.4, TD = 2.0, TANK_H = 2.4;
+
+  const FLUIDS = [
+    { n: 'oil', rho: 900, c: 0xd8b46a, top: 1.80 },
+    { n: 'water', rho: 1000, c: 0x2f7fd0, top: 1.60 },
+    { n: 'seawater', rho: 1030, c: 0x2a9d8f, top: 1.50 },
+    { n: 'glycerin', rho: 1260, c: 0x9b6fd0, top: 1.35 },
+    { n: 'mercury', rho: 13600, c: 0xc9d2dd, top: 1.00 }
+  ];
+
+  const st = Physix3D.stage(cv, {
+      accent: 0x38bdf8,
+    dist: 8, minD: 4, maxD: 40, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.3, rim: 0.34,
+    theta: 0.36, phi: 1.28, target: new T.Vector3(1.2, 1.2, 0)
+  });
+  const scene = st.scene;
+
+  const grid = st.grid(16, 16, 0x1a2338, 0x111726);
+  grid.position.y = -0.12;
+  scene.add(grid);
+
+  const tank = new T.Group();
+  scene.add(tank);
+  const glass = new T.Mesh(new T.BoxGeometry(TW, TANK_H, TD),
+    new T.MeshStandardMaterial({ color: 0xa8dcff, roughness: 0.05, metalness: 0,
+      transparent: true, opacity: 0.06, side: T.DoubleSide, depthWrite: false }));
+  glass.position.y = TANK_H / 2;
+  glass.renderOrder = 4;
+  tank.add(glass);
+  const tEdges = new T.LineSegments(
+    new T.EdgesGeometry(new T.BoxGeometry(TW, TANK_H, TD)),
+    new T.LineBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.45 }));
+  tEdges.position.copy(glass.position);
+  tank.add(tEdges);
+  const tBase = new T.Mesh(new T.BoxGeometry(TW + 0.24, 0.12, TD + 0.24),
+    new T.MeshStandardMaterial({ color: 0x1b2436, roughness: 0.5, metalness: 0.5 }));
+  tBase.position.y = -0.06;
+  tBase.receiveShadow = true;
+  tank.add(tBase);
+
+  const fluid = new T.Mesh(new T.BoxGeometry(TW - 0.08, 1, TD - 0.08),
+    new T.MeshPhysicalMaterial({ color: 0x2f7fd0, roughness: 0.1, metalness: 0,
+      transparent: true, opacity: 0.38, side: T.DoubleSide, depthWrite: false }));
+  fluid.renderOrder = 2;
+  tank.add(fluid);
+  const surf = new T.Mesh(new T.PlaneGeometry(TW - 0.08, TD - 0.08),
+    new T.MeshStandardMaterial({ color: 0x2f7fd0, roughness: 0.06, metalness: 0.4,
+      transparent: true, opacity: 0.55, side: T.DoubleSide }));
+  surf.rotation.x = -Math.PI / 2;
+  surf.renderOrder = 3;
+  tank.add(surf);
+
+  const blockMat = new T.MeshStandardMaterial({ color: 0xff8a5a, roughness: 0.45, metalness: 0.15 });
+  const block = new T.Mesh(new T.BoxGeometry(1, 1, 1), blockMat);
+  block.castShadow = true;
+  tank.add(block);
+  const disp = new T.Mesh(new T.BoxGeometry(1, 1, 1),
+    new T.MeshBasicMaterial({ color: 0x7fe8ff, transparent: true, opacity: 0.28, depthWrite: false }));
+  disp.renderOrder = 3;
+  tank.add(disp);
+  const blockEdges = new T.LineSegments(
+    new T.EdgesGeometry(new T.BoxGeometry(1, 1, 1)),
+    new T.LineBasicMaterial({ color: 0xffd0b0, transparent: true, opacity: 0.9 }));
+  tank.add(blockEdges);
+
+  const aW = st.arrow(0xff7a7a, new T.Vector3(), new T.Vector3(0, -1, 0), 1);
+  const aB = st.arrow(0x31d7f0, new T.Vector3(), new T.Vector3(0, 1, 0), 1);
+  const aD = st.arrow(0xffe066, new T.Vector3(), new T.Vector3(0, -1, 0), 1);
+  tank.add(aW, aB, aD);
+  const lblW = st.label('W', '#ff9a9a', 0.0026);
+  const lblB = st.label('B', '#7fe0ff', 0.0026);
+  const lblD = st.label('drag', '#ffe9a8', 0.0022);
+  tank.add(lblW, lblB, lblD);
+
+  let by = 2.1, bvy = 0, bx = 0, run = true, fi = 1;
+
+  const flWrap = el('fl');
+  FLUIDS.forEach((f, i) => {
+    const s = document.createElement('span');
+    s.className = 'fl' + (i === fi ? ' on' : '');
+    s.textContent = f.n;
+    s.addEventListener('click', () => {
+      fi = i;
+      [...flWrap.children].forEach((c, j) => c.classList.toggle('on', j === i));
+      fluid.material.color.set(f.c);
+      surf.material.color.set(f.c);
+      reset();
+    });
+    flWrap.appendChild(s);
+  });
+
+  function reset() { by = 2.1; bvy = 0; }
+
+  const phys = () => ({ rb: +el('sRB').value, side: +el('sS').value, f: FLUIDS[fi] });
+
+  function subLenOf(by, side, top) {
+    return Math.max(0, Math.min(side, top - (by - side / 2)));
+  }
+
+  function step(dt) {
+    const P = phys();
+    const V = P.side ** 3;
+    const m = P.rb * V;
+    const rhoF = P.f.rho;
+    const volSub = (subLenOf(by, P.side, P.f.top) / P.side) * V;
+    const B = rhoF * G * volSub;
+    const W = m * G;
+    const drag = 0.5 * CD * rhoF * (P.side * P.side) * bvy * Math.abs(bvy);
+    const aUp = (B - W - drag - 2.6 * m * bvy) / m;
+    bvy += aUp * dt;
+    by += bvy * dt;
+    const floorY = P.side / 2;
+    if (by < floorY) { by = floorY; bvy = Math.abs(bvy) * 0.18; }
+    const ceilY = TANK_H - P.side / 2;
+    if (by > ceilY) { by = ceilY; bvy = -Math.abs(bvy) * 0.18; }
+  }
+
+  function draw() {
+    const P = phys();
+    const V = P.side ** 3;
+    const m = P.rb * V;
+    const rhoF = P.f.rho;
+    const bs = P.side;
+    block.scale.set(bs, bs, bs);
+    block.position.set(bx, by, 0);
+    blockEdges.scale.set(bs, bs, bs);
+    blockEdges.position.copy(block.position);
+    blockMat.color.set(rhoF > 0 ? (P.rb < rhoF ? 0x4ade80 : 0xff8a5a) : 0xff8a5a);
+
+    const volSub = (subLenOf(by, P.side, P.f.top) / P.side) * V;
+    const subH = (volSub / V) * bs;
+    if (subH > 0.002) {
+      disp.visible = true;
+      disp.scale.set(bs * 0.96, subH, bs * 0.96);
+      disp.position.set(bx, P.f.top - subH / 2, 0);
+    } else disp.visible = false;
+
+    fluid.scale.set(1, P.f.top, 1);
+    fluid.position.set(0, P.f.top / 2, 0);
+    surf.position.set(0, P.f.top, 0);
+
+    const W = m * G, B = rhoF * G * volSub;
+    const cy = by + bs / 2;
+    const wl = Math.max(0.12, Math.min(0.95, W / 500));
+    aW.position.set(bx, cy, bs / 2 + 0.03);
+    aW.scale.set(0.6, wl, 0.6);
+    lblW.position.set(bx + 0.16, cy - wl - 0.1, bs / 2 + 0.03);
+    const bl = Math.max(0.02, Math.min(0.95, B / 500));
+    aB.position.set(bx, cy, bs / 2 + 0.03);
+    aB.scale.set(0.6, bl, 0.6);
+    lblB.position.set(bx + 0.16, cy + bl + 0.1, bs / 2 + 0.03);
+    const drag = 0.5 * CD * rhoF * (P.side * P.side) * bvy * Math.abs(bvy);
+    const dl = Math.min(0.6, drag / 500);
+    aD.visible = drag > 1;
+    aD.position.set(bx, cy - wl, bs / 2 + 0.03);
+    aD.scale.set(0.45, Math.max(0.02, dl), 0.45);
+    lblD.visible = aD.visible;
+    lblD.position.set(bx + 0.16, cy - wl - dl - 0.1, bs / 2 + 0.03);
+
+    const vt = Math.sqrt(Math.max(0, 2 * Math.max(0, W - rhoF * G * V) / (CD * rhoF * P.side * P.side)));
+    return { P, V, m, rhoF, volSub, W, B, drag, vt, net: B - W - drag, bvy };
+  }
+
+  function outs(R) {
+    const { P, V, m, rhoF, volSub, W, B, drag, vt, net } = R;
+    const floats = P.rb < rhoF;
+    el('dW').textContent = (W / 1000).toFixed(2) + ' kN';
+    el('dB').textContent = (B / 1000).toFixed(2) + ' kN';
+    el('dN').textContent = (net / 1000).toFixed(2) + ' kN';
+    const sEl = el('dS');
+    const settled = Math.abs(R.bvy) < 0.035;
+    sEl.textContent = floats ? 'floating' : (settled ? 'on the bottom' : 'sinking');
+    sEl.style.color = floats ? 'var(--ok)' : settled ? 'var(--warn)' : 'var(--bad)';
+    el('rRF').textContent = rhoF + ' kg/m³';
+    el('rV').textContent = (V * 1000).toFixed(1) + ' L';
+    el('rVd').textContent = (volSub * 1000).toFixed(1) + ' L';
+    el('rSub').textContent = (volSub / V * 100).toFixed(1) + '%';
+    el('rM').textContent = m.toFixed(1) + ' kg';
+    el('rVt').textContent = floats ? '—' : vt.toFixed(2) + ' m/s';
+
+    const chk = el('chk');
+    if (!settled && floats) {
+      chk.className = 'check bad';
+      chk.innerHTML = 'settling&hellip; moving at ' + Math.abs(R.bvy).toFixed(2) +
+        ' m/s, so B &ne; W yet. Equilibrium can only be claimed once it stops bobbing.';
+    } else if (floats) {
+      const want = P.rb / rhoF;
+      const got = volSub / V;
+      const ok = Math.abs(want - got) < 0.02;
+      chk.className = 'check' + (ok ? '' : ' bad');
+      chk.innerHTML = ok
+        ? '&#10003; floating at ' + (got * 100).toFixed(1) + '% submerged = &rho;<sub>b</sub>/&rho;<sub>f</sub> = ' +
+          P.rb + '/' + rhoF + ', and B = W = ' + (B / 1000).toFixed(2) + ' kN'
+        : '&#10007; submerged ' + (got * 100).toFixed(1) + '% but &rho;<sub>b</sub>/&rho;<sub>f</sub> = ' +
+          (want * 100).toFixed(1) + '%';
+    } else {
+      const netArch = W - rhoF * G * V;
+      const ok = Math.abs(net - (netArch - drag)) < Math.max(1, Math.abs(netArch) * 1e-6);
+      chk.className = 'check' + (ok ? '' : ' bad');
+      chk.innerHTML = ok
+        ? '&#10003; fully submerged: B = &rho;<sub>f</sub>gV = ' + (rhoF * G * V / 1000).toFixed(2) +
+          ' kN &lt; W = ' + (W / 1000).toFixed(2) + ' kN, so it cannot float at any depth'
+        : '&#10007; force balance off';
+    }
+
+    const v = el('v');
+    if (floats) {
+      v.innerHTML = '<b style="color:var(--ok)">It floats, sitting ' + (volSub / V * 100).toFixed(0) +
+        '% submerged.</b> The block has pushed aside ' + (volSub * 1000).toFixed(1) +
+        ' L of ' + P.f.n + ', which currently weighs ' + (B / 1000).toFixed(2) + ' kN against a weight of ' +
+        (W / 1000).toFixed(2) + ' kN' +
+        (settled ? ' &mdash; equal, so it has settled. Equilibrium.' : ' &mdash; still bobbing towards equality.') +
+        ' The submerged fraction is set by the density ratio alone: change the fluid and the block rides higher or lower.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (rhoF > 3000) {
+      v.innerHTML = '<b style="color:var(--warn)">Even mercury cannot hold it.</b> At &rho;<sub>f</sub> = ' +
+        rhoF + ' kg/m&sup3; the most massive block here (&rho;<sub>b</sub> = ' + P.rb +
+        ') is still far denser, so it sinks through. Only a block denser than ' + (rhoF / 1000).toFixed(1) +
+        '&times;10&sup3; would float here.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--bad)">It sinks.</b> Fully submerged it displaces only ' +
+        (rhoF * G * V / 1000).toFixed(2) + ' kN of upthrust against ' + (W / 1000).toFixed(2) +
+        ' kN of weight, a shortfall of ' + ((W - rhoF * G * V) / 1000).toFixed(2) +
+        ' kN. Drag stops it accelerating at about ' + vt.toFixed(2) + ' m/s &mdash; drag, not buoyancy, sets that limit.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sRB', 'vRB', 0], ['sS', 'vS', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  el('sRB').addEventListener('input', syncUI);
+  el('sS').addEventListener('input', () => { syncUI(); reset(); });
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', reset);
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  function pick(e) {
+    ndc.x = (e.clientX / cv.clientWidth) * 2 - 1;
+    ndc.y = -(e.clientY / cv.clientHeight) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    const hit = ray.intersectObject(block, false);
+    if (hit.length) {
+      bx = Math.max(-TW / 2 + 0.4, Math.min(TW / 2 - 0.4, hit[0].point.x));
+    }
+  }
+  cv.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.no-orbit')) pick(e); });
+  cv.addEventListener('pointermove', e => { if (e.buttons && !e.target.closest?.('.no-orbit')) pick(e); });
+
+  syncUI();
+  st.onFrame(dt => { if (run) step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

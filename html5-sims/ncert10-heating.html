@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joule Heating &amp; Electricity Bill 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#f97316; --acc2:#fbbf24; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Joule Heating &amp; Electricity Bill 3D</h1>
+  <p>The element heats because current does work against resistance. Three different routes give the
+     same number of joules &mdash; and the meter only ever counts one of them.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">H = I&sup2;Rt = VIt = Pt</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Current</span><b id="dI">—</b></div>
+  <div class="chip"><span>Monthly bill</span><b id="dC">—</b></div>
+  <div class="chip"><span>Monthly energy</span><b id="dM">—</b></div>
+  <div class="chip"><span>Resistance</span><b id="dR">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Appliance</h2>
+  <div class="ctl">
+    <label>Rated power P <b><span id="vP">1500</span> W</b></label>
+    <input type="range" id="sP" min="5" max="3000" step="5" value="1500">
+  </div>
+  <div class="ctl">
+    <label>Use per day <b><span id="vH">4.0</span> h</b></label>
+    <input type="range" id="sH" min="0.1" max="24" step="0.1" value="4">
+  </div>
+  <div class="ctl">
+    <label>Mains voltage <b><span id="vV">230</span> V</b></label>
+    <input type="range" id="sV" min="100" max="280" step="1" value="230">
+  </div>
+  <div class="ctl">
+    <label>Tariff <b><span id="vR">7.0</span> /kWh</b></label>
+    <input type="range" id="sR" min="2" max="20" step="0.1" value="7">
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Daily energy</span><b id="rD">0</b></div>
+    <div class="ro"><span>Daily joules H</span><b id="rJ">0</b></div>
+    <div class="ro"><span>Cost / day</span><b id="rCd">0</b></div>
+    <div class="ro"><span>Co<sub>2</sub> / month</span><b id="rCo">0</b></div>
+    <div class="ro"><span>Fuse rating</span><b id="rF">0</b></div>
+    <div class="ro"><span>Heater equiv.</span><b id="rHe">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">On / Off</button>
+    <button class="ghost" id="bRst">Typical 1500 W</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Carbon uses about 0.4 kg per kWh on an average grid &mdash; included so the number on the bill is
+    not abstract. The glowing element's brightness is the instantaneous heating rate, and the coil you
+    see is resistance made visible: longer coil, higher resistance, same supply voltage.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const KWH = 3.6e6, CO2 = 0.4;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xf97316,
+    dist: 13, minD: 6, maxD: 50, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.3, rim: 0.34,
+    theta: 0.42, phi: 1.26, target: new T.Vector3(1.4, 1.5, 0)
+  });
+  const scene = st.scene;
+
+  const grid = st.grid(18, 18, 0x1a2338, 0x111726);
+  grid.position.y = -0.1;
+  scene.add(grid);
+
+  const room = new T.Mesh(new T.BoxGeometry(9, 0.12, 7),
+    new T.MeshStandardMaterial({ color: 0x141b2b, roughness: 0.7 }));
+  room.position.y = -0.06;
+  room.receiveShadow = true;
+  scene.add(room);
+
+  const heater = new T.Group();
+  heater.position.set(-1.6, 0, 0);
+  scene.add(heater);
+  const body = new T.Mesh(new T.CylinderGeometry(0.5, 0.62, 1.7, 28),
+    new T.MeshStandardMaterial({ color: 0xd8dee9, roughness: 0.4, metalness: 0.25 }));
+  body.position.y = 0.95;
+  body.castShadow = true;
+  heater.add(body);
+  const grill = new T.Mesh(new T.CylinderGeometry(0.53, 0.53, 0.1, 28),
+    new T.MeshStandardMaterial({ color: 0x39445e, roughness: 0.5, metalness: 0.6 }));
+  grill.position.y = 1.78;
+  heater.add(grill);
+  const coilPts = [];
+  for (let i = 0; i <= 200; i++) {
+    const u = i / 200;
+    const a = u * Math.PI * 2 * 14;
+    coilPts.push(new T.Vector3(Math.cos(a) * 0.42, 0.2 + u * 1.45, Math.sin(a) * 0.42));
+  }
+  const coilMat = new T.MeshStandardMaterial({
+    color: 0x6b4423, roughness: 0.5, metalness: 0.7,
+    emissive: 0xff5522, emissiveIntensity: 0 });
+  const coil = new T.Mesh(
+    new T.TubeGeometry(new T.CatmullRomCurve3(coilPts), 480, 0.035, 6, false), coilMat);
+  heater.add(coil);
+  const hGlow = st.glow(0xff7a3a, 3, 0);
+  hGlow.position.y = 0.95;
+  heater.add(hGlow);
+  for (let i = 0; i < 3; i++) {
+    const foot = new T.Mesh(new T.BoxGeometry(0.12, 0.1, 0.5),
+      new T.MeshStandardMaterial({ color: 0x2a3550, roughness: 0.6 }));
+    const a = i / 3 * Math.PI * 2;
+    foot.position.set(Math.cos(a) * 0.4, 0.05, Math.sin(a) * 0.4);
+    foot.rotation.y = -a;
+    heater.add(foot);
+  }
+  const lblH = st.label('heater', '#ffb057', 0.0026);
+  lblH.position.set(-1.6, 2.5, 0);
+  scene.add(lblH);
+
+  const meter = new T.Group();
+  meter.position.set(1.9, 1.5, -0.6);
+  const mBody = new T.Mesh(new T.CylinderGeometry(0.62, 0.62, 0.22, 32),
+    new T.MeshStandardMaterial({ color: 0x1b2436, roughness: 0.5, metalness: 0.4 }));
+  mBody.rotation.x = Math.PI / 2;
+  const mFace = new T.Mesh(new T.CircleGeometry(0.52, 32),
+    new T.MeshBasicMaterial({ color: 0x0d1424 }));
+  mFace.position.z = 0.12;
+  const mRing = new T.Mesh(new T.TorusGeometry(0.55, 0.04, 8, 40),
+    new T.MeshStandardMaterial({ color: 0x8a97b5, roughness: 0.3, metalness: 0.8 }));
+  mRing.position.z = 0.12;
+  const needle = new T.Mesh(new T.BoxGeometry(0.03, 0.44, 0.02),
+    new T.MeshBasicMaterial({ color: 0xff6b6b }));
+  needle.position.set(0, 0.2, 0.15);
+  const mGlow = st.glow(0x31d7f0, 2.4, 0.35);
+  mGlow.position.z = 0.3;
+  meter.add(mBody, mFace, mRing, needle, mGlow);
+  scene.add(meter);
+  const lblM = st.label('kWh meter', '#9fb0d8', 0.0022);
+  lblM.position.set(1.9, 2.5, -0.6);
+  scene.add(lblM);
+
+  const wireMat = new T.MeshStandardMaterial({ color: 0x8a97b5, roughness: 0.3, metalness: 0.85 });
+  function wire(a, b, r = 0.04) {
+    const d = new T.Vector3().subVectors(b, a);
+    const m = new T.Mesh(new T.CylinderGeometry(r, r, d.length(), 8), wireMat);
+    m.position.copy(a).addScaledVector(d, 0.5);
+    m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize());
+    return m;
+  }
+  scene.add(wire(new T.Vector3(-1.1, 0.35, 0.4), new T.Vector3(1.4, 0.35, 0.4)));
+  scene.add(wire(new T.Vector3(-1.1, 0.35, -0.4), new T.Vector3(1.4, 0.35, -0.4)));
+
+  const REF = [
+    { label: 'LED bulb', p: 9, h: 5 },
+    { label: 'Laptop', p: 65, h: 8 },
+    { label: 'TV', p: 120, h: 4 },
+    { label: 'Electric fan', p: 75, h: 8 },
+    { label: 'Washing machine', p: 500, h: 1.5 }
+  ];
+  const bars = [];
+  const barX = 1.4, barW = 4.6;
+  REF.forEach((r, i) => {
+    const b = new T.Mesh(new T.BoxGeometry(1, 0.26, 0.26),
+      new T.MeshBasicMaterial({ color: 0x2c3852 }));
+    b.position.set(barX + barW / 2, 0.35 + i * 0.5, 0.9);
+    scene.add(b);
+    const l = st.label(r.label, '#7f92b8', 0.0019);
+    l.position.set(barX - 0.1, 0.35 + i * 0.5, 0.9);
+    scene.add(l);
+    bars.push({ mesh: b, ref: r, x0: barX });
+  });
+
+  let on = true, t = 0, shownKwh = 0;
+
+  const phys = () => ({
+    P: +el('sP').value, h: +el('sH').value,
+    V: +el('sV').value, rate: +el('sR').value
+  });
+
+  function step(dt) { if (on) t += dt; }
+
+  function draw() {
+    const P = phys();
+    const I = P.P / P.V;
+    const R = P.V * P.V / Math.max(1e-6, P.P);
+    const heat = Math.min(1, P.P / 3000);
+
+    coilMat.emissiveIntensity = on ? heat * 2.2 : 0;
+    hGlow.material.opacity = on ? heat * 0.7 : 0;
+    hGlow.scale.setScalar(1 + heat * 0.8);
+    needle.rotation.z = 2.2 - Math.min(1, I / 16) * 4.4;
+    mGlow.material.opacity = on ? 0.3 + heat * 0.4 : 0.1;
+
+    const kwhD = P.P * P.h / 1000;
+    const maxRef = Math.max(kwhD, ...REF.map(r => r.p * r.h / 1000)) * 1.05;
+    bars.forEach(b => {
+      const w = Math.max(0.02, (b.ref.p * b.ref.h / 1000) / maxRef) * barW;
+      b.mesh.scale.set(w, 1, 1);
+      b.mesh.position.x = b.x0 + w / 2;
+      b.mesh.material.color.set(b.ref.p === P.P ? 0xffb057 : 0x2c3852);
+    });
+
+    shownKwh += (on ? kwhD / 3600 : 0) * (1 / 60);
+    return { P, I, R, kwhD, heat };
+  }
+
+  function outs(D) {
+    const { P, I, R, kwhD, heat } = D;
+    const kwhM = kwhD * 30;
+    const cost = kwhM * P.rate;
+    const joules = P.P * P.h * 3600;
+    el('dI').textContent = I.toFixed(2) + ' A';
+    el('dC').textContent = '₹' + cost.toFixed(0);
+    el('dM').textContent = kwhM.toFixed(1) + ' kWh';
+    el('dR').textContent = R.toFixed(1) + ' Ω';
+    el('rD').textContent = kwhD.toFixed(3) + ' kWh';
+    el('rJ').textContent = (joules / 1e6).toFixed(2) + ' MJ';
+    el('rCd').textContent = '₹' + (cost / 30).toFixed(1);
+    el('rCo').textContent = (kwhM * CO2).toFixed(1) + ' kg';
+    const fuse = I > 5 ? '⚠ above 5 A' : '5 A OK';
+    const f = el('rF');
+    f.textContent = fuse;
+    f.style.color = I > 5 ? 'var(--bad)' : 'var(--ok)';
+    el('rHe').textContent = (P.P / 1500).toFixed(2) + ' × 1500 W';
+
+    const viaI2Rt = I * I * R * P.h * 3600;
+    const viaVIt = P.V * I * P.h * 3600;
+    const viaPt = P.P * P.h * 3600;
+    const rel = Math.max(viaI2Rt, viaPt) > 0
+      ? Math.max(Math.abs(viaI2Rt - viaPt), Math.abs(viaVIt - viaPt)) / viaPt * 100 : 0;
+    const kwhOk = Math.abs(joules / KWH - kwhD) < 1e-9;
+    const chk = el('chk');
+    chk.className = 'check' + (rel < 1e-6 && kwhOk ? '' : ' bad');
+    chk.innerHTML = (rel < 1e-6 && kwhOk)
+      ? '&#10003; I&sup2;Rt = VIt = Pt = ' + (viaPt / 1e6).toFixed(2) +
+        ' MJ, and ' + (joules / KWH).toFixed(3) + ' kWh &times; 3.6 MJ = ' + (joules / 1e6).toFixed(2) + ' MJ'
+      : '&#10007; the three routes disagree: ' + (viaI2Rt / 1e6).toFixed(3) + ' / ' +
+        (viaVIt / 1e6).toFixed(3) + ' / ' + (viaPt / 1e6).toFixed(3) + ' MJ';
+
+    const v = el('v');
+    if (I > 5) {
+      v.innerHTML = '<b style="color:var(--bad)">' + I.toFixed(1) + ' A — too much for a 5 A fuse.</b> ' +
+        P.P.toFixed(0) + ' W on ' + P.V + ' V draws ' + I.toFixed(2) + ' A, so ' +
+        (I / 5).toFixed(2) + '&times; the rating. That is why high-power appliances get their own ' +
+        'heavy-gauge socket. The element resistance here is only ' + R.toFixed(1) + ' Ω.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (kwhM > 300) {
+      v.innerHTML = '<b style="color:var(--warn)">' + kwhM.toFixed(0) + ' kWh a month.</b> That is ₹' +
+        cost.toFixed(0) + ' at ₹' + P.rate.toFixed(1) + '/kWh, and about ' + (kwhM * CO2).toFixed(0) +
+        ' kg of CO&sup2;. Running for ' + P.h.toFixed(1) + ' h a day at ' + P.P.toFixed(0) +
+        ' W is ' + (P.h / 24 * 100).toFixed(0) + '% of every day.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + P.P.toFixed(0) + ' W for ' + P.h.toFixed(1) +
+        ' h/day.</b> That is ' + kwhD.toFixed(3) + ' kWh daily, ' + kwhM.toFixed(1) +
+        ' kWh a month and ₹' + cost.toFixed(0) + '. The meter counts kWh, not joules &mdash; but 1 kWh is ' +
+        'exactly 3.6 MJ, so the heat and the bill are the same energy seen twice.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sP', 'vP', 0], ['sH', 'vH', 1], ['sV', 'vV', 0], ['sR', 'vR', 1]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sP', 'sH', 'sV', 'sR'].forEach(i => el(i).addEventListener('input', syncUI));
+  el('bGo').addEventListener('click', e => {
+    on = !on;
+    e.target.textContent = on ? 'On / Off' : 'Turn on';
+  });
+  el('bRst').addEventListener('click', () => {
+    el('sP').value = 1500; el('sH').value = 4; el('sV').value = 230; el('sR').value = 7;
+    syncUI();
+  });
+
+  syncUI();
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

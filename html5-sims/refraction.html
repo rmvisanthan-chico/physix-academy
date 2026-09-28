@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refraction (Snell) 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#fbbf24; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px)}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(680px,49vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:120px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:302px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Refraction 3D</h1>
+  <p>Drag the cyan handle to swing the incoming ray. The refracted ray follows Snell's law exactly.</p>
+</div>
+<div class="hud eq">n&#8321; sin&theta;&#8321; = n&#8322; sin&theta;&#8322;</div>
+
+<div class="hud dock">
+  <div class="chip"><span>&theta;&#8321; incident</span><b id="dT1">—</b></div>
+  <div class="chip"><span>&theta;&#8322; refracted</span><b id="dT2">—</b></div>
+  <div class="chip"><span>Speed change</span><b id="dV">—</b></div>
+  <div class="chip"><span>Outcome</span><b id="dO">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Media</h2>
+  <div class="ctl">
+    <label>Upper index n&#8321; <b><span id="vN1">1.00</span></b></label>
+    <input type="range" id="sN1" min="1" max="2.6" step="0.01" value="1">
+  </div>
+  <div class="ctl">
+    <label>Lower index n&#8322; <b><span id="vN2">1.50</span></b></label>
+    <input type="range" id="sN2" min="1" max="2.6" step="0.01" value="1.5">
+  </div>
+  <div class="ctl">
+    <label>Incident angle &theta;&#8321; <b><span id="vA">35</span>&deg;</b></label>
+    <input type="range" id="sa" min="0" max="89" step="1" value="35">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="media">media blocks</span>
+    <span class="tg on" data-t="angles">angle marks</span>
+    <span class="tg on" data-t="normal">normal</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>n&#8321; sin&theta;&#8321;</span><b id="rA1">0</b></div>
+    <div class="ro"><span>n&#8322; sin&theta;&#8322;</span><b id="rA2">0</b></div>
+    <div class="ro"><span>Speed above</span><b id="rV1">0</b></div>
+    <div class="ro"><span>Speed below</span><b id="rV2">0</b></div>
+    <div class="ro"><span>Critical angle</span><b id="rC">—</b></div>
+    <div class="ro"><span>Deviation</span><b id="rD">0&deg;</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Aim at critical</button>
+    <button class="ghost" id="bRst">Reset</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Set n&#8321; higher than n&#8322; and push the angle past the critical angle &mdash; the refracted
+    ray vanishes and all the light reflects back. That is what a fibre-optic cable relies on.
+    Scroll to zoom, right-drag to pan, drag empty space to orbit.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const C0 = 2.998e8;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xfbbf24,
+    dist: 24, minD: 9, maxD: 80, exposure: 0.95, bg: 0x05070f,
+    preserve: true, hemi: 0.24, key: 2.4, fill: 0.24, rim: 0.36,
+    theta: 0.18, phi: 1.5
+  });
+  const scene = st.scene;
+  const show = { media: true, angles: true, normal: true };
+
+  const medUp = new T.Mesh(
+    new T.BoxGeometry(26, 9, 7),
+    new T.MeshStandardMaterial({ color: 0x1c3f6b, transparent: true, opacity: 0.30, roughness: 0.15, metalness: 0.1, depthWrite: false }));
+  medUp.position.y = 4.5;
+  scene.add(medUp);
+
+  const medDn = new T.Mesh(
+    new T.BoxGeometry(26, 9, 7),
+    new T.MeshStandardMaterial({ color: 0x2a5f7a, transparent: true, opacity: 0.30, roughness: 0.15, metalness: 0.1, depthWrite: false }));
+  medDn.position.y = -4.5;
+  scene.add(medDn);
+
+  const iface = new T.Mesh(
+    new T.BoxGeometry(26, 0.07, 7),
+    new T.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0x2a6a9a, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.4 }));
+  scene.add(iface);
+
+  function seg(color, r, emis) {
+    const g = new T.CylinderGeometry(r, r, 1, 10);
+    g.translate(0, 0.5, 0);
+    const m = new T.Mesh(g, new T.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: emis === undefined ? 1.0 : emis, roughness: 0.4
+    }));
+    scene.add(m);
+    return m;
+  }
+  function setSeg(m, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-4) { m.visible = false; return; }
+    m.visible = true;
+    m.position.set(x1, y1, 0);
+    m.scale.set(1, L, 1);
+    m.rotation.z = Math.atan2(dy, dx) - Math.PI / 2;
+  }
+
+  const rInc = seg(0xffd166, 0.075, 0.9);
+  const rRef = seg(0x31d7f0, 0.075, 1.1);
+  const rRet = seg(0xff7a7a, 0.07, 1.0);
+  const rNormal = seg(0xffffff, 0.035, 0.5);
+  const rNrm2 = seg(0xffffff, 0.035, 0.5);
+
+  function arc(color, cx, cy, rad, a0, a1, z) {
+    const g = new T.BufferGeometry();
+    const N = 22, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const a = a0 + (a1 - a0) * i / N;
+      pts.push(new T.Vector3(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, z || 0));
+    }
+    g.setFromPoints(pts);
+    const m = new T.Line(g, new T.LineBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+    scene.add(m);
+    return m;
+  }
+  let arc1 = null, arc2 = null;
+
+  const handle = new T.Mesh(
+    new T.SphereGeometry(0.34, 24, 18),
+    new T.MeshStandardMaterial({ color: 0x31d7f0, emissive: 0x0d6f80, emissiveIntensity: 0.8, roughness: 0.3 }));
+  scene.add(handle);
+  const handleGlow = st.glow(0x31d7f0, 2.4, 0.85);
+  scene.add(handleGlow);
+  const srcLbl = st.label('source', '#ffd166', 0.008);
+  const hitLbl = st.label('hit', '#ffffff', 0.008);
+  scene.add(srcLbl); scene.add(hitLbl);
+
+  function par() { return { n1: +el('sN1').value, n2: +el('sN2').value, a: +el('sa').value }; }
+
+  function trace() {
+    const P = par();
+    const t1 = P.a * Math.PI / 180;
+    const HIT = new T.Vector2(0, 0);
+    const dist = 11;
+    const sx = HIT.x - Math.cos(t1) * dist * -1 * -1;
+    const dirx = Math.sin(t1), diry = -Math.cos(t1);
+    const start = new T.Vector2(HIT.x - dirx * dist, HIT.y - diry * dist);
+
+    const sin2 = P.n1 * Math.sin(t1) / P.n2;
+    const tir = Math.abs(sin2) > 1;
+    const t2 = tir ? null : Math.asin(Math.max(-1, Math.min(1, sin2)));
+
+    let end;
+    if (tir) end = new T.Vector2(HIT.x - dirx * dist * 0.75, HIT.y - diry * dist * 0.75);
+    else end = new T.Vector2(HIT.x + Math.sin(t2) * dist * 0.75, HIT.y - Math.cos(t2) * dist * 0.75);
+
+    return { P, t1, t2, tir, start, end, HIT, dist };
+  }
+
+  function draw() {
+    const R = trace();
+    setSeg(rInc, R.start.x, R.start.y, R.HIT.x, R.HIT.y);
+
+    if (R.tir) {
+      rRef.visible = false;
+      setSeg(rRet, R.HIT.x, R.HIT.y, R.end.x, R.end.y);
+    } else {
+      rRet.visible = false;
+      setSeg(rRef, R.HIT.x, R.HIT.y, R.end.x, R.end.y);
+    }
+
+    rNormal.visible = show.normal;
+    rNrm2.visible = show.normal;
+    if (show.normal) {
+      setSeg(rNormal, R.HIT.x, R.HIT.y, R.HIT.x, R.HIT.y + 3.2);
+      setSeg(rNrm2, R.HIT.x, R.HIT.y, R.HIT.x, R.HIT.y - 3.2);
+    }
+
+    if (arc1) { scene.remove(arc1); arc1.geometry.dispose(); arc1 = null; }
+    if (arc2) { scene.remove(arc2); arc2.geometry.dispose(); arc2 = null; }
+    if (show.angles) {
+      arc1 = arc(0xffd166, R.HIT.x, R.HIT.y, 1.7, Math.PI / 2, Math.PI / 2 - R.t1, 0.2);
+      if (!R.tir) arc2 = arc(0x31d7f0, R.HIT.x, R.HIT.y, 2.1, Math.PI / 2, Math.PI / 2 - R.t2, -0.2);
+    }
+
+    handle.position.set(R.start.x, R.start.y, 0);
+    handleGlow.position.copy(handle.position);
+    handleGlow.scale.setScalar(2.2 + Math.sin(performance.now() * 0.005) * 0.15);
+    srcLbl.position.set(R.start.x, R.start.y + 0.9, 0);
+    hitLbl.position.set(R.HIT.x + 0.5, R.HIT.y + 0.5, 0);
+
+    medUp.visible = show.media; medDn.visible = show.media;
+
+    const dens = Math.max(0.05, (R.P.n1 - 1) * 0.5 + 0.12);
+    medUp.material.color.setHSL(0.58 - dens * 0.4, 0.55, 0.32);
+    const dens2 = Math.max(0.05, (R.P.n2 - 1) * 0.5 + 0.12);
+    medDn.material.color.setHSL(0.52 - dens2 * 0.4, 0.5, 0.34);
+
+    return R;
+  }
+
+  function outs(R) {
+    const P = R.P;
+    const d1 = P.n1 * Math.sin(R.t1);
+    el('dT1').textContent = (R.t1 * 180 / Math.PI).toFixed(1) + '°';
+    el('dT2').textContent = R.tir ? '—' : (R.t2 * 180 / Math.PI).toFixed(1) + '°';
+    el('dV').textContent = (P.n1 / P.n2).toFixed(2) + '×';
+    el('dO').textContent = R.tir ? 'Total internal' : 'Refracts';
+    el('dO').style.color = R.tir ? 'var(--bad)' : 'var(--ok)';
+
+    el('rA1').textContent = d1.toFixed(4);
+    el('rA2').textContent = R.tir ? 'no ray' : (P.n2 * Math.sin(R.t2)).toFixed(4);
+    el('rV1').textContent = (C0 / P.n1 / 1e6).toFixed(0) + ' Mm/s';
+    el('rV2').textContent = (C0 / P.n2 / 1e6).toFixed(0) + ' Mm/s';
+    const crit = P.n1 > P.n2 ? Math.asin(P.n2 / P.n1) * 180 / Math.PI : null;
+    el('rC').textContent = crit === null ? 'n/a' : crit.toFixed(1) + '°';
+    el('rD').textContent = R.tir ? '180°' : ((R.t1 - R.t2) * 180 / Math.PI).toFixed(1) + '°';
+
+    const v = el('v');
+    if (R.tir) {
+      v.innerHTML = '<b style="color:var(--bad)">Total internal reflection.</b> ' +
+        P.n1.toFixed(2) + ' sin(' + (R.t1 * 180 / Math.PI).toFixed(0) + '&deg;) = ' + d1.toFixed(3) +
+        ' exceeds n&#8322; = ' + P.n2.toFixed(2) + ', so no refracted ray can exist. All the energy reflects.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (P.n2 > P.n1) {
+      v.innerHTML = '<b style="color:var(--ok)">Bends toward the normal.</b> Entering a denser medium slows light to ' +
+        (P.n1 / P.n2).toFixed(2) + '× and shortens &theta; to ' + (R.t2 * 180 / Math.PI).toFixed(1) + '&deg;.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    } else if (P.n2 < P.n1) {
+      v.innerHTML = '<b style="color:var(--acc2)">Bends away from the normal.</b> Into a rarer medium light speeds up to ' +
+        (P.n1 / P.n2).toFixed(2) + '× and &theta; grows to ' + (R.t2 * 180 / Math.PI).toFixed(1) + '&deg;.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--txt)">Matched indices.</b> With n&#8321; = n&#8322; the ray does not bend at all.';
+      v.style.borderColor = 'rgba(255,255,255,.2)';
+    }
+  }
+
+  function syncUI() {
+    [['sN1', 'vN1', 2], ['sN2', 'vN2', 2], ['sa', 'vA', 0]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sN1', 'sN2', 'sa'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', () => {
+    el('sN1').value = 1.6; el('sN2').value = 1.0; syncUI();
+    el('sa').value = Math.round(Math.asin(1.0 / 1.6) * 180 / Math.PI) + 1; syncUI();
+  });
+  el('bRst').addEventListener('click', () => {
+    el('sN1').value = 1.0; el('sN2').value = 1.5; el('sa').value = 35; syncUI();
+  });
+
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  let drag = false;
+
+  cv.addEventListener('pointerdown', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (ray.ray.distanceToPoint(handle.position) < 1.5) {
+      drag = true; st.controls.enabled = false; cv.setPointerCapture(ev.pointerId);
+    }
+  }, true);
+
+  cv.addEventListener('pointermove', ev => {
+    const r = cv.getBoundingClientRect();
+    ndc.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    ndc.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, st.camera);
+    if (!drag) { cv.style.cursor = ray.ray.distanceToPoint(handle.position) < 1.5 ? 'grab' : 'default'; return; }
+    const dp = new T.Plane(new T.Vector3(0, 0, 1), 0);
+    const hit = new T.Vector3();
+    if (!ray.ray.intersectPlane(dp, hit)) return;
+    const dx = hit.x - 0, dy = hit.y - 0;
+    let a = Math.atan2(Math.abs(dx), Math.abs(dy)) * 180 / Math.PI;
+    a = Math.max(0, Math.min(89, a));
+    el('sa').value = a; syncUI();
+  }, true);
+
+  const end = () => { drag = false; st.controls.enabled = true; };
+  cv.addEventListener('pointerup', end, true);
+  cv.addEventListener('pointercancel', end, true);
+
+  syncUI();
+  st.onFrame(() => { outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

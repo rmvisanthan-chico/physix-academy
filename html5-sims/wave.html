@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Travelling Wave — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#38bdf8; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:70ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Travelling Wave</h1>
+    <span class="eq">v = f&lambda; &nbsp;&nbsp; y = A sin(kx &minus; &omega;t)</span>
+  </header>
+  <p class="sub">A rope shape that slides through the material without the material moving. The pattern's speed is set by frequency and wavelength alone &mdash; change one and watch which side wins.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <h2>Controls</h2>
+      <div class="ctl">
+        <label>Amplitude A <b><span id="vA">26</span> px</b></label>
+        <input type="range" id="sA" min="2" max="70" step="1" value="26">
+      </div>
+      <div class="ctl">
+        <label>Frequency f <b><span id="vf">1.20</span> Hz</b></label>
+        <input type="range" id="sf" min="0.15" max="4" step="0.05" value="1.2">
+      </div>
+      <div class="ctl">
+        <label>Wavelength &lambda; <b><span id="vl">110</span> px</b></label>
+        <input type="range" id="sl" min="24" max="260" step="2" value="110">
+      </div>
+      <div class="ctl">
+        <label>Phase <b><span id="vp">0</span>&deg;</b></label>
+        <input type="range" id="sp" min="0" max="360" step="1" value="0">
+      </div>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Wave speed</span><b id="rV">0 px/s</b></div>
+        <div class="ro"><span>Angular &omega;</span><b id="rW">0</b></div>
+        <div class="ro"><span>Wave number k</span><b id="rK">0</b></div>
+        <div class="ro"><span>Period T</span><b id="rT">0 s</b></div>
+        <div class="ro"><span>&lambda; on screen</span><b id="rL">0</b></div>
+        <div class="ro"><span>Direction</span><b id="rD">—</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Pause</button>
+        <button class="ghost" id="bRst">Reset phase</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+
+      <p class="note">The green marker is pinned to one point of the rope. It moves up and down but stays put horizontally &mdash; the wave carries energy past it, not the rope itself.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const sA = document.getElementById('sA'), sF = document.getElementById('sf');
+  const sL = document.getElementById('sl'), sP = document.getElementById('sp');
+  const st = { t: 0, run: true };
+
+  let W = 0, H = 0, mid = 0, amp = 0;
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    W = Math.max(320, r.width); H = Math.round(W * 0.44);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mid = H * 0.52;
+    amp = H * 0.34;
+  }
+
+  function par() {
+    const A = +sA.value, f = +sF.value, L = +sL.value, ph = (+sP.value * Math.PI) / 180;
+    const w = 2 * Math.PI * f, k = 2 * Math.PI / L;
+    return { A, f, L, ph, w, k, v: f * L, T: 1 / f };
+  }
+
+  function draw() {
+    const P = par();
+    ctx.clearRect(0, 0, W, H);
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a1020'); bg.addColorStop(1, '#070b16');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+    for (let gx = 0; gx < W; gx += 28) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,.14)';
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(109,93,246,.28)'; ctx.setLineDash([3, 5]);
+    for (let x = 0; x < W; x += P.L) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    ctx.setLineDash([]);
+
+    const sc = amp / 70;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x++) {
+      const y = mid - P.A * sc * Math.sin(P.k * x - P.w * st.t + P.ph);
+      x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = '#6d5df6'; ctx.lineWidth = 2.6; ctx.stroke();
+
+    ctx.lineTo(W, mid); ctx.lineTo(0, mid); ctx.closePath();
+    const fg = ctx.createLinearGradient(0, mid - amp, 0, mid + amp);
+    fg.addColorStop(0, 'rgba(109,93,246,.22)'); fg.addColorStop(.5, 'rgba(109,93,246,.05)');
+    fg.addColorStop(1, 'rgba(34,211,238,.18)');
+    ctx.fillStyle = fg; ctx.fill();
+
+    for (let x = 0; x <= W; x += 3) {
+      const y = mid - P.A * sc * Math.sin(P.k * x - P.w * st.t + P.ph);
+      ctx.fillStyle = 'rgba(232,237,247,.28)';
+      ctx.fillRect(x, y, 1, 1.6);
+    }
+
+    const mx = W * 0.32;
+    const my = mid - P.A * sc * Math.sin(P.k * mx - P.w * st.t + P.ph);
+    ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(mx, 16); ctx.lineTo(mx, my - 10); ctx.stroke();
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath(); ctx.arc(mx, my, 5, 0, 6.284); ctx.fill();
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('pinned particle', mx + 8, 26);
+
+    ctx.fillStyle = '#6b7a99'; ctx.textAlign = 'center';
+    ctx.font = '11px ui-monospace,Menlo,Consolas,monospace';
+    ctx.fillText('the pattern travels right at ' + P.v.toFixed(0) + ' px/s   ·   one wavelength every ' + P.T.toFixed(2) + ' s', W / 2, H - 12);
+
+    return P;
+  }
+
+  function sync() {
+    [['sA', 'vA', 0], ['sf', 'vf', 2], ['sl', 'vl', 0], ['sp', 'vp', 0]].forEach(([el, o, d]) => {
+      const e = document.getElementById(el);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      document.getElementById(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  function outs(P) {
+    document.getElementById('rV').textContent = P.v.toFixed(0) + ' px/s';
+    document.getElementById('rW').textContent = P.w.toFixed(2) + ' rad/s';
+    document.getElementById('rK').textContent = P.k.toFixed(4);
+    document.getElementById('rT').textContent = P.T.toFixed(3) + ' s';
+    document.getElementById('rL').textContent = (W / P.L).toFixed(1) + ' cycles';
+    document.getElementById('rD').textContent = 'right';
+    const v = document.getElementById('v');
+    const onScreen = (W / P.L).toFixed(1);
+    v.innerHTML = '<b style="color:#22d3ee">v = f&lambda; = ' + P.f.toFixed(2) + ' &times; ' + P.L +
+      ' = ' + P.v.toFixed(0) + ' px/s.</b><br>That is ' + onScreen +
+      ' full wavelengths across the rope, and ' + (P.A / amp * 100).toFixed(0) +
+      '% of the available height is being used.';
+    v.style.borderColor = 'rgba(34,211,238,.3)';
+  }
+
+  [sA, sF, sL, sP].forEach(e => e.addEventListener('input', sync));
+  document.getElementById('bGo').addEventListener('click', e => {
+    st.run = !st.run; e.target.textContent = st.run ? 'Pause' : 'Play';
+  });
+  document.getElementById('bRst').addEventListener('click', () => { st.t = 0; sP.value = 0; sync(); });
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (st.run) st.t += dt;
+    outs(draw());
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); draw(); });
+  fit(); sync();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

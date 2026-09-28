@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohm's Law Circuit 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#f59e0b; --acc2:#fde047; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Ohm's Law Circuit 3D</h1>
+  <p>A closed loop with a real battery, resistor and bulb. The charge you see drifting round the wire
+     is moving at a rate set by V&divide;R &mdash; and the graph is the straight line that law predicts.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">I = V/R &nbsp;&nbsp; P = VI = I&sup2;R</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Current</span><b id="dI">—</b></div>
+  <div class="chip"><span>Power</span><b id="dP">—</b></div>
+  <div class="chip"><span>V&divide;R</span><b id="dVR">—</b></div>
+  <div class="chip"><span>Resistance</span><b id="dR">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Supply &amp; load</h2>
+  <div class="ctl">
+    <label>Battery V <b><span id="vV">12.0</span> V</b></label>
+    <input type="range" id="sV" min="1.5" max="24" step="0.5" value="12">
+  </div>
+  <div class="ctl">
+    <label>Resistance R <b><span id="vR">24</span> &Omega;</b></label>
+    <input type="range" id="sR" min="2" max="100" step="1" value="24">
+  </div>
+  <div class="ctl">
+    <label>Charge speed <b><span id="vS">1.0</span>&times;</b></label>
+    <input type="range" id="sS" min="0.2" max="4" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="carriers">charge carriers</span>
+    <span class="tg on" data-t="graph">V&ndash;I graph</span>
+    <span class="tg on" data-t="fields">field arrows</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>Conductance 1/R</span><b id="rG">0</b></div>
+    <div class="ro"><span>Energy / s</span><b id="rE">0</b></div>
+    <div class="ro"><span>Resistor P</span><b id="rPr">0</b></div>
+    <div class="ro"><span>Battery P</span><b id="rPb">0</b></div>
+    <div class="ro"><span>Drift (scaled)</span><b id="rD">0</b></div>
+    <div class="ro"><span>Carriers</span><b id="rN">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Open switch</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    The straight line on the graph is I = V/R with slope 1/R &mdash; the definition of ohmic behaviour.
+    Steepen it by dropping R. Drag empty space to orbit, scroll to zoom, right-drag to pan.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const NC = 54;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xf59e0b,
+    dist: 20, minD: 9, maxD: 80, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.28, rim: 0.34,
+    theta: 0.44, phi: 1.30, target: new T.Vector3(3.6, 2.4, 0)
+  });
+  const scene = st.scene;
+  const show = { carriers: true, graph: true, fields: true };
+  let open = false;
+
+  const grid = st.grid(24, 24, 0x1a2338, 0x111726);
+  grid.position.y = -2.6;
+  scene.add(grid);
+
+  const W = 6.4, Dp = 3.4, Y0 = 0.9, Y1 = 4.3;
+  const LX = -W / 2, RX = W / 2;
+  const board = new T.Mesh(new T.BoxGeometry(W + 1.4, 0.28, Dp + 1.2),
+    new T.MeshStandardMaterial({ color: 0x141b2b, roughness: 0.6, metalness: 0.3 }));
+  board.position.set(0, 0.14, 0);
+  board.receiveShadow = true;
+  scene.add(board);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const leg = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.8, 10),
+      new T.MeshStandardMaterial({ color: 0x39445e, roughness: 0.4, metalness: 0.7 }));
+    leg.position.set(sx * (W / 2 + 0.5), -0.3, sz * (Dp / 2 + 0.4));
+    scene.add(leg);
+  }
+
+  const wireMat = new T.MeshStandardMaterial({ color: 0x8a97b5, roughness: 0.3, metalness: 0.85 });
+  function wire(pts, r = 0.075) {
+    const curve = new T.CatmullRomCurve3(pts, false, 'catmullrom', 0.02);
+    return new T.Mesh(new T.TubeGeometry(curve, Math.max(24, pts.length * 8), r, 8, false), wireMat);
+  }
+  const yTop = Y1, yBot = Y0;
+  const loopPts = [
+    new T.Vector3(LX, yBot, 0), new T.Vector3(RX, yBot, 0),
+    new T.Vector3(RX, yTop, 0), new T.Vector3(LX, yTop, 0), new T.Vector3(LX, yBot, 0)
+  ];
+  const loopCurve = new T.CatmullRomCurve3(loopPts, true, 'catmullrom', 0.0);
+  const loopLen = loopCurve.getLength();
+
+  const wireBottom = new T.Mesh(new T.TubeGeometry(loopCurve, 200, 0.075, 8, true), wireMat);
+  scene.add(wireBottom);
+
+  const bat = new T.Group();
+  const batBody = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 1.5, 24),
+    new T.MeshStandardMaterial({ color: 0x1f2a3d, roughness: 0.45, metalness: 0.4 }));
+  batBody.rotation.z = Math.PI / 2;
+  const capP = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.22, 16),
+    new T.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0x5a1010, emissiveIntensity: 0.6, roughness: 0.35 }));
+  capP.rotation.z = Math.PI / 2; capP.position.x = 0.86;
+  const capN = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.22, 16),
+    new T.MeshStandardMaterial({ color: 0x3b6fd4, emissive: 0x0d2050, emissiveIntensity: 0.6, roughness: 0.35 }));
+  capN.rotation.z = Math.PI / 2; capN.position.x = -0.86;
+  bat.add(batBody, capP, capN);
+  bat.position.set(0, yBot, 0);
+  scene.add(bat);
+  const lblP = st.label('+', '#ff6b6b', 0.0026);
+  const lblN = st.label('−', '#6f9bff', 0.0026);
+  lblP.position.set(1.1, yBot - 0.75, 0);
+  lblN.position.set(-1.1, yBot - 0.75, 0);
+  scene.add(lblP, lblN);
+
+  const resGroup = new T.Group();
+  const coilPts = [];
+  for (let i = 0; i <= 60; i++) {
+    const u = i / 60;
+    coilPts.push(new T.Vector3((u - 0.5) * 2.0, Math.sin(u * Math.PI * 8) * 0.2, Math.cos(u * Math.PI * 8) * 0.2));
+  }
+  const coil = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(coilPts), 160, 0.07, 8, false),
+    new T.MeshStandardMaterial({ color: 0xd08a4a, roughness: 0.45, metalness: 0.6,
+      emissive: 0xff6b1a, emissiveIntensity: 0 }));
+  resGroup.add(coil);
+  resGroup.position.set(0, yTop, 0);
+  scene.add(resGroup);
+  const lblR = st.label('R', '#ffb057', 0.0026);
+  lblR.position.set(0, yTop + 0.62, 0);
+  scene.add(lblR);
+
+  const bulb = new T.Group();
+  const glass = new T.Mesh(new T.SphereGeometry(0.42, 24, 18),
+    new T.MeshPhysicalMaterial({ color: 0xfff0d0, roughness: 0.05, metalness: 0,
+      transparent: true, opacity: 0.22, side: T.DoubleSide, depthWrite: false }));
+  const fil = new T.Mesh(new T.SphereGeometry(0.13, 14, 10),
+    new T.MeshBasicMaterial({ color: 0x554433 }));
+  const bulbGlow = st.glow(0xffc043, 3, 0);
+  const neck = new T.Mesh(new T.CylinderGeometry(0.16, 0.2, 0.34, 16), wireMat);
+  neck.position.y = -0.48;
+  bulb.add(glass, fil, bulbGlow, neck);
+  bulb.position.set(RX, yTop - 0.9, 0);
+  scene.add(bulb);
+  const lblB = st.label('bulb', '#ffe0a0', 0.0024);
+  lblB.position.set(RX + 0.7, yTop - 0.35, 0);
+  scene.add(lblB);
+
+  const eArrows = [];
+  for (let i = 0; i < 6; i++) {
+    const a = st.arrow(0x31d7f0, new T.Vector3(), new T.Vector3(1, 0, 0), 2.4);
+    scene.add(a);
+    eArrows.push(a);
+  }
+
+  const carriers = new T.InstancedMesh(
+    new T.SphereGeometry(0.1, 12, 9),
+    new T.MeshBasicMaterial({ color: 0x7fe8ff }),
+    NC);
+  carriers.frustumCulled = false;
+  scene.add(carriers);
+  const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(), tmpP = new T.Vector3(), tmpS = new T.Vector3(1, 1, 1);
+
+  const GR = new T.Group();
+  GR.position.set(5.0, 3.4, 0);
+  scene.add(GR);
+  const GW = 5.2, GH = 4.0;
+  const GN = 40;
+  const gp = new T.BufferGeometry();
+  gp.setAttribute('position', new T.BufferAttribute(new Float32Array((GN + 1) * 3), 3));
+  const gLine = new T.Line(gp, new T.LineBasicMaterial({ color: 0x3ee0a4 }));
+  gLine.frustumCulled = false;
+  GR.add(gLine);
+  const gAxV = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, GH, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.6 }));
+  gAxV.position.set(-GW / 2, 0, 0);
+  const gAxI = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, GW, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.6 }));
+  gAxI.rotation.z = Math.PI / 2; gAxI.position.set(0, -GH / 2, 0);
+  GR.add(gAxV, gAxI);
+  const gl1 = st.label('V', '#9fb0d8', 0.0022);
+  const gl2 = st.label('I', '#9fb0d8', 0.0022);
+  gl1.position.set(-GW / 2 - 0.4, 0, 0);
+  gl2.position.set(0, -GH / 2 - 0.4, 0);
+  const gl3 = st.label('I = V/R', '#3ee0a4', 0.0024);
+  gl3.position.set(0, GH / 2 + 0.5, 0);
+  GR.add(gl1, gl2, gl3);
+  const gDot = new T.Mesh(new T.SphereGeometry(0.16, 14, 10),
+    new T.MeshBasicMaterial({ color: 0xffffff }));
+  const gDotGlow = st.glow(0xffffff, 1.2, 0.9);
+  GR.add(gDot, gDotGlow);
+
+  let phase = 0, t = 0, run = true;
+  const IM = 1.2, VM = 24;
+
+  const phys = () => ({ V: +el('sV').value, R: +el('sR').value, sp: +el('sS').value });
+
+  function step(dt) {
+    const P = phys();
+    const I = open ? 0 : P.V / P.R;
+    phase = (phase + Math.min(1.4, I * 0.22) * P.sp * dt) % 1;
+    t += dt;
+  }
+
+  function draw() {
+    const P = phys();
+    const I = open ? 0 : P.V / P.R;
+    const Pw = I * P.V;
+
+    for (let i = 0; i < NC; i++) {
+      const u = ((phase + i / NC) % 1);
+      const q = loopCurve.getPointAt(u);
+      tmpP.copy(q);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      carriers.setMatrixAt(i, tmpM);
+    }
+    carriers.count = show.carriers ? NC : 0;
+    carriers.instanceMatrix.needsUpdate = true;
+    wireBottom.material.color.set(open ? 0x5a6478 : 0x8a97b5);
+
+    const glow = Math.min(1, Pw / 26);
+    fil.material.color.setRGB(0.33 + glow * 0.67, 0.27 + glow * 0.6, 0.2 + glow * 0.3);
+    bulbGlow.material.opacity = glow * 0.9;
+    bulbGlow.scale.setScalar(1 + glow * 1.4);
+    coil.material.emissiveIntensity = Math.min(1, Pw / 34) * 0.9;
+
+    eArrows.forEach((a, i) => {
+      a.visible = show.fields && !open;
+      const u = (i + 0.5) / eArrows.length;
+      const q = loopCurve.getPointAt(u);
+      const q2 = loopCurve.getPointAt((u + 0.01) % 1);
+      const dir = new T.Vector3().subVectors(q2, q).normalize();
+      a.position.copy(q).addScaledVector(dir, -1.2);
+      a.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
+      a.scale.set(0.6 + glow * 0.7, 0.6 + glow * 0.7, 0.6 + glow * 0.7);
+    });
+
+    GR.visible = show.graph;
+    if (show.graph) {
+      const arr = gp.attributes.position.array;
+      for (let i = 0; i <= GN; i++) {
+        const v = (i / GN) * VM;
+        const ii = open ? 0 : v / P.R;
+        const y = Math.min(1, ii / IM) * GH;
+        arr[i * 3] = (v / VM) * GW - GW / 2;
+        arr[i * 3 + 1] = y - GH / 2;
+        arr[i * 3 + 2] = 0;
+      }
+      gp.attributes.position.needsUpdate = true;
+      gp.setDrawRange(0, GN + 1);
+      const oi = Math.min(1, I / IM);
+      gDot.position.set((P.V / VM) * GW - GW / 2, oi * GH - GH / 2, 0.05);
+      gDotGlow.position.copy(gDot.position);
+      GR.rotation.y = Math.atan2(st.camera.position.x - GR.position.x, st.camera.position.z);
+    }
+
+    return { P, I, Pw };
+  }
+
+  /* Fixed 1-decimal rounding made small powers look wrong: 6 V x 0.06 A is
+     0.36 W but it displayed "0.4 W", so V*I and I^2R visibly disagreed.
+     Three significant figures keeps P = VI = I^2R true on screen. */
+  function sf(v, n) {
+    if (!isFinite(v) || v === 0) return '0';
+    const d = Math.max(0, (n || 3) - 1 - Math.floor(Math.log10(Math.abs(v))));
+    return v.toFixed(Math.min(4, d));
+  }
+
+  function outs(R) {
+    const { P, I, Pw } = R;
+    el('dI').textContent = I.toFixed(3) + ' A';
+    el('dP').textContent = sf(Pw) + ' W';
+    el('dVR').textContent = (P.V / P.R).toFixed(3) + ' A';
+    el('dR').textContent = P.R.toFixed(0) + ' Ω';
+    el('rG').textContent = (1 / P.R).toFixed(4) + ' S';
+    el('rE').textContent = sf(Pw) + ' J/s';
+    el('rPr').textContent = sf(I * I * P.R) + ' W';
+    el('rPb').textContent = sf(P.V * I) + ' W';
+    el('rD').textContent = (I * 0.02).toFixed(3) + ' (rel.)';
+    el('rN').textContent = show.carriers ? NC : 0;
+
+    const chk = el('chk');
+    const viaR = I * I * P.R, viaV = P.V * I;
+    const ok = Math.abs(viaR - viaV) < 1e-9;
+    chk.className = 'check' + (ok ? '' : ' bad');
+    chk.innerHTML = ok
+      ? '&#10003; I&sup2;R = ' + viaR.toFixed(2) + ' W = VI &mdash; the two routes to power agree'
+      : '&#10007; I&sup2;R = ' + viaR.toFixed(3) + ' but VI = ' + viaV.toFixed(3);
+
+    const v = el('v');
+    if (open) {
+      v.innerHTML = '<b style="color:var(--bad)">Switch open.</b> No complete path, so I = 0 and the bulb is dark ' +
+        'however large the battery. A circuit needs a loop.';
+      v.style.borderColor = 'rgba(255,122,122,.34)';
+    } else if (P.R < 6) {
+      v.innerHTML = '<b style="color:var(--warn)">' + I.toFixed(2) + ' A — near a short.</b> At R = ' +
+        P.R.toFixed(0) + ' &Omega; the resistance is tiny, so ' + Pw.toFixed(0) +
+        ' W is being dissipated in a resistor the size of a pencil. Real circuits add a fuse.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + P.V.toFixed(1) + ' V across ' + P.R.toFixed(0) +
+        ' &Omega; gives ' + I.toFixed(3) + ' A.</b> That is ' + Pw.toFixed(1) +
+        ' W of heat and light. Halve R and the current doubles while the power quadruples &mdash; the steep line on the graph.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sV', 'vV', 1], ['sR', 'vR', 0], ['sS', 'vS', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sV', 'sR', 'sS'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { open = !open; el('bRst').textContent = open ? 'Close switch' : 'Open switch'; });
+
+  syncUI();
+  st.onFrame(dt => { if (run) step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

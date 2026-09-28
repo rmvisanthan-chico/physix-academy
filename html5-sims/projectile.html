@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projectile Motion — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99;
+    --acc:#f97316; --acc2:#fbbf24; --onAcc:#0b1220; --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:-.01em}
+  .eq{font-family:var(--mono);font-size:13px;color:var(--acc2);background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.22);padding:3px 9px;border-radius:999px}
+  .sub{color:var(--txt2);font-size:13px;margin:0 0 16px;max-width:70ch;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+  .stage{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:10px}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;touch-action:none}
+  .panel{background:var(--panel);border:1px solid var(--brd);border-radius:14px;padding:14px}
+  .panel h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:0 0 12px;font-weight:600}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:6px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.12) var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;
+    border:3px solid var(--acc);cursor:grab}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:var(--panel2);border:1px solid var(--brd);border-radius:9px;padding:8px 9px}
+  .ro span{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{font-family:var(--mono);font-size:15px;font-weight:500;display:block;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:9px;padding:9px 12px;
+    font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.12)}
+  button.ghost{background:rgba(255,255,255,.07);color:var(--txt2)}
+  .note{font-size:11.5px;color:var(--txt3);line-height:1.5;margin-top:14px;
+    border-top:1px solid var(--brd);padding-top:11px}
+  .verdict{margin-top:12px;padding:9px 11px;border-radius:9px;font-size:12.5px;line-height:1.45;
+    border:1px solid var(--brd);background:rgba(255,255,255,.03)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt2);margin-bottom:12px;cursor:pointer}
+  .chk input{width:15px;height:15px;accent-color:#6d5df6;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Projectile Motion</h1>
+    <span class="eq">x = v<sub>0x</sub>t &nbsp;&nbsp; y = v<sub>0y</sub>t &minus; &frac12;gt&sup2;</span>
+  </header>
+  <p class="sub">One launch, two independent motions. Horizontal speed never changes; vertical speed is eaten by gravity alone. Everything else follows from that split.</p>
+
+  <div class="grid">
+    <section class="stage"><canvas id="c"></canvas></section>
+
+    <aside class="panel">
+      <h2>Launch</h2>
+      <div class="ctl">
+        <label>Speed <b><span id="vv">28</span> m/s</b></label>
+        <input type="range" id="sv" min="5" max="60" step="0.5" value="28">
+      </div>
+      <div class="ctl">
+        <label>Angle <b><span id="va">45</span>&deg;</b></label>
+        <input type="range" id="sa" min="5" max="85" step="1" value="45">
+      </div>
+      <div class="ctl">
+        <label>Height <b><span id="vh">0</span> m</b></label>
+        <input type="range" id="sh" min="0" max="60" step="1" value="0">
+      </div>
+      <div class="ctl">
+        <label>Gravity <b><span id="vg">9.81</span> m/s&sup2;</b></label>
+        <input type="range" id="sg" min="1.6" max="24.8" step="0.01" value="9.81">
+      </div>
+      <label class="chk"><input type="checkbox" id="sdrag"> Air resistance (quadratic drag)</label>
+
+      <h2 class="mt">Readouts</h2>
+      <div class="ros">
+        <div class="ro"><span>Range</span><b id="rR">0 m</b></div>
+        <div class="ro"><span>Max height</span><b id="rH">0 m</b></div>
+        <div class="ro"><span>Flight time</span><b id="rT">0 s</b></div>
+        <div class="ro"><span>vₓ now</span><b id="rVx">0</b></div>
+        <div class="ro"><span>v_y now</span><b id="rVy">0</b></div>
+        <div class="ro"><span>Speed now</span><b id="rV">0</b></div>
+      </div>
+
+      <div class="btns">
+        <button id="bGo">Launch</button>
+        <button class="ghost" id="bRst">Reset</button>
+      </div>
+
+      <div class="verdict" id="v">—</div>
+
+      <p class="note">Without drag the range peaks at 45&deg;. Add air resistance and the best angle drops below 45&deg; &mdash; real javelins and baseballs are thrown well under 45&deg; for exactly this reason.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const sv = document.getElementById('sv'), sa = document.getElementById('sa');
+  const sh = document.getElementById('sh'), sg = document.getElementById('sg'), sdr = document.getElementById('sdrag');
+
+  let W = 0, H = 0, gy = 0, sxm = 0, sym = 0, pad = 40;
+  const p = { x: 0, y: 0, vx: 0, vy: 0, t: 0, live: false };
+  let path = [], landing = null, apogee = 0, truth = null;
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    W = Math.max(320, r.width); H = Math.round(W * 0.5);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pad = Math.max(28, W * 0.035);
+    gy = H - 44;
+  }
+
+  function scaleFor(range, height) {
+    sxm = (W - pad * 2) / Math.max(6, range * 1.08);
+    sym = Math.min(sxm, (gy - 34) / Math.max(4, height * 1.15));
+  }
+
+  function predict() {
+    const v0 = +sv.value, th = (+sa.value * Math.PI) / 180, g = +sg.value, h0 = +sh.value;
+    const vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+    if (!sdr.checked) {
+      const t = (vy + Math.sqrt(vy * vy + 2 * g * h0)) / g;
+      return { vx, vy, g, t, range: vx * t, height: h0 + (vy * vy) / (2 * g) };
+    }
+    let x = 0, y = h0, ux = vx, uy = vy, t = 0, hi = h0, k = 0.0025;
+    const dt = 0.004;
+    while (y >= 0 && t < 200) {
+      const sp = Math.hypot(ux, uy);
+      ux -= k * sp * ux * dt;
+      uy -= (g + k * sp * uy) * dt;
+      x += ux * dt; y += uy * dt; t += dt;
+      if (y > hi) hi = y;
+    }
+    return { vx, vy, g, t, range: x, height: hi };
+  }
+
+  function fire() {
+    const v0 = +sv.value, th = (+sa.value * Math.PI) / 180, g = +sg.value;
+    p.x = 0; p.y = +sh.value;
+    p.vx = v0 * Math.cos(th); p.vy = v0 * Math.sin(th);
+    p.t = 0; p.live = true;
+    path = [[0, p.y]]; landing = null; apogee = p.y;
+    truth = predict();
+    scaleFor(truth.range, truth.height);
+  }
+
+  function step(dt) {
+    if (!p.live) return;
+    const g = +sg.value;
+    if (sdr.checked) {
+      const sp = Math.hypot(p.vx, p.vy), k = 0.0025;
+      p.vx -= k * sp * p.vx * dt;
+      p.vy -= (g + k * sp * p.vy) * dt;
+    } else {
+      p.vy -= g * dt;
+    }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.t += dt;
+    if (p.y > apogee) apogee = p.y;
+    if (path.length === 0 || Math.hypot(p.x - path[path.length - 1][0], p.y - path[path.length - 1][1]) > truth.range / 160) {
+      path.push([p.x, p.y]);
+    }
+    if (p.y <= 0 && p.t > 0.05) {
+      p.y = 0; landing = p.x; p.live = false;
+    }
+    if (p.x > truth.range * 1.35) p.live = false;
+  }
+
+  function arrow(x, y, dx, dy, col, label) {
+    if (Math.hypot(dx, dy) < 0.5) return;
+    const ex = x + dx, ey = y + dy;
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+    const a = Math.atan2(dy, dx), h = 8;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - h * Math.cos(a - 0.42), ey - h * Math.sin(a - 0.42));
+    ctx.lineTo(ex - h * Math.cos(a + 0.42), ey - h * Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+    if (label) {
+      ctx.font = '600 11px ui-monospace,Menlo,Consolas,monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, ex + 6, ey + 4);
+    }
+  }
+
+  function draw() {
+    if (!truth) truth = predict();
+    ctx.clearRect(0, 0, W, H);
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a1020'); bg.addColorStop(1, '#070b16');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+    const stepX = truth.range / 10;
+    for (let i = 0; i <= 10; i++) {
+      const gx = pad + i * stepX * sxm;
+      ctx.beginPath(); ctx.moveTo(gx, 24); ctx.lineTo(gx, gy); ctx.stroke();
+    }
+    const stepY = Math.max(2, Math.ceil(truth.height / 6 / 5) * 5);
+    for (let h = 0; h <= truth.height + 1; h += stepY) {
+      const yy = gy - h * sym;
+      if (yy < 20) break;
+      ctx.beginPath(); ctx.moveTo(pad, yy); ctx.lineTo(W - pad, yy); ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad - 14, gy); ctx.lineTo(W - pad + 14, gy); ctx.stroke();
+    ctx.fillStyle = '#6b7a99';
+    ctx.font = '10px ui-monospace,Menlo,Consolas,monospace';
+    ctx.textAlign = 'center';
+    for (let i = 0; i <= 10; i += 2) ctx.fillText((i * stepX).toFixed(0) + 'm', pad + i * stepX * sxm, gy + 15);
+    ctx.textAlign = 'right';
+    for (let h = 0; h <= truth.height + 1; h += stepY) {
+      const yy = gy - h * sym;
+      if (yy < 20) break;
+      ctx.fillText(h + 'm', pad - 16, yy + 3);
+    }
+
+    if (+sh.value > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      ctx.fillRect(pad - 14, gy - (+sh.value) * sym, W - pad * 2 + 28, (+sh.value) * sym);
+    }
+
+    if (path.length > 1) {
+      ctx.strokeStyle = 'rgba(109,93,246,.85)'; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      path.forEach((q, i) => {
+        const gx = pad + q[0] * sxm, yy = gy - q[1] * sym;
+        i ? ctx.lineTo(gx, yy) : ctx.moveTo(gx, yy);
+      });
+      ctx.stroke();
+    }
+
+    const px = pad + p.x * sxm, py = gy - p.y * sym;
+    const vk = 1.9;
+    arrow(px, py, p.vx / vk, -p.vy / vk, '#22d3ee', 'v');
+    arrow(px, py, p.vx / vk, 0, '#34d399', 'vₓ');
+    arrow(px, py, 0, p.vy / vk, '#fbbf24', 'vᵧ');
+    arrow(px, py, 0, (+sg.value) * sym * 0.00028 * 40, '#f87171', '');
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(px, py, 5.5, 0, 6.284); ctx.fill();
+
+    if (landing !== null) {
+      ctx.strokeStyle = 'rgba(52,211,153,.7)'; ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(px, gy); ctx.lineTo(px, gy - 22); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#34d399'; ctx.textAlign = 'center';
+      ctx.fillText('landed', px, gy - 27);
+    }
+
+    ctx.fillStyle = '#6b7a99'; ctx.textAlign = 'center';
+    ctx.font = '11px ui-monospace,Menlo,Consolas,monospace';
+    ctx.fillText(p.live ? 'in flight — t = ' + p.t.toFixed(2) + ' s' :
+      (landing !== null ? 'flight complete' : 'press Launch'), W / 2, H - 12);
+  }
+
+  function sync() {
+    [['sv', 'vv', 1], ['sa', 'va', 0], ['sh', 'vh', 0], ['sg', 'vg', 2]].forEach(([el, o, d]) => {
+      const e = document.getElementById(el);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      document.getElementById(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+
+  function outs() {
+    if (!truth) truth = predict();
+    document.getElementById('rR').textContent = truth.range.toFixed(1) + ' m';
+    document.getElementById('rH').textContent = truth.height.toFixed(1) + ' m';
+    document.getElementById('rT').textContent = truth.t.toFixed(2) + ' s';
+    document.getElementById('rVx').textContent = p.vx.toFixed(1) + ' m/s';
+    document.getElementById('rVy').textContent = p.vy.toFixed(1) + ' m/s';
+    document.getElementById('rV').textContent = Math.hypot(p.vx, p.vy).toFixed(1) + ' m/s';
+
+    const a = +sa.value, drag = sdr.checked;
+    const v = document.getElementById('v');
+    if (a === 45 && !drag) {
+      v.innerHTML = '<b style="color:#34d399">Best possible range.</b> At 45&deg; the horizontal and vertical components are equal, so the time aloft and the distance covered are balanced.';
+      v.style.borderColor = 'rgba(52,211,153,.3)';
+    } else if (drag) {
+      v.innerHTML = '<b style="color:#fbbf24">Drag is on.</b> vₓ is no longer constant, so the optimum angle has fallen below 45&deg; and the range is shorter than the drag-free prediction.';
+      v.style.borderColor = 'rgba(251,191,36,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#22d3ee">' + (a < 45 ? 'Flat and fast' : 'High and slow') + '.</b> ' +
+        'Same speed, but the extra time in the air at ' + a + '&deg; ' + (a > 45 ? 'costs more horizontal reach than gravity gives back' : 'is not enough to win back the lost speed') + '.';
+      v.style.borderColor = 'rgba(34,211,238,.3)';
+    }
+  }
+
+  [sv, sa, sh, sg].forEach(e => e.addEventListener('input', () => { sync(); fire(); }));
+  sdr.addEventListener('change', fire);
+  document.getElementById('bGo').addEventListener('click', fire);
+  document.getElementById('bRst').addEventListener('click', () => { p.live = false; p.x = 0; p.y = +sh.value; p.vx = 0; p.vy = 0; p.t = 0; path = []; landing = null; });
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.016, (now - last) / 1000); last = now;
+    step(dt);
+    draw(); outs();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => { fit(); draw(); });
+  fit(); sync(); fire();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

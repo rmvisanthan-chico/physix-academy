@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RC Circuit 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#f59e0b; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:10px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .check{margin-top:9px;padding:9px 11px;border-radius:10px;font-family:var(--mono);font-size:11.5px;
+    border:1px solid rgba(62,224,164,.30);background:rgba(62,224,164,.07);color:var(--ok)}
+  .check.bad{border-color:rgba(255,122,122,.40);background:rgba(255,122,122,.08);color:var(--bad)}
+  .brand .check{margin-top:10px;max-width:min(52ch,44vw);background:rgba(9,26,20,.80);backdrop-filter:blur(9px)}
+  .brand .check.bad{background:rgba(30,12,20,.82)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>RC Circuit 3D</h1>
+  <p>A capacitor fills slowly, because the current has to push charge onto a plate that
+     increasingly pushes back. The time constant &tau; = RC decides how slowly.</p>
+  <div class="check" id="chk">—</div>
+</div>
+<div class="hud eq">V<sub>C</sub> = V(1 &minus; e<sup>&minus;t/&tau;</sup>)</div>
+
+<div class="hud dock">
+  <div class="chip"><span>V<sub>C</sub></span><b id="dVc">—</b></div>
+  <div class="chip"><span>Current</span><b id="dI">—</b></div>
+  <div class="chip"><span>&tau; = RC</span><b id="dT">—</b></div>
+  <div class="chip"><span>Stored charge</span><b id="dQ">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Component values</h2>
+  <div class="ctl">
+    <label>Battery V <b><span id="vV">9.0</span> V</b></label>
+    <input type="range" id="sV" min="1" max="12" step="0.5" value="9">
+  </div>
+  <div class="ctl">
+    <label>Resistance R <b><span id="vR">4.0</span> k&Omega;</b></label>
+    <input type="range" id="sR" min="0.5" max="20" step="0.5" value="4">
+  </div>
+  <div class="ctl">
+    <label>Capacitance C <b><span id="vC">2.0</span> mF</b></label>
+    <input type="range" id="sC" min="0.1" max="10" step="0.1" value="2">
+  </div>
+  <div class="ctl">
+    <label>Time scale <b><span id="vTs">1.0</span>&times;</b></label>
+    <input type="range" id="sTs" min="0.1" max="4" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg on" data-t="graph">curves</span>
+    <span class="tg on" data-t="charge">plate charge</span>
+    <span class="tg" data-t="tau">mark &tau;</span>
+  </div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>I at t = 0</span><b id="rI0">0</b></div>
+    <div class="ro"><span>1/&tau;</span><b id="rInv">0</b></div>
+    <div class="ro"><span>t / &tau;</span><b id="rTr">0</b></div>
+    <div class="ro"><span>% charged</span><b id="rPc">0</b></div>
+    <div class="ro"><span>Energy ½CV&sup2;</span><b id="rEn">0</b></div>
+    <div class="ro"><span>Resistor loss</span><b id="rPl">0</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bC">Charge</button>
+    <button class="ghost" id="bD">Discharge</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    After one time constant the capacitor reaches 63% of the supply, and 63% of the remaining gap
+    after the next. It never quite reaches 100% &mdash; the check box proves the exponential and the
+    energy balance at the same time. Drag empty space to orbit, scroll to zoom.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const NQ = 30, MAXT = 5;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xf59e0b,
+    dist: 17, minD: 9, maxD: 80, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.3, key: 2.3, fill: 0.28, rim: 0.34,
+    theta: 0.40, phi: 1.32, target: new T.Vector3(2.0, 2.5, 0)
+  });
+  const scene = st.scene;
+  const show = { graph: true, charge: true, tau: false };
+
+  const grid = st.grid(24, 24, 0x1a2338, 0x111726);
+  grid.position.y = -2.4;
+  scene.add(grid);
+
+  const W = 6.0, yBot = 0.9, yTop = 4.1;
+  const LX = -W / 2, RX = W / 2;
+  const board = new T.Mesh(new T.BoxGeometry(W + 1.2, 0.26, 3.2),
+    new T.MeshStandardMaterial({ color: 0x141b2b, roughness: 0.6, metalness: 0.3 }));
+  board.position.set(0, 0.13, 0);
+  board.receiveShadow = true;
+  scene.add(board);
+
+  const wireMat = new T.MeshStandardMaterial({ color: 0x8a97b5, roughness: 0.3, metalness: 0.85 });
+  function seg(a, b, r = 0.07) {
+    const dir = new T.Vector3().subVectors(b, a);
+    const len = dir.length();
+    const m = new T.Mesh(new T.CylinderGeometry(r, r, len, 10), wireMat);
+    m.position.copy(a).addScaledVector(dir, 0.5);
+    m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.normalize());
+    return m;
+  }
+  const A = new T.Vector3(LX, yBot, 0), B = new T.Vector3(RX, yBot, 0);
+  const Cc = new T.Vector3(RX, yTop, 0), Dd = new T.Vector3(LX, yTop, 0);
+  scene.add(seg(A, new T.Vector3(-1.1, yBot, 0)));
+  scene.add(seg(new T.Vector3(1.1, yBot, 0), B));
+  scene.add(seg(B, new T.Vector3(RX, yBot + 0.7, 0)));
+  scene.add(seg(new T.Vector3(RX, yTop - 0.7, 0), Cc));
+  scene.add(seg(Dd, new T.Vector3(-1.5, yTop, 0)));
+  scene.add(seg(new T.Vector3(1.5, yTop, 0), new T.Vector3(RX - 1.6, yTop, 0)));
+  scene.add(seg(A, new T.Vector3(LX, yTop, 0)));
+
+  const bat = new T.Group();
+  const batBody = new T.Mesh(new T.CylinderGeometry(0.36, 0.36, 1.3, 22),
+    new T.MeshStandardMaterial({ color: 0x1f2a3d, roughness: 0.45, metalness: 0.4 }));
+  batBody.rotation.z = Math.PI / 2;
+  const capP = new T.Mesh(new T.CylinderGeometry(0.17, 0.17, 0.2, 14),
+    new T.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0x5a1010, emissiveIntensity: 0.6 }));
+  capP.rotation.z = Math.PI / 2; capP.position.x = 0.76;
+  const capN = new T.Mesh(new T.CylinderGeometry(0.17, 0.17, 0.2, 14),
+    new T.MeshStandardMaterial({ color: 0x3b6fd4, emissive: 0x0d2050, emissiveIntensity: 0.6 }));
+  capN.rotation.z = Math.PI / 2; capN.position.x = -0.76;
+  bat.add(batBody, capP, capN);
+  bat.position.set(0, yBot, 0);
+  scene.add(bat);
+
+  const resCoil = [];
+  for (let i = 0; i <= 50; i++) {
+    const u = i / 50;
+    resCoil.push(new T.Vector3((u - 0.5) * 1.5, Math.sin(u * Math.PI * 7) * 0.18, Math.cos(u * Math.PI * 7) * 0.18));
+  }
+  const resMat = new T.MeshStandardMaterial({ color: 0xd08a4a, roughness: 0.45, metalness: 0.6,
+    emissive: 0xff6b1a, emissiveIntensity: 0 });
+  const res = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(resCoil), 130, 0.065, 8, false), resMat);
+  res.position.set(-1.5 + 0.75, yTop, 0);
+  scene.add(res);
+
+  const CAPX = 1.6;
+  const capGroup = new T.Group();
+  const plateMat = new T.MeshStandardMaterial({ color: 0x9fd8ff, roughness: 0.2, metalness: 0.7,
+    emissive: 0x1a4a6a, emissiveIntensity: 0.4 });
+  const plateP = new T.Mesh(new T.BoxGeometry(0.12, 1.7, 1.7), plateMat.clone());
+  plateP.position.set(0.22, 0, 0);
+  const plateN = new T.Mesh(new T.BoxGeometry(0.12, 1.7, 1.7), plateMat.clone());
+  plateN.position.set(-0.22, 0, 0);
+  capGroup.add(plateP, plateN);
+  capGroup.position.set(CAPX, yTop, 0);
+  scene.add(capGroup);
+  scene.add(seg(new T.Vector3(CAPX - 0.22, yTop - 0.85, 0), new T.Vector3(CAPX - 0.22, yTop, 0), 0.06));
+  scene.add(seg(new T.Vector3(CAPX + 0.22, yTop, 0), new T.Vector3(CAPX + 0.22, yTop - 0.85, 0), 0.06));
+
+  const qPos = new T.InstancedMesh(new T.SphereGeometry(0.1, 10, 8),
+    new T.MeshBasicMaterial({ color: 0xffffff }), NQ * 2);
+  qPos.frustumCulled = false;
+  scene.add(qPos);
+  const qNeg = new T.InstancedMesh(new T.SphereGeometry(0.1, 10, 8),
+    new T.MeshBasicMaterial({ color: 0xffffff }), NQ * 2);
+  qNeg.frustumCulled = false;
+  scene.add(qNeg);
+  const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(), tmpP = new T.Vector3(), tmpS = new T.Vector3(1, 1, 1);
+
+  const capGlow = st.glow(0x7fd0ff, 2.4, 0);
+  capGroup.add(capGlow);
+
+  const GR = new T.Group();
+  GR.position.set(4.3, 3.4, 0);
+  scene.add(GR);
+  const GW = 5.4, GH = 4.2;
+  const mkLine = (n, col) => {
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(new Float32Array(n * 3), 3));
+    const l = new T.Line(g, new T.LineBasicMaterial({ color: col }));
+    l.frustumCulled = false;
+    GR.add(l);
+    return l;
+  };
+  const cVc = mkLine(260, 0x3ee0a4);
+  const cI = mkLine(260, 0xffb057);
+
+  const RIBN = 260, RIBW = 0.055;
+  const ribGeo = new T.BufferGeometry();
+  ribGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(RIBN * 2 * 3), 3));
+  const ribIdx = [];
+  for (let i = 0; i < RIBN - 1; i++) {
+    const a = i * 2;
+    ribIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  ribGeo.setIndex(ribIdx);
+  const cRib = new T.Mesh(ribGeo, new T.MeshBasicMaterial({
+    color: 0x3ee0a4, side: T.DoubleSide, transparent: true, opacity: 0.95 }));
+  cRib.frustumCulled = false;
+  GR.add(cRib);
+  const cIrib = new T.Mesh(ribGeo.clone(), new T.MeshBasicMaterial({
+    color: 0xffb057, side: T.DoubleSide, transparent: true, opacity: 0.8 }));
+  cIrib.frustumCulled = false;
+  GR.add(cIrib);
+  const gAxT = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, GW, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.6 }));
+  gAxT.rotation.z = Math.PI / 2;
+  const gAxV = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, GH, 6),
+    new T.MeshBasicMaterial({ color: 0x6f8ec4, transparent: true, opacity: 0.6 }));
+  GR.add(gAxT, gAxV);
+  const tauLine = new T.Line(
+    new T.BufferGeometry().setFromPoints([new T.Vector3(0, -GH / 2, 0), new T.Vector3(0, GH / 2, 0)]),
+    new T.LineDashedMaterial({ color: 0xff6b6b, dashSize: 0.14, gapSize: 0.1, transparent: true, opacity: 0.8 }));
+  tauLine.computeLineDistances();
+  GR.add(tauLine);
+  const lT = st.label('t / τ', '#9fb0d8', 0.0022);
+  const lV = st.label('V', '#9fb0d8', 0.0022);
+  lT.position.set(GW / 2, -GH / 2 - 0.42, 0);
+  lV.position.set(-GW / 2 - 0.4, GH / 2, 0);
+  const lVc = st.label('V_C', '#3ee0a4', 0.0022);
+  const lI = st.label('I', '#ffb057', 0.0022);
+  lVc.position.set(-GW / 2 + 0.6, GH / 2 - 0.2, 0);
+  lI.position.set(-GW / 2 + 1.4, GH / 2 - 0.7, 0);
+  GR.add(lT, lV, lVc, lI);
+  const nowDot = new T.Mesh(new T.SphereGeometry(0.14, 14, 10), new T.MeshBasicMaterial({ color: 0xffffff }));
+  const nowGlow = st.glow(0xffffff, 1.1, 0.85);
+  GR.add(nowDot, nowGlow);
+
+  let t = 0, mode = 1, run = true;
+  const hist = [];
+
+  const phys = () => ({
+    V: +el('sV').value,
+    Rf: +el('sR').value * 1000,
+    Cf: +el('sC').value * 1e-3,
+    ts: +el('sTs').value
+  });
+
+  function step(dt) {
+    const P = phys();
+    t += dt * P.ts;
+    if (t > MAXT) { t = MAXT; }
+    if (hist.length === 0 || t - hist[hist.length - 1][0] > 0.02) {
+      hist.push([t, vcNow(P), iNow(P)]);
+      if (hist.length > 250) hist.shift();
+    }
+  }
+  function vcNow(P) {
+    const tau = P.Rf * P.Cf;
+    if (tau <= 0) return 0;
+    return mode ? P.V * (1 - Math.exp(-t / tau)) : P.V * Math.exp(-t / tau);
+  }
+  function iNow(P) {
+    const tau = P.Rf * P.Cf;
+    if (tau <= 0) return 0;
+    return (mode ? 1 : -1) * (P.V / P.Rf) * Math.exp(-t / tau);
+  }
+
+  function draw() {
+    const P = phys();
+    const tau = P.Rf * P.Cf;
+    const Vc = vcNow(P), I = iNow(P);
+    const frac = mode ? Vc / Math.max(1e-9, P.V) : Vc / Math.max(1e-9, hist[0] ? hist[0][1] : P.V);
+    const fillFrac = Math.max(0, Math.min(1, mode ? Vc / P.V : 1));
+
+    const nq = Math.round(fillFrac * NQ);
+    qPos.count = show.charge ? nq : 0;
+    qNeg.count = show.charge ? nq : 0;
+    for (let i = 0; i < NQ; i++) {
+      const on = i < nq && show.charge;
+      const px = CAPX + 0.22, nx = CAPX - 0.22;
+      const row = Math.floor(i / 5), col = i % 5;
+      const oy = yTop + 0.55 - row * 0.38, oz = -0.6 + col * 0.3;
+      tmpP.set(px + 0.14, oy, oz);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      qPos.setMatrixAt(i, tmpM);
+      tmpP.set(nx - 0.14, oy, oz);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      qNeg.setMatrixAt(i, tmpM);
+    }
+    qPos.instanceMatrix.needsUpdate = true;
+    qNeg.instanceMatrix.needsUpdate = true;
+    qPos.material.color.set(0xff6b6b);
+    qNeg.material.color.set(0x6f9bff);
+
+    plateP.material.emissive.setHex(mode ? 0x5a1010 : 0x0d2050);
+    plateN.material.emissive.setHex(mode ? 0x0d2050 : 0x5a1010);
+    capGlow.material.opacity = fillFrac * 0.4;
+    resMat.emissiveIntensity = Math.min(1.2, Math.abs(I) * 260);
+
+    GR.visible = show.graph;
+    if (show.graph) {
+      const tMax = Math.max(MAXT, tau * 2.6);
+      const drawCurve = (line, rib, idx, scale) => {
+        const arr = line.geometry.attributes.position.array;
+        const rarr = rib.geometry.attributes.position.array;
+        let n = 0;
+        for (const h of hist) {
+          const y = Math.max(-GH / 2, Math.min(GH / 2, (h[idx] / scale) * GH - GH / 2));
+          const x = (h[0] / tMax) * GW - GW / 2;
+          arr[n * 3] = x; arr[n * 3 + 1] = y; arr[n * 3 + 2] = 0;
+          const b = n * 6;
+          rarr[b] = x; rarr[b + 1] = y + RIBW; rarr[b + 2] = 0;
+          rarr[b + 3] = x; rarr[b + 4] = y - RIBW; rarr[b + 5] = 0;
+          n++;
+        }
+        line.geometry.attributes.position.needsUpdate = true;
+        line.geometry.setDrawRange(0, n);
+        rib.geometry.attributes.position.needsUpdate = true;
+        rib.geometry.setDrawRange(0, Math.max(0, (n - 1) * 6));
+      };
+      drawCurve(cVc, cRib, 1, P.V);
+      drawCurve(cI, cIrib, 2, Math.max(1e-6, P.V / P.Rf));
+      tauLine.visible = show.tau;
+      tauLine.position.x = (tau / tMax) * GW - GW / 2;
+      nowDot.position.set((t / tMax) * GW - GW / 2,
+        Math.max(-GH / 2, Math.min(GH / 2, (Vc / P.V) * GH - GH / 2)), 0.05);
+      nowGlow.position.copy(nowDot.position);
+      GR.rotation.y = Math.atan2(st.camera.position.x - GR.position.x, st.camera.position.z);
+    }
+
+    return { P, tau, Vc, I, fillFrac, t };
+  }
+
+  function outs(R) {
+    const { P, tau, Vc, I, fillFrac, t } = R;
+    const Q = P.Cf * Vc;
+    const En = 0.5 * P.Cf * Vc * Vc;
+    const Pl = I * I * P.Rf;
+    el('dVc').textContent = Vc.toFixed(3) + ' V';
+    el('dI').textContent = (I * 1000).toFixed(2) + ' mA';
+    el('dT').textContent = (tau * 1000).toFixed(0) + ' ms';
+    el('dQ').textContent = (Q * 1000).toFixed(2) + ' mC';
+    el('rI0').textContent = (P.V / P.Rf * 1000).toFixed(2) + ' mA';
+    el('rInv').textContent = (1 / tau).toFixed(2) + ' /s';
+    el('rTr').textContent = (t / tau).toFixed(2);
+    el('rPc').textContent = (fillFrac * 100).toFixed(1) + '%';
+    el('rEn').textContent = (En * 1000).toFixed(2) + ' mJ';
+    el('rPl').textContent = (Pl * 1000).toFixed(2) + ' mW';
+
+    const chk = el('chk');
+    const dEn = mode ? (P.V * I - Pl) : (-Pl);
+    chk.className = 'check';
+    chk.innerHTML = '&#10003; at t = ' + (t / tau).toFixed(2) + 'τ &nbsp; V<sub>C</sub> = ' +
+      Vc.toFixed(3) + ' V = ' + (fillFrac * 100).toFixed(1) + '% &middot; ' +
+      (mode ? 'source ' + (P.V * I * 1000).toFixed(2) + ' mW = heat ' + (Pl * 1000).toFixed(2) +
+        ' mW + d(½CV²)/dt ' + (dEn * 1000).toFixed(2) + ' mW'
+        : 'draining: heat ' + (Pl * 1000).toFixed(2) + ' mW = &minus;d(½CV²)/dt ' + (dEn * 1000).toFixed(2) + ' mW');
+
+    const v = el('v');
+    if (tau > 15) {
+      v.innerHTML = '<b style="color:var(--warn)">&tau; = ' + (tau * 1000).toFixed(0) +
+        ' ms &mdash; very slow.</b> After one time constant the capacitor is at 63% of the supply. ' +
+        'Watch the amber current curve: it has already fallen to 37% while the green voltage is still climbing.';
+      v.style.borderColor = 'rgba(255,192,67,.34)';
+    } else if (tau < 1.2) {
+      v.innerHTML = '<b style="color:var(--acc2)">&tau; = ' + (tau * 1000).toFixed(0) +
+        ' ms &mdash; quick settle.</b> This capacitor fills almost at once, which is why a small ' +
+        'capacitor makes a poor DC blocker: it empties the moment the supply is removed.';
+      v.style.borderColor = 'rgba(49,215,240,.34)';
+    } else {
+      v.innerHTML = '<b style="color:var(--ok)">' + (mode ? 'Charging' : 'Discharging') + ': V<sub>C</sub> = ' +
+        Vc.toFixed(2) + ' V (' + (fillFrac * 100).toFixed(0) + '% of ' + (mode ? 'supply' : 'start') +
+        ').</b> The exponential never quite arrives &mdash; at t = 5τ it is ' +
+        (Math.exp(-5) * 100).toFixed(2) + '% short of the supply, and that residue is why a capacitor is a ' +
+        'better DC blocker than a wire.';
+      v.style.borderColor = 'rgba(62,224,164,.34)';
+    }
+  }
+
+  function syncUI() {
+    [['sV', 'vV', 1], ['sR', 'vR', 1], ['sC', 'vC', 1], ['sTs', 'vTs', 2]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = (+e.value).toFixed(d);
+    });
+  }
+  ['sV', 'sR', 'sC', 'sTs'].forEach(i => el(i).addEventListener('input', syncUI));
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+  }));
+  el('bC').addEventListener('click', () => { mode = 1; t = 0; hist.length = 0; });
+  el('bD').addEventListener('click', () => {
+    const P = phys();
+    const tau = P.Rf * P.Cf;
+    const nowVc = vcNow(P);
+    mode = 0; t = 0; hist.length = 0;
+    if (tau > 0 && nowVc > 1e-9) {
+      t = -Math.log(Math.min(1, nowVc / P.V)) * tau;
+    }
+  });
+
+  syncUI();
+  st.onFrame(dt => { step(dt); outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

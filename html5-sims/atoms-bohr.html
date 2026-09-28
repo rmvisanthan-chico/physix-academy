@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bohr Atom 3D — HTML5 Simulation</title>
+<style>
+  :root{
+    --bg:#05070f; --brd:rgba(255,255,255,.10);
+    --txt:#eef3fb; --txt2:#9dabc6; --txt3:#68779a;
+    --acc:#a78bfa; --acc2:#22d3ee; --onAcc:#0b1220; --ok:#3ee0a4; --warn:#ffc043; --bad:#ff7a7a;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  #view{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .hud{position:fixed;pointer-events:none;z-index:5}
+  .brand{top:18px;left:20px}
+  .brand h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;text-shadow:0 2px 18px rgba(0,0,0,.85)}
+  .brand p{margin:3px 0 0;font-size:12px;color:var(--txt2);text-shadow:0 1px 10px rgba(0,0,0,.9)}
+  .eq{top:18px;right:20px;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:rgba(10,14,26,.72);border:1px solid rgba(49,215,240,.28);padding:5px 11px;
+    border-radius:999px;backdrop-filter:blur(9px);display:inline-block}
+  .dock{left:20px;bottom:20px;display:flex;gap:9px;flex-wrap:wrap;max-width:min(690px,50vw)}
+  .chip{pointer-events:auto;background:rgba(10,14,26,.74);border:1px solid var(--brd);
+    border-radius:11px;padding:9px 12px;backdrop-filter:blur(9px);min-width:124px}
+  .chip span{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3)}
+  .chip b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;margin-top:1px}
+  .panel{position:fixed;top:50%;right:20px;transform:translateY(-50%);width:308px;z-index:6;
+    background:rgba(10,14,26,.80);border:1px solid var(--brd);border-radius:16px;padding:15px;
+    backdrop-filter:blur(16px);box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:calc(100vh - 120px);overflow-y:auto}
+  .panel h2{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);margin:0 0 13px;font-weight:650}
+  .panel h2.mt{margin-top:20px}
+  .ctl{margin-bottom:14px}
+  .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
+  .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--acc);cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .ros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ro{background:rgba(255,255,255,.045);border:1px solid var(--brd);border-radius:10px;padding:8px 9px}
+  .ro span{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+  .ro b{display:block;font-family:var(--mono);font-size:14px;font-weight:500;margin-top:2px}
+  .btns{display:flex;gap:8px;margin-top:16px}
+  button{flex:1;background:var(--acc);color:var(--onAcc);border:0;border-radius:10px;padding:10px 12px;
+    font-size:12.5px;font-weight:650;cursor:pointer;font-family:var(--sans)}
+  button:hover{filter:brightness(1.14)}
+  button.ghost{background:rgba(255,255,255,.08);color:var(--txt2)}
+  .verdict{margin-top:14px;padding:11px 12px;border-radius:11px;font-size:12.5px;line-height:1.5;
+    border:1px solid var(--brd);background:rgba(255,255,255,.035)}
+  .hint{margin-top:11px;font-size:11.5px;color:var(--txt3);line-height:1.5}
+  .spec{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+  .sprow{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px}
+  .sprow i{font-style:normal;width:74px;color:var(--txt2)}
+  .spbar{flex:1;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+  .spbar b{display:block;height:100%;border-radius:5px}
+  .spbar b.g{background:linear-gradient(90deg,#3ee0a4,#31d7f0)}
+  .spbar b.o{background:linear-gradient(90deg,#ffb057,#ff7a4a)}
+  .sprow u{text-decoration:none;width:62px;text-align:right}
+  .toggles{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tg{pointer-events:auto;font-size:11px;padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.06);border:1px solid var(--brd);color:var(--txt2);user-select:none}
+  .tg.on{background:rgba(123,108,255,.24);border-color:rgba(123,108,255,.6);color:#cfc8ff}
+  @media (max-width:900px){
+    .panel{top:auto;bottom:0;right:0;left:0;width:100%;transform:none;border-radius:16px 16px 0 0;max-height:50vh}
+    #view{inset:0 0 50vh 0}
+    .dock,.eq{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="view"><canvas id="c"></canvas></div>
+
+<div class="hud brand">
+  <h1>Bohr Atom 3D</h1>
+  <p>Quantised shells, real n&sup2; radii, a real energy ladder. Drop the electron down a level and watch the
+     photon leave &mdash; its colour is computed from the energy gap, not looked up.</p>
+</div>
+<div class="hud eq">E<sub>n</sub> = &minus;13.6/n&sup2; eV &nbsp;&nbsp; r<sub>n</sub> = 0.529n&sup2; &Aring;</div>
+
+<div class="hud dock">
+  <div class="chip"><span>Active n</span><b id="dN">—</b></div>
+  <div class="chip"><span>Shell radius</span><b id="dR">—</b></div>
+  <div class="chip"><span>Binding energy</span><b id="dE">—</b></div>
+  <div class="chip"><span>State</span><b id="dS">—</b></div>
+</div>
+
+<aside class="panel no-orbit">
+  <h2>Atom</h2>
+  <div class="ctl">
+    <label>Principal quantum n <b><span id="vN">3</span></b></label>
+    <input type="range" id="sN" min="1" max="7" step="1" value="3">
+  </div>
+  <div class="ctl">
+    <label>Atomic number Z <b><span id="vZ">11</span></b></label>
+    <input type="range" id="sZ" min="1" max="20" step="1" value="11">
+  </div>
+  <div class="ctl">
+    <label>Orbit speed <b><span id="vS">1.0</span>&times;</b></label>
+    <input type="range" id="sS" min="0" max="4" step="0.05" value="1">
+  </div>
+
+  <div class="toggles">
+    <span class="tg" data-t="all">all shells</span>
+    <span class="tg on" data-t="glow">emission glow</span>
+    <span class="tg" data-t="prob">probability cloud</span>
+  </div>
+
+  <h2 class="mt">Emission spectrum</h2>
+  <div class="spec" id="spec"></div>
+
+  <h2 class="mt">Readouts</h2>
+  <div class="ros">
+    <div class="ro"><span>v at n</span><b id="rV">0</b></div>
+    <div class="ro"><span>Period</span><b id="rT">0</b></div>
+    <div class="ro"><span>Orbital &omega;</span><b id="rW">0</b></div>
+    <div class="ro"><span>Electrons</span><b id="rEl">0</b></div>
+    <div class="ro"><span>Wavelength</span><b id="rWl">0</b></div>
+    <div class="ro"><span>Photon colour</span><b id="rPc">—</b></div>
+  </div>
+
+  <div class="btns">
+    <button id="bGo">Pause</button>
+    <button class="ghost" id="bRst">Ground state</button>
+  </div>
+
+  <div class="verdict" id="v">—</div>
+  <p class="hint">
+    Drag empty space to orbit, scroll to zoom. The spectrum bars are real:
+    &lambda; = hc/&Delta;E, with hc = 1240 eV&middot;nm. Scroll the n slider and the bars re-derive.
+  </p>
+</aside>
+
+<script src="../js/vendor/three.min.js"></script>
+<script src="lib/physix3d.js"></script>
+<script>
+(() => {
+  'use strict';
+  const T = THREE;
+  const el = id => document.getElementById(id);
+  const cv = el('c');
+  const A0 = 52.9, KEV = 13.605693, HC = 1240;
+  const ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg',
+    'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca'];
+  const SHELL_COL = [0xff6b6b, 0xffb057, 0xffe066, 0x3ee0a4, 0x31d7f0, 0x7b9cff, 0xc77dff];
+  const CAP = [2, 8, 8, 18, 18, 32, 32];
+  const SCALE = 0.014;
+
+  const st = Physix3D.stage(cv, {
+      accent: 0xa78bfa,
+    dist: 24, minD: 10, maxD: 120, exposure: 1.0, bg: 0x05070f,
+    preserve: true, hemi: 0.22, key: 2.6, fill: 0.2, rim: 0.3,
+    theta: 0.62, phi: 1.38, target: new T.Vector3(1.2, 7.0, 0)
+  });
+  const scene = st.scene;
+  const show = { all: false, glow: true, prob: false };
+
+  const grid = st.grid(26, 26, 0x1a2338, 0x111726);
+  grid.position.y = -9;
+  scene.add(grid);
+
+  const ATOM = new T.Group();
+  ATOM.position.set(-4.6, 3.4, 0);
+  scene.add(ATOM);
+
+  const nucleusMat = new T.MeshStandardMaterial({ color: 0xff7a4a, emissive: 0xff4a1a,
+    emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.4 });
+  const nucleus = new T.Mesh(new T.SphereGeometry(0.34, 32, 24), nucleusMat);
+  nucleus.castShadow = true;
+  ATOM.add(nucleus);
+  const nucGlow = st.glow(0xff7a4a, 3.2, 0.6);
+  ATOM.add(nucGlow);
+
+  const shellGroup = new T.Group();
+  ATOM.add(shellGroup);
+  const TILT = [0, 0.62, -0.48, 1.15, -0.95, 0.85, -1.32];
+  const shells = [];
+  for (let k = 1; k <= 7; k++) {
+    const g = new T.Group();
+    g.rotation.x = TILT[k - 1];
+    /* Everything inside g inherits g's scale (= the shell radius), so sizes
+       that must look constant on screen are pre-divided by that radius.
+       Without this an n=7 ring is 7x fatter than n=1 and its electrons
+       render as 25px blobs. */
+    const rk = A0 * k * k * SCALE;
+    const ring = new T.Mesh(
+      new T.TorusGeometry(1, 0.013 / rk, 6, 140),
+      new T.MeshBasicMaterial({ color: SHELL_COL[k - 1], transparent: true, opacity: 0.3 }));
+    g.add(ring);
+    const halo = new T.Mesh(
+      new T.TorusGeometry(1, 0.05 / rk, 6, 100),
+      new T.MeshBasicMaterial({ color: SHELL_COL[k - 1], transparent: true, opacity: 0.07 }));
+    g.add(halo);
+    const lbl = st.label('n=' + k, '#9fb0d8', 0.0055);
+    g.add(lbl);
+    shellGroup.add(g);
+    /* st.label returns a wide sprite (w*k, 72*k). Resizing it with
+       setScalar would collapse it to a square speck, which is why the n=
+       labels were never actually visible. Keep the base to preserve aspect. */
+    shells.push({ g, ring, halo, lbl, rk, lblBase: lbl.scale.clone(), e: [] });
+    for (let i = 0; i < CAP[k - 1]; i++) {
+      const dot = new T.Mesh(new T.SphereGeometry(1, 12, 9),
+        new T.MeshStandardMaterial({ color: 0xffffff, emissive: SHELL_COL[k - 1],
+          emissiveIntensity: 0.9, roughness: 0.3 }));
+      const gl = st.glow(SHELL_COL[k - 1], 0.44, 0.42);
+      g.add(dot, gl);
+      shells[k - 1].e.push({
+        dot, gl,
+        a: (i / CAP[k - 1]) * Math.PI * 2,
+        sp: (k % 2 ? 1 : -1) * (0.9 / Math.pow(k, 1.6)),
+        r: 1 + (Math.random() - 0.5) * 0.07
+      });
+    }
+  }
+
+  /* Soft round sprite for the cloud points. Without a map, PointsMaterial
+     draws hard squares, which read as noise rather than as a cloud. */
+  function dotTex() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const t = new T.CanvasTexture(c);
+    t.encoding = T.sRGBEncoding;
+    return t;
+  }
+
+  const cloud = new T.Points(
+    new T.BufferGeometry(),
+    new T.PointsMaterial({ size: 0.2, color: 0x9ad8ff, map: dotTex(), alphaTest: 0.02,
+      transparent: true, opacity: 0.85, depthWrite: false, sizeAttenuation: true }));
+  cloud.frustumCulled = false;
+  ATOM.add(cloud);
+  const cloudPos = new Float32Array(1400 * 3);
+  cloud.geometry.setAttribute('position', new T.BufferAttribute(cloudPos, 3));
+  let cloudN = -1;
+
+  const beamMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 });
+  const beam = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 1, 12), beamMat);
+  beam.visible = false;
+  scene.add(beam);
+  let beamT = 0, beamFrom = 0, beamTo = 0, beamCol = 0xffffff;
+
+  const SPEC = new T.Group();
+  SPEC.position.set(4.9, 0, 1.2);
+  scene.add(SPEC);
+  const specBars = [];
+  for (let i = 0; i < 6; i++) {
+    const b = new T.Mesh(new T.BoxGeometry(0.8, 1, 0.8),
+      new T.MeshBasicMaterial({ color: 0x31d7f0, transparent: true, opacity: 0.85 }));
+    b.visible = false;
+    SPEC.add(b);
+    specBars.push(b);
+  }
+  /* The axis used to be a fixed 6-bar length, so with only two lines it ran
+     on into empty space and the chart read as unfinished. It is rescaled to
+     the bars actually on show. */
+  const specAxis = new T.Line(
+    new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), new T.Vector3(1, 0, 0)]),
+    new T.LineBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.6 }));
+  SPEC.add(specAxis);
+  const specLbl = st.label('visible emission lines', '#9fb0d8', 0.0034);
+  specLbl.position.set(2.4, 4.2, 0);
+  SPEC.add(specLbl);
+  const specLo = st.label('380 nm  violet', '#8f7fd8', 0.0026);
+  const specHi = st.label('750 nm  red', '#d88f8f', 0.0026);
+  SPEC.add(specLo, specHi);
+
+  const shellR = n => A0 * n * n;
+  const shellE = n => -KEV / (n * n);
+
+  function electrons(Z) {
+    const out = [];
+    let left = Z;
+    for (let n = 1; n <= 7 && left > 0; n++) {
+      const take = Math.min(CAP[n - 1], left);
+      for (let i = 0; i < take; i++) out.push(n);
+      left -= take;
+    }
+    return out;
+  }
+
+  let n = 3, Z = 11, run = true, t = 0;
+
+  function frameView() {
+    const els = electrons(Z);
+    const maxOcc = els.length ? Math.max(...els) : 1;
+    const topN = show.all ? 7 : Math.min(7, Math.max(maxOcc, n));
+    const rmax = shellR(topN) * SCALE;
+    ATOM.position.set(-3.0, rmax + 0.5, 0);
+    /* Wanted world width of an n= label, in scene units. Scaling with rmax
+       keeps the text a constant size on screen as the camera pulls back. */
+    lblScale = Math.max(0.18, rmax * 0.11);
+    const camD = Math.max(20, rmax * 3.4);
+    st.controls.frame(camD, new T.Vector3(1.2, rmax + 0.5, 0));
+    /* The chart is world-sized, but the camera swings from 20 to 123 as the
+       shells grow, so a fixed size shrank to a smudge. Scaling it with the
+       framed distance keeps it a constant size on screen, and the offset
+       keeps it clear of the control panel on the right. */
+    SPEC.scale.setScalar(camD / 22.7);
+    SPEC.position.set(1.2 + 0.26 * camD * 0.712, rmax + 0.5 - 0.30 * camD * 0.445, 0);
+  }
+  let lblScale = 0.0057;
+
+  function draw() {
+    const els = electrons(Z);
+    const maxN = els.length ? Math.max(...els) : 1;
+    const spd = +el('sS').value;
+
+    shells.forEach((S, idx) => {
+      const k = idx + 1;
+      const present = els.includes(k);
+      const active = k === n;
+      S.g.visible = show.all || present;
+      const r = shellR(k) * SCALE;
+      S.g.scale.setScalar(r);
+      /* Sit just outside the ring, but always clear of the nucleus glow. */
+      S.lbl.position.set(1.06 + 1.1 / r, 0, 0);
+      /* lblScale is the wanted world width in units; divide out the group
+         scale so every label reads the same size whatever the shell radius. */
+      const lf = lblScale / (S.lblBase.x * r);
+      S.lbl.scale.set(S.lblBase.x * lf, S.lblBase.y * lf, 1);
+      S.lbl.material.opacity = show.all || present ? (active ? 1 : 0.4) : 0;
+      const base = active ? 0.85 : 0.22;
+      S.ring.material.opacity = base * (active ? 1 : 0.7);
+      S.halo.material.opacity = active ? 0.18 : 0.04;
+      S.halo.visible = active;
+      S.ring.material.color.set(SHELL_COL[k - 1]);
+      const cnt = Math.min(CAP[k - 1], Math.max(0, els.filter(x => x === k).length));
+      S.e.forEach((e, i) => {
+        const on = i < cnt && (show.all || present);
+        e.dot.visible = on; e.gl.visible = on && show.glow;
+        if (!on) return;
+        const a = e.a + t * e.sp * spd;
+        const px = Math.cos(a) * e.r;
+        const pz = Math.sin(a) * e.r;
+        e.dot.position.set(px, 0, pz);
+        e.gl.position.copy(e.dot.position);
+        const s = active ? 0.085 : 0.05;
+        e.dot.scale.setScalar(s / r);
+        /* A tight halo, not a bloom: at 0.9 units eleven of these merged into
+           a formless smear and the electrons stopped reading as points. */
+        e.gl.scale.setScalar((active ? 0.44 : 0.3) / r);
+        e.dot.material.emissiveIntensity = active ? 1.5 : 0.5;
+      });
+    });
+
+    cloud.visible = show.prob;
+    if (show.prob) {
+      /* Reshape only when n changes. Re-rolling every frame made the cloud
+         crawl as random noise and cost a full buffer rewrite per frame. */
+      if (cloudN !== n) {
+        cloudN = n;
+        const r = shellR(n) * SCALE;
+        for (let i = 0; i < 1400; i++) {
+          const u = Math.random(), v = Math.random(), w = Math.random();
+          const th = 2 * Math.PI * u, ph = Math.acos(2 * v - 1);
+          const rad = r * Math.cbrt(w) * 1.05;
+          cloudPos[i * 3] = rad * Math.sin(ph) * Math.cos(th);
+          cloudPos[i * 3 + 1] = rad * Math.cos(ph);
+          cloudPos[i * 3 + 2] = rad * Math.sin(ph) * Math.sin(th);
+        }
+        cloud.geometry.attributes.position.needsUpdate = true;
+      }
+      cloud.rotation.y = t * 0.06;
+    }
+
+    if (beamT > 0) {
+      beamT = Math.max(0, beamT - 0.022);
+      const r1 = shellR(beamFrom) * SCALE, r2 = shellR(beamTo) * SCALE;
+      const len = Math.abs(r2 - r1);
+      beam.visible = true;
+      beam.scale.set(1, Math.max(0.01, len), 1);
+      beam.position.set((r1 + r2) / 2, 0, 0);
+      beamMat.color.set(beamCol);
+      beamMat.opacity = beamT * 0.95;
+    } else beam.visible = false;
+
+    const nucR = 0.34 + Math.sqrt(Z) * 0.045;
+    nucleus.scale.setScalar(nucR / 0.34);
+    nucGlow.scale.setScalar(1 + Z * 0.12);
+
+    return { els, maxN, nucR };
+  }
+
+  function outs(D) {
+    const n0 = +el('sN').value, Z0 = +el('sZ').value;
+    const gap = n0 > 1 ? Math.abs(shellE(n0 - 1) - shellE(n0)) : 0;
+    const lam = gap > 0 ? HC / gap : 0;
+    el('dN').textContent = 'n = ' + n0;
+    el('dR').textContent = shellR(n0).toFixed(0) + ' pm';
+    el('dE').textContent = shellE(n0).toFixed(2) + ' eV';
+    el('dS').textContent = n0 === D.maxN ? 'ground' : 'excited';
+
+    /* Hydrogen Bohr (this sim's shellE and shellR are Z-independent, so Z only
+       sets how many electrons sit in each shell):
+         r_n = n^2 a0,  v_n = 2.1877e6/n m/s,  w_n = v_n/r_n,  T_n = 2*PI/w_n.
+       This used to scale the speed as 1/n^2 (wrong by a factor n), print a
+       stray "e3" onto a number already in km/s, and use a w constant 53x too
+       large -- so v, w and the period contradicted each other on screen. */
+    const vn = 2.1877e6 / n0 / 1000;              // km/s
+    const rM = shellR(n0) * 1e-12;                // m
+    const om = vn * 1000 / rM;                    // rad/s
+    const per = 2 * Math.PI / om;                 // s
+    el('rV').textContent = vn.toFixed(0) + ' km/s';
+    el('rT').textContent = per.toExponential(2) + ' s';
+    el('rW').textContent = om.toExponential(2) + ' rad/s';
+    el('rEl').textContent = D.els.filter(x => x === n0).length + ' of ' + Z0;
+    el('rWl').textContent = gap > 0 ? lam.toFixed(0) + ' nm' : '—';
+    const pc = el('rPc');
+    if (gap > 0) {
+      let hex;
+      if (lam < 420) hex = '#a78bfa';
+      else if (lam < 490) hex = '#4f8cff';
+      else if (lam < 570) hex = '#3ee0a4';
+      else if (lam < 590) hex = '#ffe066';
+      else if (lam < 620) hex = '#ffb057';
+      else hex = '#ff6b6b';
+      pc.textContent = lam < 420 ? 'violet' : lam < 490 ? 'blue' : lam < 570 ? 'green'
+        : lam < 590 ? 'yellow' : lam < 620 ? 'orange' : 'red';
+      pc.style.color = hex;
+    } else { pc.textContent = '—'; pc.style.color = ''; }
+
+    const spec = el('spec');
+    const lines = [];
+    for (let k = 2; k <= Math.min(7, D.maxN + 1); k++) {
+      for (let j = 1; j < k; j++) {
+        const g = Math.abs(shellE(j) - shellE(k));
+        lines.push({ g, lam: HC / g, from: j, to: k });
+      }
+    }
+    lines.sort((a, b) => a.lam - b.lam);
+    const vis = lines.filter(l => l.lam >= 380 && l.lam <= 750);
+    const shown = vis.slice(-6);
+    let html = '';
+    shown.forEach((l, i) => {
+      const col = l.lam < 420 ? '#a78bfa' : l.lam < 490 ? '#4f8cff' : l.lam < 570 ? '#3ee0a4'
+        : l.lam < 590 ? '#ffe066' : l.lam < 620 ? '#ffb057' : '#ff6b6b';
+      const pct = Math.max(6, 100 - (l.lam - 380) / 3.7);
+      html += '<div class="sprow"><i>' + l.from + '&rarr;' + l.to + '</i>' +
+        '<span class="spbar"><b class="' + (l.lam < 570 ? 'g' : 'o') + '" style="width:' + pct.toFixed(0) + '%;background:' + col + '"></b></span>' +
+        '<u>' + l.lam.toFixed(0) + ' nm</u></div>';
+    });
+    if (!shown.length) html = '<div class="sprow"><i>none</i><span class="spbar"></span><u>&mdash;</u></div>';
+    spec.innerHTML = html;
+    specBars.forEach((b, i) => {
+      /* Ascending wavelength left to right, matching the 380 nm / 750 nm end
+         labels. This used to index backwards, putting red beside violet. */
+      const l = shown[i];
+      b.visible = !!l;
+      if (!l) return;
+      const h = 0.9 + 2.6 * Math.max(0, 1 - (l.lam - 380) / 400);
+      b.scale.set(1, h, 1);
+      b.position.set(0.4 + i * 0.85, h / 2, 0);
+      b.material.color.set(l.lam < 420 ? 0xa78bfa : l.lam < 490 ? 0x4f8cff : l.lam < 570 ? 0x3ee0a4
+        : l.lam < 590 ? 0xffe066 : l.lam < 620 ? 0xffb057 : 0xff6b6b);
+    });
+    /* Fit the axis and its end labels to the bars that exist, and hide the
+       whole chart when the element has no visible lines at all. */
+    const nShown = shown.length;
+    SPEC.visible = nShown > 0;
+    if (nShown > 0) {
+      const w = 0.8 + (nShown - 1) * 0.85;
+      const pos = specAxis.geometry.attributes.position;
+      pos.setXYZ(0, -0.4, 0, 0);
+      pos.setXYZ(1, w + 0.3, 0, 0);
+      pos.needsUpdate = true;
+      specAxis.geometry.computeBoundingSphere();
+      specLbl.position.set(w / 2, 4.4, 0);
+      specLo.position.set(-0.4, -1.5, 0);
+      specHi.position.set(w + 0.3, -1.5, 0);
+    }
+
+    const v = el('v');
+    if (n0 === 1) {
+      v.innerHTML = '<b style="color:#ff6b6b">Ground state.</b> Tightest and most strongly bound at ' +
+        shellE(1).toFixed(2) + ' eV, radius ' + shellR(1).toFixed(0) + ' pm. Everything else sits outside this shell.';
+      v.style.borderColor = 'rgba(255,107,107,.3)';
+    } else if (n0 >= 6) {
+      v.innerHTML = '<b style="color:#ffb057">Barely bound at ' + shellE(n0).toFixed(2) +
+        ' eV.</b> The radius is ' + n0 * n0 + '&times; the ground shell, so a small nudge frees the electron entirely.';
+      v.style.borderColor = 'rgba(255,176,87,.3)';
+    } else if (n0 > D.maxN) {
+      v.innerHTML = '<b style="color:#31d7f0">Ionised.</b> Z = ' + Z0 + ' (' + ELEMENTS[Z0 - 1] +
+        ') only fills up to n = ' + D.maxN + ', so n = ' + n0 + ' is empty &mdash; the electron has left the atom.';
+      v.style.borderColor = 'rgba(49,215,240,.3)';
+    } else {
+      v.innerHTML = '<b style="color:#31d7f0">Excited state, n = ' + n0 + '.</b> Radius ' + n0 * n0 +
+        '&times; ground, binding ' + Math.abs(shellE(n0)).toFixed(2) + ' eV. Dropping to n = 1 would release ' +
+        (-shellE(1)).toFixed(2) + ' eV as a single ' + (HC / KEV).toFixed(0) + ' nm photon.';
+      v.style.borderColor = 'rgba(49,215,240,.3)';
+    }
+  }
+
+  function syncUI() {
+    [['sN', 'vN', 0], ['sZ', 'vZ', 0], ['sS', 'vS', 1]].forEach(([i, o, d]) => {
+      const e = el(i);
+      e.style.setProperty('--p', ((e.value - e.min) / (e.max - e.min) * 100) + '%');
+      el(o).textContent = i === 'sZ' ? (+e.value) + ' (' + ELEMENTS[+e.value - 1] + ')' : (+e.value).toFixed(d);
+    });
+  }
+  el('sN').addEventListener('input', () => {
+    const nn = +el('sN').value;
+    if (nn !== n) {
+      const g = Math.abs(shellE(Math.max(1, nn)) - shellE(n));
+      if (g > 0.01) {
+        beamFrom = n; beamTo = nn; beamT = 1;
+        beamCol = g > 2 ? 0xff6b6b : g > 1 ? 0xffe066 : 0x3ee0a4;
+      }
+      n = nn;
+    }
+    syncUI();
+  });
+  el('sZ').addEventListener('input', () => { Z = +el('sZ').value; syncUI(); frameView(); });
+  el('sS').addEventListener('input', syncUI);
+  document.querySelectorAll('.tg').forEach(x => x.addEventListener('click', () => {
+    const k = x.dataset.t;
+    show[k] = !show[k];
+    x.classList.toggle('on', show[k]);
+    if (k === 'all') frameView();
+  }));
+  el('bGo').addEventListener('click', e => { run = !run; e.target.textContent = run ? 'Pause' : 'Play'; });
+  el('bRst').addEventListener('click', () => { el('sN').value = 1; n = 1; t = 0; syncUI(); });
+
+  syncUI();
+  n = +el('sN').value; Z = +el('sZ').value;
+  frameView();
+  st.onFrame(dt => { if (run) t += dt; outs(draw()); });
+  st.start();
+})();
+</script>
+</body>
+</html>

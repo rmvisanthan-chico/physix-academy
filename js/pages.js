@@ -116,21 +116,36 @@ function viewSimsPage(id) {
     Sims.mount(id, $('.sim-slot-lg', App.el));
     return;
   }
-  const items = Object.values(Sims.reg);
-  App.el.innerHTML = `
-  <div class="wrap">
-    <div class="page-head"><h1>Simulations</h1>
-    <p class="sub">Physics you can poke. Every simulation runs live in your browser — drag the sliders and watch the equations respond.</p></div>
-    ${items.length ? '<div class="grid g3">' + items.map(d => `
-      <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
-        ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">🚀 Official PhET</em></div>' : ''}
-        <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
-        <p class="muted">${esc(d.desc)}</p>
-        <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open ▸</a></div>
-      </div>`).join('') + '</div>'
-      : '<div class="empty-state"><div class="big">🔧</div><p>No simulations registered yet.</p></div>'}
-  </div>`;
-}
+    const items = Object.values(Sims.reg);
+    /* Standalone pages under /html5-sims/. These are whole documents rather
+       than Sims.register() modules, so they open as normal navigations. */
+    const threeD = (window.Sims3D || []);
+    App.el.innerHTML = `
+    <div class="wrap">
+      <div class="page-head"><h1>Simulations</h1>
+      <p class="sub">Physics you can poke. Every simulation runs live in your browser �?" drag the sliders and watch the equations respond.</p></div>
+      ${items.length ? '<div class="grid g3">' + items.map(d => `
+        <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
+          ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">dYs? Official PhET</em></div>' : ''}
+          <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
+          <p class="muted">${esc(d.desc)}</p>
+          <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open �-,</a></div>
+        </div>`).join('') + '</div>'
+        : '<div class="empty-state"><div class="big">dY"</div><p>No simulations registered yet.</p></div>'}
+      ${threeD.length ? `
+      <div class="sec-title" style="margin-top:34px"><h2>Standalone 3D set</h2>
+        <a class="more" href="/html5-sims/index.html">All ${threeD.length} �-,</a></div>
+      <div class="grid g3">` + threeD.map(d => `
+        <div class="card hover topic-card">
+          <h3>${d.i} ${esc(d.t)}</h3>
+          <p class="muted">${esc(d.d)}</p>
+          <div class="topic-meta">
+            <a class="btn btn-sm btn-primary" href="/html5-sims/${d.f}">Open �-,</a>
+          </div>
+          <code style="font-size:10px;opacity:.5">${d.f}</code>
+        </div>`).join('') + '</div>' : ''}
+    </div>`;
+  }
 
 /* ---------------- Tutor page ---------------- */
 function viewTutorPage() {
