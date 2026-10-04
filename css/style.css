@@ -86,7 +86,7 @@ kbd{background:var(--card);border:1px solid var(--card-brd);border-radius:6px;pa
   display:grid;place-items:center;width:36px;height:36px;border-radius:10px;color:var(--txt2);
   border:1px solid transparent;transition:.2s;
 }
-.icon-btn:hover{color:var(--txt);background:var(--card);border-color:var(--card-brd)}
+.icon-btn:hover{color:var(--txt);background:var(--card);border-color:var(--card-brd);text-decoration:none}
 #btn-theme .ic-sun{display:none}
 [data-theme="light"] #btn-theme .ic-sun{display:block}
 [data-theme="light"] #btn-theme .ic-moon{display:none}
