@@ -1,6 +1,12 @@
 /* PhysiX Academy — Progress Dashboard */
 'use strict';
 
+/* Survives the re-render that follows a successful import. Setting the
+   message straight onto the element was pointless because viewProgress()
+   replaces the whole view, so the confirmation was wiped before it could be
+   read. */
+let _backupMsg = '';
+
 function viewProgress() {
   const flat = flatLessons();
   const doneN = Object.keys(Store.data.completed).length;
@@ -117,6 +123,18 @@ function viewProgress() {
     </section>
 
     <section class="sec">
+      <div class="sec-title"><h2>Backup &amp; transfer</h2></div>
+      <p class="small muted">Your progress lives in this browser only (<span id="store-mode">${Store.storageMode()}</span>).
+      Clearing site data or switching device loses it, so download a copy.</p>
+      <div class="btn-row">
+        <button class="btn btn-sm" id="btn-export">⬇ Export backup (.json)</button>
+        <button class="btn btn-sm" id="btn-import">⬆ Import backup</button>
+        <input type="file" id="file-import" accept="application/json,.json" hidden>
+      </div>
+      <p class="small muted" id="backup-msg">${_backupMsg}</p>
+    </section>
+
+    <section class="sec">
       <details class="danger-zone">
         <summary>⚠️ Danger zone</summary>
         <p class="small muted">Erase all progress, notes and quiz history from this browser. Cannot be undone.</p>
@@ -125,10 +143,61 @@ function viewProgress() {
     </section>
   </div>`;
 
-  $('#btn-reset')?.addEventListener('click', () => {
+  $('#btn-export')?.addEventListener('click', async () => {
+    const msg = $('#backup-msg');
+    try {
+      await Store.flush();
+      const payload = JSON.stringify(Store.exportBackup(), null, 2);
+      const blob = new Blob([payload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `physix-academy-progress-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      if (msg) {
+        const c = Store.exportBackup().counts;
+        _backupMsg = `Saved <b>${c.lessons}</b> lessons, <b>${c.questions}</b> answers and <b>${c.notes}</b> notes.`;
+        msg.innerHTML = _backupMsg;
+      }
+    } catch (e) {
+      if (msg) msg.textContent = 'Could not create the backup file.';
+    }
+  });
+
+  $('#btn-import')?.addEventListener('click', () => $('#file-import')?.click());
+  $('#file-import')?.addEventListener('change', async ev => {
+    const f = ev.target.files && ev.target.files[0];
+    const msg = $('#backup-msg');
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const res = Store.importBackup(text);
+      if (msg) {
+        if (!res.ok) {
+          _backupMsg = `<span style="color:var(--bad)">${res.error}</span>`;
+          msg.innerHTML = _backupMsg;
+        } else {
+          _backupMsg = `Restored <b>${res.lessons}</b> lessons, <b>${res.questions}</b> answers, <b>${res.notes}</b> notes.`;
+          msg.innerHTML = _backupMsg;
+          toast('Backup restored.');
+          viewProgress();
+        }
+      }
+    } catch (e) {
+      if (msg) msg.innerHTML = '<span style="color:var(--bad)">Could not read that file.</span>';
+    } finally {
+      ev.target.value = '';
+    }
+  });
+
+  $('#btn-reset')?.addEventListener('click', async () => {
     if (confirm('Really erase ALL local progress? This cannot be undone.')) {
       try { localStorage.removeItem(Store.KEY); } catch (e) {}
-      Store.load();
+      await Store.clearAll();
       toast('All local data erased.');
       viewProgress();
     }

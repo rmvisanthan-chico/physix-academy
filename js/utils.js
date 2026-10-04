@@ -21,6 +21,75 @@ function fmtNum(n, d = 2) {
   return parseFloat(n.toFixed(d)).toString();
 }
 
+/* ---------- IndexedDB layer ----------
+   Kept deliberately small and dependency-free, like the search and speech
+   code, so the app still runs from file:// with no network and no build step.
+
+   The Store API below stays fully synchronous: all ten call sites read
+   Store.data directly, and making those await would have been a large,
+   risky refactor for no user-visible gain. Instead the in-memory object is
+   the source of truth for reads, and writes are mirrored to IndexedDB, which
+   removes the 5 MB localStorage ceiling and keeps large writes off the
+   main thread. localStorage is kept as a synchronous mirror so a crash
+   mid-write cannot lose everything, and so older data still opens. */
+
+function physixIdb() {
+  let p = null;
+  return function open() {
+    if (p) return p;
+    p = new Promise(resolve => {
+      let idb;
+      try { idb = window.indexedDB; } catch (e) { return resolve(null); }
+      if (!idb) return resolve(null);
+      let req;
+      try { req = idb.open('physix-academy', 1); }
+      catch (e) { return resolve(null); }
+      req.onupgradeneeded = () => {
+        try { req.result.createObjectStore('kv'); } catch (e) { /* already there */ }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+      setTimeout(() => resolve(null), 2500);   // never hang the boot on a stuck DB
+    });
+    return p;
+  };
+}
+
+const IDB = physixIdb();
+
+function idbGet(key) {
+  return IDB().then(db => {
+    if (!db) return undefined;
+    return new Promise(resolve => {
+      let r;
+      try { r = db.transaction('kv', 'readonly').objectStore('kv').get(key); }
+      catch (e) { return resolve(undefined); }
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => resolve(undefined);
+    });
+  });
+}
+
+function idbSet(key, value) {
+  return IDB().then(db => {
+    if (!db) return false;
+    try {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+    } catch (e) { return false; }
+    return true;
+  });
+}
+
+function idbDel(key) {
+  return IDB().then(db => {
+    if (!db) return false;
+    try { db.transaction('kv', 'readwrite').objectStore('kv').delete(key); } catch (e) { return false; }
+    return true;
+  });
+}
+
 /* ---------- persistent store ---------- */
 const Store = {
   KEY: 'physix.v1',
@@ -38,15 +107,91 @@ const Store = {
   },
   data: null,
   load() {
+    /* Synchronous first paint from the localStorage mirror, so nothing that
+       reads Store.data during boot has to wait on IndexedDB. ready() then
+       reconciles against IndexedDB, which wins if it holds newer data. */
     try {
       this.data = Object.assign(this.defaults(), JSON.parse(localStorage.getItem(this.KEY) || '{}'));
-      // deep-merge critical sub-objects in case of older versions
       this.data.settings = Object.assign(this.defaults().settings, this.data.settings || {});
       this.data.quiz     = Object.assign(this.defaults().quiz, this.data.quiz || {});
     } catch (e) { this.data = this.defaults(); }
     return this.data;
   },
-  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* storage unavailable */ } },
+  /* Resolves once IndexedDB has been consulted. Anything rendering persisted
+     state should await this (see ready() in app.js). */
+  ready() {
+    if (this._ready) return this._ready;
+    this._ready = idbGet(this.KEY).then(rec => {
+      if (rec && rec.data) {
+        const d = Object.assign(this.defaults(), rec.data);
+        d.settings = Object.assign(this.defaults().settings, d.settings || {});
+        d.quiz     = Object.assign(this.defaults().quiz, d.quiz || {});
+        this.data = d;
+      } else if (rec === undefined) {
+        // nothing in IndexedDB yet: seed it from what localStorage had
+        return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data }).then(() => false);
+      }
+      return true;
+    }).catch(() => false);
+    return this._ready;
+  },
+  save() {
+    // localStorage mirror first (cheap, keeps crash-safety and older versions
+    // working), then IndexedDB as the real store
+    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* quota or unavailable */ }
+    idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data });
+  },
+  /* Wait for any in-flight IndexedDB write. Used before export and unload. */
+  flush() { return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data }); },
+  storageMode() { return (typeof indexedDB !== 'undefined') ? 'IndexedDB + localStorage mirror' : 'localStorage only'; },
+
+  /* ---------- backup / restore ---------- */
+  exportBackup() {
+    return {
+      app: 'PhysiX Academy',
+      kind: 'progress-backup',
+      v: 1,
+      exportedAt: new Date().toISOString(),
+      counts: {
+        lessons: Object.keys(this.data.completed || {}).length,
+        questions: (this.data.quiz && this.data.quiz.history || []).length,
+        notes: Object.keys(this.data.notes || {}).length,
+        streakDays: (this.data.streakDays || []).length
+      },
+      data: this.data
+    };
+  },
+  /* Accepts either a full export envelope or a bare data object. Returns a
+     short report so the UI can tell the student what actually changed. */
+  importBackup(text) {
+    let payload;
+    try { payload = JSON.parse(text); }
+    catch (e) { return { ok: false, error: 'That file is not valid JSON.' }; }
+    const incoming = (payload && payload.kind === 'progress-backup') ? payload.data : payload;
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+      return { ok: false, error: 'No progress data found in that file.' };
+    }
+    const d = Object.assign(this.defaults(), incoming);
+    d.settings = Object.assign(this.defaults().settings, d.settings || {});
+    d.quiz     = Object.assign(this.defaults().quiz, d.quiz || {});
+    if (!d.completed || typeof d.completed !== 'object') d.completed = {};
+    if (!d.notes || typeof d.notes !== 'object') d.notes = {};
+    if (!Array.isArray(d.streakDays)) d.streakDays = [];
+    if (!d.timeLog || typeof d.timeLog !== 'object') d.timeLog = {};
+    this.data = d;
+    this.save();
+    return {
+      ok: true,
+      lessons: Object.keys(d.completed).length,
+      questions: (d.quiz.history || []).length,
+      notes: Object.keys(d.notes).length
+    };
+  },
+  async clearAll() {
+    this.data = this.defaults();
+    this.save();
+    await idbDel(this.KEY);
+  },
   /* --- activity / streaks --- */
   touchToday() {
     const d = new Date(); const iso = d.toISOString().slice(0, 10);
@@ -168,6 +313,13 @@ const DIFFS = {
   expert:       { label: 'Expert',       dot: '🔴', cls: 'd-expert' }
 };
 
-/* load immediately */
+/* load immediately, then reconcile with IndexedDB in the background.
+   Store.data is populated synchronously from the localStorage mirror so the
+   first render never waits; anything that shows persisted state (the progress
+   page, the streak chip) awaits Store.ready() first. */
 Store.load();
+Store.ready().then(() => {
+  // let anything already on screen pick up hydrated values
+  try { document.dispatchEvent(new CustomEvent('physix:store-ready')); } catch (e) { /* older browsers */ }
+});
 Theme.apply();
