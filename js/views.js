@@ -53,7 +53,13 @@ function route() {
   };
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!prefersReduced && document.startViewTransition) {
-    document.startViewTransition(() => doRoute());
+    /* startViewTransition returns a ViewTransition whose .ready and .finished
+       promises REJECT when the transition is skipped (rapid navigation, tab
+       hidden, another transition starting). Unhandled, that surfaces as an
+       uncaught error in the console on almost every route change. */
+    const vt = document.startViewTransition(() => doRoute());
+    if (vt && vt.ready && vt.ready.catch) { vt.ready.catch(() => { }); }
+    if (vt && vt.finished && vt.finished.catch) { vt.finished.catch(() => { }); }
   } else {
     doRoute();
   }

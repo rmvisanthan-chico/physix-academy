@@ -1,0 +1,20 @@
+﻿
+=== BASELINE (https://physix-academy.vercel.app) ===
+  ok   #/                   nodes=338    chars=4353   canvas=1
+  ok   #/learn              nodes=1488   chars=12376  canvas=0
+  ok   #/topics             nodes=1301   chars=10056  canvas=0
+  ok   #/sims               nodes=1301   chars=10056  canvas=0
+  ok   #/games              nodes=17     chars=238    canvas=0
+  ok   #/practice           nodes=33     chars=551    canvas=0
+  ok   #/tutor              nodes=47     chars=698    canvas=0
+  ok   #/formulas           nodes=21634  chars=25048  canvas=0
+  ok   #/calculators        nodes=141    chars=1190   canvas=0
+  ok   #/people             nodes=338    chars=4353   canvas=1
+  ok   #/progress           nodes=172    chars=851    canvas=0
+  ok   #/support            nodes=23     chars=595    canvas=0
+  ok   #/sims/newton        nodes=42     chars=405    canvas=1
+  ok   #/sims/energy        nodes=42     chars=402    canvas=1
+  ok   #/sims/circuit       nodes=32     chars=289    canvas=1
+  ok   #/sims/collision     nodes=47     chars=315    canvas=1
+
+routes 16/16 ok   standalone sims 40/40 ok

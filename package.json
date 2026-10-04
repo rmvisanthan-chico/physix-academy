@@ -1,0 +1,64 @@
+{
+  "name": "physix-academy-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PhysiX Academy Windows desktop prototype",
+  "author": "R.M.VISANTHAN",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "verify": "node tools/verify.mjs http://localhost:4173 preview",
+    "verify:live": "node tools/verify.mjs https://physix-academy.vercel.app live",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "vite": "^7.3.6"
+  },
+  "build": {
+    "appId": "com.physixacademy.prototype",
+    "productName": "PhysiX Academy",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "index.html",
+      "404.html",
+      "about.html",
+      "privacy.html",
+      "terms.html",
+      "*.html",
+      "blog/**",
+      "css/**",
+      "js/**",
+      "assets/**",
+      "html5-sims/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "PhysiX-Academy-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PhysiX Academy"
+    }
+  }
+}
