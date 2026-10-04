@@ -140,6 +140,9 @@
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.toneMappingExposure = o.exposure;
     renderer.physicallyCorrectLights = true;
+    /* Hand the canvas to the screen-reader bridge. Doing it here means all 33
+       simulations get accessible announcements without each one opting in. */
+    if (global.PhysixA11y) global.PhysixA11y.install({ canvas, label: o.a11yLabel });
     if (o.shadows) {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = T.PCFSoftShadowMap;
