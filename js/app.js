@@ -14,44 +14,158 @@ function searchIndex() {
       if (b.formula && b.formula.tex) hay += ' ' + (b.formula.name || '');
       if (b.revise) hay += ' ' + b.revise.join(' ');
     });
-    ix.push({
-      type: 'Lesson', icon: '📖', title: ls.title,
-      sub: level.name + ' › ' + ch.title, href: '#/lesson/' + ls.id,
-      hay: hay.toLowerCase()
+      ix.push({
+        type: 'Lesson', icon: '📖', title: ls.title,
+        sub: level.name + ' › ' + ch.title, href: '#/lesson/' + ls.id,
+        hay: hay.toLowerCase()
+      });
+    })));
+    getFormulaIndex().forEach(f => {
+      ix.push({
+        type: 'Formula', icon: '∑', title: f.name || f.tex.slice(0, 40),
+        sub: (f.note || '').slice(0, 70), href: f.href,
+        hay: ((f.name || '') + ' ' + (f.note || '')).toLowerCase()
+      });
     });
-  })));
-  getFormulaIndex().forEach(f => {
-    ix.push({
-      type: 'Formula', icon: '∑', title: f.name || f.tex.slice(0, 40),
-      sub: (f.note || '').slice(0, 70), href: f.href,
-      hay: ((f.name || '') + ' ' + (f.note || '')).toLowerCase()
+    QUIZ_BANK.forEach(q => {
+      ix.push({
+        type: 'Question', icon: '❓', title: q.q.replace(/<[^>]+>/g, '').slice(0, 80),
+        sub: q.topic, href: '#/practice',
+        hay: (q.q + ' ' + q.topic + ' ' + q.choices.join(' ')).toLowerCase().replace(/<[^>]+>/g, '')
+      });
     });
-  });
-  QUIZ_BANK.forEach(q => {
-    ix.push({
-      type: 'Question', icon: '❓', title: q.q.replace(/<[^>]+>/g, '').slice(0, 80),
-      sub: q.topic, href: '#/practice',
-      hay: (q.q + ' ' + q.topic + ' ' + q.choices.join(' ')).toLowerCase().replace(/<[^>]+>/g, '')
+    /* Tokenise once here rather than on every keystroke. Title tokens drive
+       the weighted matches; hay tokens catch a typo inside body text. */
+    ix.forEach(it => {
+      it.toks = tokensOf(it.title);
+      it.hayToks = tokensOf(it.hay);
     });
-  });
-  return (_searchIndex = ix);
-}
+    return (_searchIndex = ix);
+  }
 
-function doSearch(qs) {
-  const words = qs.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-  if (!words.length) return [];
-  const hits = [];
-  searchIndex().forEach(item => {
-    let score = 0;
-    words.forEach(w => {
-      if (item.title.toLowerCase().includes(w)) score += 3;
-      if (item.hay.includes(w)) score += 1;
+  /* --- typo-tolerant matching (Phase 4) ---
+     Written by hand rather than pulling in Fuse.js: that would have to be
+     fetched or bundled, and this app has to keep working opened straight
+     from disk over file:// with no network. */
+
+  /* Damerau-Levenshtein with an early exit, so a transposition counts as one
+     edit: "accleration" is 1 edit from "acceleration", not 2. */
+  function editDist(a, b, cap) {
+    if (a === b) return 0;
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > cap) return cap + 1;
+    let prev2 = null;
+    let prev = new Array(lb + 1), cur = new Array(lb + 1);
+    for (let j = 0; j <= lb; j++) prev[j] = j;
+    for (let i = 1; i <= la; i++) {
+      cur[0] = i;
+      let best = i;
+      for (let j = 1; j <= lb; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        let v = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          v = Math.min(v, prev2[j - 2] + 1);
+        }
+        cur[j] = v;
+        if (v < best) best = v;
+      }
+      if (best > cap) return cap + 1;
+      const spare = new Array(lb + 1);
+      prev2 = prev; prev = cur; cur = spare;
+    }
+    return prev[lb];
+  }
+
+  const editCap = w => (w.length <= 4 ? 1 : w.length <= 8 ? 2 : 3);
+
+  /* Tokens of a searchable string, kept once at index build time so that
+     typing does not re-tokenise every record on each keystroke. */
+  const tokensOf = s => s.toLowerCase().split(/[^a-z0-9+\-/^°]+/).filter(t => t.length > 1);
+
+  /* Best (lowest) edit distance from w to any token. */
+  function nearest(w, toks, cap) {
+    let best = cap + 1;
+    for (let i = 0; i < toks.length; i++) {
+      const t = toks[i];
+      if (t === w) return 0;
+      if (Math.abs(t.length - w.length) > cap) continue;
+      const d = editDist(w, t, cap);
+      if (d < best) { best = d; if (best === 1) break; }
+    }
+    return best;
+  }
+
+  /* Score one query word against one record. Returns 0 for no match, so the
+     caller can require every word to hit something. */
+  function scoreWord(w, item, cap) {
+    const title = item.title.toLowerCase();
+    if (title.indexOf(w) >= 0) {
+      // a whole-word hit at the start of the title is the best possible signal
+      return title.indexOf(w) === 0 || title.startsWith(w + ' ') ? 100 : 90;
+    }
+    if (item.hay.indexOf(w) >= 0) return 40;
+
+    const dT = nearest(w, item.toks, cap);
+    if (dT <= cap) return dT === 1 ? 30 : 14;
+    const dH = nearest(w, item.hayToks, cap);
+    if (dH <= cap) return dH === 1 ? 20 : 8;
+    return 0;
+  }
+
+  function doSearch(qs) {
+    const words = qs.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+    if (!words.length) return [];
+    const ix = searchIndex();
+
+    // Fast path: exact substring matches, which is what a correctly spelled
+    // query produces. Only fall back to the (much costlier) fuzzy pass when
+    // that comes up short, so typing stays instant.
+    const exact = [];
+    ix.forEach(item => {
+      let s = 0;
+      for (const w of words) {
+        if (item.title.toLowerCase().indexOf(w) >= 0) s += 3;
+        else if (item.hay.indexOf(w) >= 0) s += 1;
+        else { s = 0; break; }
+      }
+      if (s > 0) exact.push([s, item]);
     });
-    if (score > 0) hits.push([score, item]);
-  });
-  hits.sort((a, b) => b[0] - a[0]);
-  return hits.slice(0, 14).map(h => h[1]);
-}
+    if (exact.length >= 8) {
+      exact.sort((a, b) => b[0] - a[0]);
+      return exact.slice(0, 14).map(h => h[1]);
+    }
+
+    // Fuzzy pass. Prefer records matching EVERY word, so "accleration prism"
+    // does not return loose hits on one word alone.
+    const hits = [];
+    ix.forEach(item => {
+      let total = 0;
+      for (const w of words) {
+        const s = scoreWord(w, item, editCap(w));
+        if (!s) { total = 0; break; }
+        total += s;
+      }
+      if (total > 0) hits.push([total, item]);
+    });
+    if (hits.length) {
+      hits.sort((a, b) => b[0] - a[0]);
+      return hits.slice(0, 14).map(h => h[1]);
+    }
+
+    // Nothing matched all of them. Falling back to OR beats returning an
+    // empty box: show the best records for any word, most-matched first.
+    const any = [];
+    ix.forEach(item => {
+      let total = 0, matched = 0;
+      for (const w of words) {
+        const s = scoreWord(w, item, editCap(w));
+        if (s) { matched++; total += s; }
+      }
+      if (matched) any.push([matched * 1000 + total, item]);
+    });
+    any.sort((a, b) => b[0] - a[0]);
+    return any.slice(0, 14).map(h => h[1]);
+  }
 
 let _srActive = -1, _srItems = [];
 
