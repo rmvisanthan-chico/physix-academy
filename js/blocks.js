@@ -1,7 +1,10 @@
+import { $$, DIFFS, esc, Store } from './utils.js';
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Content Block Renderers + Quiz Engine */
 'use strict';
 
-function mdInline(s) {
+export function mdInline(s) {
   return esc(String(s == null ? '' : s)).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 }
 
@@ -62,7 +65,7 @@ const Blocks = {
   video: url => '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' + esc(url) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
 };
 
-function renderBlocks(content) {
+export function renderBlocks(content) {
   if (!Array.isArray(content)) return '';
   return content.map((b, i) => {
     if (!b) return '';
@@ -74,7 +77,7 @@ function renderBlocks(content) {
 }
 
 /* ---------------- Quiz engine ---------------- */
-const Quiz = {
+export const Quiz = {
   byId: null,
   init() {
     this.byId = new Map(QUIZ_BANK.map(q => [q.id, q]));
@@ -133,25 +136,25 @@ const Quiz = {
 };
 
 /* ---------------- Shared data helpers ---------------- */
-function flatLessons() {
+export function flatLessons() {
   if (flatLessons._c) return flatLessons._c;
   flatLessons._c = [];
   CURRICULUM.forEach(level => level.chapters.forEach(ch =>
     ch.lessons.forEach(ls => flatLessons._c.push({ level, chapter: ch, lesson: ls }))));
   return flatLessons._c;
 }
-function findLesson(id) { return flatLessons().find(e => e.lesson.id === id); }
-function levelDoneCount(level) {
+export function findLesson(id) { return flatLessons().find(e => e.lesson.id === id); }
+export function levelDoneCount(level) {
   return level.chapters.reduce((n, ch) => n + ch.lessons.filter(ls => Store.isComplete(ls.id)).length, 0);
 }
-function levelTotalCount(level) {
+export function levelTotalCount(level) {
   return level.chapters.reduce((n, ch) => n + ch.lessons.length, 0);
 }
-function levelPct(level) {
+export function levelPct(level) {
   const t = levelTotalCount(level);
   return t ? Math.round(100 * levelDoneCount(level) / t) : 0;
 }
-function overallPct() {
+export function overallPct() {
   const all = flatLessons();
   return all.length ? Math.round(100 * all.filter(e => Store.isComplete(e.lesson.id)).length / all.length) : 0;
 }

@@ -1,3 +1,4 @@
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Level 3 Part E: Optics + Modern Physics */
 'use strict';
 

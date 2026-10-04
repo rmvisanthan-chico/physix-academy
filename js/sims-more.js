@@ -1,3 +1,5 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — More Sims: Thermo, KTG, Atoms (local trial) */
 'use strict';
 function msArrow(g,x,y,dx,dy,c,w){const l=Math.hypot(dx,dy);if(l<2)return;g.strokeStyle=c;g.fillStyle=c;g.lineWidth=w||2;g.beginPath();g.moveTo(x,y);g.lineTo(x+dx,y+dy);g.stroke();const a=Math.atan2(dy,dx),h=(w||2)+4;g.beginPath();g.moveTo(x+dx,y+dy);g.lineTo(x+dx-h*Math.cos(a-0.42),y+dy-h*Math.sin(a-0.42));g.lineTo(x+dx-h*Math.cos(a+0.42),y+dy-h*Math.sin(a+0.42));g.closePath();g.fill();}

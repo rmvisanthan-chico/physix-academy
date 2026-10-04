@@ -1,7 +1,9 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — True-3D simulations A: gravity orbit + wave surface */
 'use strict';
 
-function S3D(frame, h) {
+export function S3D(frame, h) {
   const wrap = SU.el('div', 'sim-canvas-wrap');
   frame.appendChild(wrap);
   const W = Math.max(300, frame.clientWidth || 640);
@@ -15,7 +17,7 @@ function S3D(frame, h) {
   return { wrap, renderer, scene, camera };
 }
 
-function S3Ddrag(dragTarget, dom, camRig) {
+export function S3Ddrag(dragTarget, dom, camRig) {
   let tx = 0.5, ty = 0.35, drag = false, lx = 0, ly = 0;
   dom.addEventListener('pointerdown', e => { drag = true; lx = e.clientX; ly = e.clientY; });
   window.addEventListener('pointermove', e => {

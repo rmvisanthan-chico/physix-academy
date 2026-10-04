@@ -1,3 +1,5 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — Realism Pack: CDN lazy 3D + WASM fluid (local trial) */
 'use strict';
 

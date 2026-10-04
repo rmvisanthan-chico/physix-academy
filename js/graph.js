@@ -1,3 +1,6 @@
+import { $, $$, esc, Store, Tex } from './utils.js';
+import { App } from './core.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Knowledge Graph */
 'use strict';
 
@@ -22,7 +25,7 @@ const KG_EDGES = [
   ['l4.rel', 'l4.quantum'], ['l4.nucpart', 'l4.astro'], ['l4.rel', 'l4.astro']
 ];
 
-function viewGraph() {
+export function viewGraph() {
   const rowH = 40, colW = 210, nodeW = 176, nodeH = 30, pad = 16;
   const cols = CURRICULUM;
   const maxRows = Math.max(...cols.map(l => l.chapters.length));

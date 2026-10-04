@@ -1,3 +1,6 @@
+import { route } from './views.js';
+import { CURRICULUM } from './data-core.js';
+import { flatLessons } from './blocks.js';
 /* PhysiX Academy — Video Lessons (trial): per NCERT chapter */
 'use strict';
 const VIDEO_MAP={

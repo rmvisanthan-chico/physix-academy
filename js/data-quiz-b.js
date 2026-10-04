@@ -1,3 +1,6 @@
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { $, esc } from './utils.js';
+import { Quiz } from './blocks.js';
 /* PhysiX Academy — Quiz Bank Part B: Level 3 (Mechanics, Fluids, Thermo, Waves) */
 'use strict';
 

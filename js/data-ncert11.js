@@ -1,5 +1,7 @@
+import { $ } from './utils.js';
+import { CURRICULUM } from './data-core.js';
 /* ============================================================
-   PhysiX Academy — NCERT Class 11 Physics
+PhysiX Academy — NCERT Class 11 Physics
    14 chapters across 10 units (as per your table)
    ============================================================ */
 'use strict';

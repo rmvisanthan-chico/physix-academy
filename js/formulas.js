@@ -1,3 +1,7 @@
+import { $, $$, debounce, esc, Tex } from './utils.js';
+import { mdInline } from './blocks.js';
+import { App } from './core.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Formula Library */
 'use strict';
 
@@ -16,7 +20,7 @@ function formulaIndex() {
   return out;
 }
 let _fIndex = null;
-const getFormulaIndex = () => _fIndex || (_fIndex = formulaIndex());
+export const getFormulaIndex = () => _fIndex || (_fIndex = formulaIndex());
 
 function renderFormulaGrid() {
   const q = (App.fq || '').toLowerCase();
@@ -62,12 +66,12 @@ function openFormulaModal(f) {
   Tex.render(ov);
 }
 
-function closeModal() {
+export function closeModal() {
   const m = $('#fm');
   if (m) m.remove();
 }
 
-function viewFormulas(q) {
+export function viewFormulas(q) {
   App.fq = q ? decodeURIComponent(q) : '';
   App.flvl = 'all';
   const idx = getFormulaIndex();

@@ -1,6 +1,9 @@
+import { App, SU } from './core.js';
+import { $, esc } from './utils.js';
+import { afterRender } from './views.js';
 /* PhysiX Academy — Games (trial/games): 2 physics-lab games */
 'use strict';
-const Games={list:[]};
+export const Games={list:[]};
 Games.register=(id,title,desc,icon,run)=>Games.list.push({id,title,desc,icon,run});
 Games.col={bg:'#05070d',grid:'#26314a',accent:'#22d3ee',ok:'#34d399',warn:'#fbbf24'};
 
@@ -95,7 +98,7 @@ Games.register('balance','Torque Balance','Place weights to balance the beam. To
   rS.el=rS.el||document.createElement('div');
 });
 
-function viewGames(id){
+export function viewGames(id){
   if(id){
     const g=Games.list.find(x=>x.id===id);
     if(!g){App.el.innerHTML='<div class="wrap"><p>Game not found.</p><a href="#/games">← All games</a></div>'; return;}

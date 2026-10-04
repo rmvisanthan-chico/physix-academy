@@ -1,6 +1,6 @@
+import { $ } from './utils.js';
 /* LaTeX -> spoken English, for the lesson "Listen" button.
-
-   The previous behaviour stripped only the $ delimiters, so speech
+The previous behaviour stripped only the $ delimiters, so speech
    synthesis read "\frac{G m_1 m_2}{r^2}" aloud as "backslash frac brace G
    m one m two close brace r squared". Worse, the formula blocks were never
    passed to the utterance at all, so a lesson on Newton's law was heard with
@@ -96,7 +96,7 @@ function readArg(s, i) {
    2" is a lot to listen to when "squared" will do. */
 const POW_WORD = { '2': 'squared', '3': 'cubed', '0': 'to the power zero', '1': '' };
 
-function texToSpeech(tex) {
+export function texToSpeech(tex) {
   if (tex == null) return '';
   const s = String(tex);
   let out = '';
@@ -240,7 +240,7 @@ function texToSpeech(tex) {
 /* Lesson prose carries inline $...$ math as well as display equations. This
    converts those inline spans and then scrubs anything still LaTeX-shaped, so
    no "\mu" or stray "$" is ever handed to the voice. */
-function speechifyText(s) {
+export function speechifyText(s) {
   let t = String(s == null ? '' : s);
   if (typeof texToSpeech === 'function') {
     // Must contain real LaTeX markup to count as math, must not cross a line

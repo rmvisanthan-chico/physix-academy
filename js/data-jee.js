@@ -1,3 +1,5 @@
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — JEE/NEET PYQ Bank (local trial for item 2) */
 'use strict';
 

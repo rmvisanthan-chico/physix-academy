@@ -1,3 +1,11 @@
+import { $, $$, esc, Theme, toast } from './utils.js';
+import { route } from './views.js';
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { closeModal, getFormulaIndex } from './formulas.js';
+import { App } from './core.js';
+import { Tutor } from './tutor.js';
+import { CURRICULUM } from './data-core.js';
+import { Quiz } from './blocks.js';
 /* PhysiX Academy — App shell: search, wiring, bootstrap */
 'use strict';
 

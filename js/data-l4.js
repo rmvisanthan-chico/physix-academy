@@ -1,3 +1,4 @@
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Level 4: Advanced Physics */
 'use strict';
 

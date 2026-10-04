@@ -1,10 +1,17 @@
+import { $, $$, DIFFS, esc, Store, Tex, toast } from './utils.js';
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { Sims } from './sims-a.js';
+import { flatLessons, mdInline, Quiz } from './blocks.js';
+import { App } from './core.js';
+import { Tutor } from './tutor.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Pages: Practice sessions, Simulations gallery, AI Tutor page */
 'use strict';
 
 /* ---------------- Practice ---------------- */
 const Session = { qs: [], i: 0, correct: 0, misses: [] };
 
-function viewPractice() {
+export function viewPractice() {
   const diffs = ['any', ...Object.keys(DIFFS)];
   App.el.innerHTML = `
   <div class="wrap">
@@ -101,7 +108,7 @@ function viewPractice() {
 }
 
 /* ---------------- Simulations ---------------- */
-function viewSimsPage(id) {
+export function viewSimsPage(id) {
   if (id && Sims.reg[id]) {
     const d = Sims.reg[id];
     const usedIn = flatLessons().filter(e => e.lesson.content.some(b => b.sim === id));
@@ -148,7 +155,7 @@ function viewSimsPage(id) {
   }
 
 /* ---------------- Tutor page ---------------- */
-function viewTutorPage() {
+export function viewTutorPage() {
   // Load conversation history
   Tutor.loadHistory();
   

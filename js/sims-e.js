@@ -1,22 +1,10 @@
+import { pxArrow, pxLabel, SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — Simulations Part E: richer, more realistic, classroom-friendly sims */
 'use strict';
 
+
 /* local drawing helpers */
-function pxArrow(g, x, y, dx, dy, col, w) {
-  const len = Math.hypot(dx, dy); if (len < 2) return;
-  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w || 3;
-  g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y + dy); g.stroke();
-  const a = Math.atan2(dy, dx), h = (w || 3) + 5;
-  g.beginPath();
-  g.moveTo(x + dx, y + dy);
-  g.lineTo(x + dx - h * Math.cos(a - 0.42), y + dy - h * Math.sin(a - 0.42));
-  g.lineTo(x + dx - h * Math.cos(a + 0.42), y + dy - h * Math.sin(a + 0.42));
-  g.closePath(); g.fill();
-}
-function pxLabel(g, x, y, t, col) {
-  g.fillStyle = col || '#9aa8c3'; g.font = '11px Segoe UI'; g.textAlign = 'left';
-  g.fillText(t, x, y);
-}
 
 /* ---------------- 1. Inclined plane ---------------- */
 Sims.register('incline', 'Inclined Plane', 'Weight splits into a slide-force and a press-force; friction fights back.', '📐', frame => {

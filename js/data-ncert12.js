@@ -1,3 +1,4 @@
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — NCERT Class 12 Physics (14 chapters) */
 'use strict';
 CURRICULUM.push({

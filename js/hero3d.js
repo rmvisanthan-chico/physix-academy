@@ -1,3 +1,6 @@
+import { onAfterRender } from './core.js';
+import { $, toast } from './utils.js';
+import { afterRender } from './views.js';
 /* PhysiX Academy — Homepage hero: AtomicCore (port of motion-site design) */
 'use strict';
 
@@ -225,8 +228,4 @@ const Hero3D = {
   }
 };
 
-(function hookHero() {
-  if (typeof afterRender !== 'function') return;
-  const orig = afterRender;
-  window.afterRender = function (root) { orig(root); Hero3D.mount(); };
-})();
+onAfterRender(() => Hero3D.mount());

@@ -1,3 +1,5 @@
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { Quiz } from './blocks.js';
 /* PhysiX Academy — Quiz Bank Part C: Level 3 (E&M, Optics, Modern) + Level 4 */
 'use strict';
 

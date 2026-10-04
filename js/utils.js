@@ -5,15 +5,15 @@
 'use strict';
 
 /* ---------- tiny DOM helpers ---------- */
-const $  = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+export const $  = (sel, root = document) => root.querySelector(sel);
+export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-function esc(s) {
+export function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-function fmtNum(n, d = 2) {
+export function fmtNum(n, d = 2) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   if (typeof n !== 'number') return String(n);
   const a = Math.abs(n);
@@ -91,7 +91,7 @@ function idbDel(key) {
 }
 
 /* ---------- persistent store ---------- */
-const Store = {
+export const Store = {
   KEY: 'physix.v1',
   defaults() {
     return {
@@ -238,7 +238,7 @@ const Store = {
 };
 
 /* ---------- theme / a11y ---------- */
-const Theme = {
+export const Theme = {
   ACCENTS: ['sunset', 'emerald', 'nebula', 'blue'],
   NAMES: { sunset: 'Sunset 🌅', emerald: 'Emerald 💚', nebula: 'Nebula 💜', blue: 'Deep Blue 💙' },
   apply() {
@@ -262,7 +262,7 @@ const Theme = {
 };
 
 /* ---------- KaTeX rendering ---------- */
-const Tex = {
+export const Tex = {
   ready: false,
   init() {
     const tryInit = () => {
@@ -291,7 +291,7 @@ const Tex = {
 Tex.init();
 
 /* ---------- toasts ---------- */
-function toast(msg, kind = 'ok', ms = 3200) {
+export function toast(msg, kind = 'ok', ms = 3200) {
   const box = $('#toasts'); if (!box) return;
   const t = document.createElement('div');
   t.className = `toast toast-${kind}`;
@@ -302,11 +302,11 @@ function toast(msg, kind = 'ok', ms = 3200) {
 }
 
 /* ---------- misc ---------- */
-function debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; }
-function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+export function debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; }
+export function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 /* difficulty metadata */
-const DIFFS = {
+export const DIFFS = {
   beginner:     { label: 'Beginner',     dot: '🟢', cls: 'd-beginner' },
   intermediate: { label: 'Intermediate', dot: '🟡', cls: 'd-intermediate' },
   advanced:     { label: 'Advanced',     dot: '🟠', cls: 'd-advanced' },

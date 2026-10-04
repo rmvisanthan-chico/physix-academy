@@ -1,3 +1,6 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
+import { Games } from './games.js';
 /* PhysiX Academy — NCERT Simulations: 9th / 10th / 11th */
 'use strict';
 function ncArrow(g,x,y,dx,dy,col,w){const l=Math.hypot(dx,dy);if(l<2)return;g.strokeStyle=col;g.fillStyle=col;g.lineWidth=w||3;g.beginPath();g.moveTo(x,y);g.lineTo(x+dx,y+dy);g.stroke();const a=Math.atan2(dy,dx),h=(w||3)+5;g.beginPath();g.moveTo(x+dx,y+dy);g.lineTo(x+dx-h*Math.cos(a-0.42),y+dy-h*Math.sin(a-0.42));g.lineTo(x+dx-h*Math.cos(a+0.42),y+dy-h*Math.sin(a+0.42));g.closePath();g.fill();}

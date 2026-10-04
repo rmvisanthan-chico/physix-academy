@@ -1,8 +1,10 @@
+import { $ } from './utils.js';
+import { Quiz } from './blocks.js';
 /* PhysiX Academy — Quiz Bank Part A: Levels 1 & 2 */
 'use strict';
 
 /* Question shape: {id, topic, difficulty, q, choices[4], answer(index), why} */
-const QUIZ_BANK = [];
+export const QUIZ_BANK = [];
 
 QUIZ_BANK.push(
   { id:'q-v1', topic:'vectors', difficulty:'beginner',

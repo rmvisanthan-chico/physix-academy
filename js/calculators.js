@@ -1,3 +1,5 @@
+import { $, $$, esc, fmtNum } from './utils.js';
+import { App } from './core.js';
 /* PhysiX Academy — Physics Calculators */
 'use strict';
 
@@ -131,7 +133,7 @@ const CALCULATORS = [
   }
 ];
 
-function viewCalculators() {
+export function viewCalculators() {
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>🧮 Physics Calculators</h1>

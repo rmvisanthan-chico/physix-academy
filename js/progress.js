@@ -1,3 +1,8 @@
+import { $, DIFFS, esc, Store, toast } from './utils.js';
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { flatLessons, levelDoneCount, levelPct, levelTotalCount, overallPct, Quiz } from './blocks.js';
+import { App } from './core.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Progress Dashboard */
 'use strict';
 
@@ -7,7 +12,7 @@
    read. */
 let _backupMsg = '';
 
-function viewProgress() {
+export function viewProgress() {
   const flat = flatLessons();
   const doneN = Object.keys(Store.data.completed).length;
   const pct = overallPct();

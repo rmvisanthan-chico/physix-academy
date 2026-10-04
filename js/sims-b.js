@@ -1,3 +1,5 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 'use strict';
 

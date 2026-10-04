@@ -1,13 +1,27 @@
+import { $, $$, debounce, esc, Store, Tex, toast } from './utils.js';
+import { speechifyText, texToSpeech } from './tex-speech.js';
+import { QUIZ_BANK } from './data-quiz-a.js';
+import { viewGames } from './games.js';
+import { findLesson, flatLessons, levelDoneCount, levelPct, levelTotalCount, mdInline, Quiz, renderBlocks } from './blocks.js';
+import { Sims } from './sims-a.js';
+import { viewGraph } from './graph.js';
+import { chFirstLesson, SCIENTISTS, viewScientists } from './scientists.js';
+import { viewPractice, viewSimsPage, viewTutorPage } from './pages.js';
+import { viewFormulas } from './formulas.js';
+import { App, renderHooks } from './core.js';
+import { viewProgress } from './progress.js';
+import { viewCalculators } from './calculators.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Router + Home/Learn/Lesson/Topics views */
 'use strict';
 
-const App = { el: null, levelFilter: 'all' };
+
 
 function navActive(name) {
   $$('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
 }
 
-function afterRender(root) {
+export function afterRender(root) {
   const host = root || App.el;
   $$('.sim-slot', host).forEach(slot => Sims.mount(slot.dataset.sim, slot));
   $$('.quiz-slot', host).forEach(slot => Quiz.renderList(slot, slot.dataset.quiz.split(',')));
@@ -15,15 +29,19 @@ function afterRender(root) {
     h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
   $$('.reveal', host).forEach(el => io.observe(el));
   Tex.render(host);
+  for (const hook of renderHooks) {
+    try { hook(root); }
+    catch (e) { console.error('[afterRender]', e); }
+  }
 }
 
-const io = ('IntersectionObserver' in window)
+export const io = ('IntersectionObserver' in window)
   ? new IntersectionObserver(es => es.forEach(e => {
       if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
     }), { threshold: 0.06 })
   : { observe(el) { el.classList.add('in'); } };
 
-function route() {
+export function route() {
   const doRoute = () => {
     const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
     window.scrollTo(0, 0);

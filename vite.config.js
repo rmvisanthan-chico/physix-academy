@@ -37,7 +37,10 @@ export default defineConfig({
     // doing by hand, without having to bump a number on every asset
     assetsDir: 'assets',
     rollupOptions: {
-      input: { main: path.resolve('js/main.js') }
+      // index.html is the entry, NOT js/main.js. Naming the JS file here makes
+      // Vite build only that chunk and skip HTML entirely, so dist/ has no
+      // index.html and the hashed-asset rewriting never happens.
+      input: { index: path.resolve('index.html') }
     }
   },
   server: { port: 5173, strictPort: false },

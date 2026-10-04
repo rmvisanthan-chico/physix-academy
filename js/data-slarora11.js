@@ -1,3 +1,4 @@
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — SL Arora Class 11 Guide (inspired, original explanations) */
 'use strict';
 CURRICULUM.push({

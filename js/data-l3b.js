@@ -1,3 +1,5 @@
+import { $ } from './utils.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Level 3 Part B: Kinematics 2D, Laws, Work, Systems, Rotation, Gravitation */
 'use strict';
 

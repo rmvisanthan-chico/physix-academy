@@ -1,7 +1,10 @@
+import { $, esc } from './utils.js';
+import { App } from './core.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Hall of Physicists */
 'use strict';
 
-const SCIENTISTS = [
+export const SCIENTISTS = [
   { img: 'galileo.jpg', name: 'Galileo Galilei', years: '1564–1642', from: 'Italy',
     known: 'Dropped the idea that heavy things fall faster. Turned physics into an experiment-first science.',
     ch: 'l2.motion' },
@@ -67,7 +70,7 @@ const SCIENTISTS = [
     ch: 'l4.astro' }
 ];
 
-function chFirstLesson(chId) {
+export function chFirstLesson(chId) {
   for (const l of CURRICULUM) {
     const c = l.chapters.find(x => x.id === chId);
     if (c && c.lessons.length) return '#/lesson/' + c.lessons[0].id;
@@ -75,7 +78,7 @@ function chFirstLesson(chId) {
   return '#/learn';
 }
 
-function viewScientists() {
+export function viewScientists() {
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>🏛️ Hall of Physicists</h1>

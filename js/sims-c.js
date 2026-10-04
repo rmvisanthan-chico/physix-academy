@@ -1,5 +1,8 @@
+import { pxArrow, pxLabel, SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — Simulations Part C: projectile, SHM, doppler */
 'use strict';
+
 
 /* ---------------- Projectile motion ---------------- */
 Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits into vₓ (constant) and v_y (gravity). Air drag optional.', '🎯', frame => {

@@ -1,3 +1,6 @@
+import { onAfterRender } from './core.js';
+import { $, $$, clamp } from './utils.js';
+import { afterRender, io, route } from './views.js';
 /* PhysiX Academy — Scroll cinema: scrub-linked hero, staggered sweeps, count-ups */
 'use strict';
 
@@ -94,11 +97,5 @@ const Cine = {
 Cine.init();
 
 /* join the post-render hook chain */
-(function hookCine() {
-  if (typeof afterRender !== 'function') return;
-  const orig = afterRender;
-  window.afterRender = function (root) {
-    orig(root);
-    Cine.rescan(root);
-  };
-})();
+onAfterRender(root => { Cine.rescan(root); });
+

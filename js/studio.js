@@ -1,3 +1,6 @@
+import { $, $$, esc } from './utils.js';
+import { chFirstLesson } from './scientists.js';
+import { App } from './core.js';
 /* PhysiX Academy — Studio page: motion-site port (vanilla, no React) */
 'use strict';
 

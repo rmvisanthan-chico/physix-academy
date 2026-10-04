@@ -1,3 +1,4 @@
+import { onAfterRender } from './core.js';
 /* PhysiX — anime.js demo: stagger for cards + progress ring */
 'use strict';
 (function(){
@@ -62,6 +63,6 @@
     }
   }
   document.addEventListener('DOMContentLoaded', ()=> run());
-  const ar = window.afterRender;
-  window.afterRender = function(root){ if (typeof ar==='function') ar(root); run(root); };
+  onAfterRender(root => run(root));
+
 })();

@@ -1,5 +1,6 @@
+import { CURRICULUM } from './data-core.js';
 /* ============================================================
-   PhysiX Academy — NCERT Class 10 Physics (Science)
+PhysiX Academy — NCERT Class 10 Physics (Science)
    4 core chapters: Light, Human Eye, Electricity, Magnetic Effects
    Rendered by blocks.js — same schema as CURRICULUM
    ============================================================ */

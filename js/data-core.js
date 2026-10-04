@@ -1,12 +1,13 @@
+import { $ } from './utils.js';
 /* ============================================================
-   PhysiX Academy — Curriculum Data: Levels 1 & 2
+PhysiX Academy — Curriculum Data: Levels 1 & 2
    Content block schema (rendered by app.js):
    h | p | why | intuition | def | formula(s) | derive | example |
    mistakes | revise | sim | svg | table | quiz | ul
    ============================================================ */
 'use strict';
 
-const CURRICULUM = [];
+export const CURRICULUM = [];
 
 /* ============================ LEVEL 1 ============================ */
 CURRICULUM.push({

@@ -1,5 +1,6 @@
+import { Sims } from './sims-a.js';
 /* PhysiX Academy - catalogue for the standalone HTML5 simulation set.
-   These are self-contained pages under /html5-sims/, not modules registered with
+These are self-contained pages under /html5-sims/, not modules registered with
    Sims.register(), so they are listed here and opened as normal documents.
    Titles and blurbs are kept in step with html5-sims/index.html. */
 'use strict';

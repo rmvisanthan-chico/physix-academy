@@ -1,5 +1,7 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
 /* PhysiX Academy — PhET integrations: official sims embedded via iframe (requires internet).
- * Simulations created by PhET Interactive Simulations, University of Colorado Boulder.
+* Simulations created by PhET Interactive Simulations, University of Colorado Boulder.
  * https://phet.colorado.edu — used under the PhET license (educational use, attribution). */
 'use strict';
 

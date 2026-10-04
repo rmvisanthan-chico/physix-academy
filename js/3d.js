@@ -1,3 +1,6 @@
+import { $, $$ } from './utils.js';
+import { afterRender } from './views.js';
+import { App, onAfterRender } from './core.js';
 /* PhysiX Academy — 3D interaction engine: tilt cards + parallax */
 'use strict';
 
@@ -70,18 +73,13 @@ const D3 = {
 };
 
 /* hook into the router's post-render step */
-(function hookAfterRender() {
-  if (typeof afterRender !== 'function') return;
-  const orig = afterRender;
-  window.afterRender = function (root) {
-    orig(root);
-    D3.scan(root);
-    if (App.el) {
-      App.el.classList.remove('page-in');
-      void App.el.offsetWidth;
-      App.el.classList.add('page-in');
-    }
-  };
-})();
+onAfterRender(root => {
+  D3.scan(root);
+  if (App.el) {
+    App.el.classList.remove('page-in');
+    void App.el.offsetWidth;
+    App.el.classList.add('page-in');
+  }
+});
 
 D3.init();

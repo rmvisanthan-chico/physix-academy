@@ -1,3 +1,6 @@
+import { SU } from './core.js';
+import { Sims } from './sims-a.js';
+import { S3D, S3Ddrag } from './sims3d-a.js';
 /* PhysiX Academy — True-3D simulation B: electric field lines */
 'use strict';
 

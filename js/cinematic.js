@@ -1,3 +1,5 @@
+import { onAfterRender } from './core.js';
+import { $, $$ } from './utils.js';
 /* PhysiX Academy — Cinematic interaction: spotlight + magnetic buttons + Skiper spotlight cards */
 'use strict';
 
@@ -44,9 +46,8 @@ function kineticScan(root){
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (!window.matchMedia('(hover:hover) and (pointer:fine)').matches) { // still run kinetic on touch
     document.addEventListener('DOMContentLoaded', kineticSplit);
-    const _origAR = window.afterRender;
-    if (typeof _origAR === 'function') window.afterRender = function(r){ _origAR(r); kineticScan(r); };
-    else window.afterRender = kineticScan;
+    onAfterRender(r => kineticScan(r));
+
     return;
   }
 
@@ -96,18 +97,12 @@ function kineticScan(root){
     }
   }
   document.addEventListener('DOMContentLoaded', () => { kineticSplit(); motionPageIn(); });
-  const _origAR2 = window.afterRender;
-  if (typeof _origAR2 === 'function') {
-    window.afterRender = function(r){
-      _origAR2(r);
-      kineticScan(r);
-      motionPageIn();
-      // liquid class for cards (Skiper warp)
-      $$('.card.hover, .study', r || document).forEach(c => c.classList.add('liquid'));
-    };
-  } else {
-    window.afterRender = function(r){ kineticScan(r); motionPageIn(); $$('.card.hover, .study', r || document).forEach(c => c.classList.add('liquid')); };
-  }
+  onAfterRender(r => {
+    kineticScan(r);
+    motionPageIn();
+    // liquid class for cards (Skiper warp)
+    $$('.card.hover, .study', r || document).forEach(c => c.classList.add('liquid'));
+  });
   // initial liquid tagging
   setTimeout(()=> $$('.card.hover, .study').forEach(c=>c.classList.add('liquid')), 600);
 })();

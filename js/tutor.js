@@ -1,7 +1,10 @@
+import { $, $$, esc } from './utils.js';
+import { mdInline } from './blocks.js';
+import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Local AI Tutor (offline heuristic engine, v2: long-question aware) */
 'use strict';
 
-const Tutor = {
+export const Tutor = {
   docs: null,
   STOP: null,
   history: [], // conversation history for context

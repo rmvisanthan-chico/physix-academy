@@ -18,7 +18,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
   try { return createRequire(import.meta.url)('playwright'); }
   catch (_) {
-    const globals = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim();
+    // On Windows the npm shim is npm.cmd; spawnSync('npm') fails with ENOENT,
+    // and Node >=18 refuses to spawn a .cmd without a shell (EINVAL).
+    const win = process.platform === 'win32';
+    const globals = execFileSync(win ? 'npm.cmd' : 'npm', ['root', '-g'],
+      { encoding: 'utf8', shell: win }).trim();
     return createRequire(path.join(globals, 'noop.js'))('playwright');
   }
 }

@@ -1,5 +1,6 @@
+import { CURRICULUM } from './data-core.js';
 /* ============================================================
-   PhysiX Academy — NCERT Class 9 Physics (Science)
+PhysiX Academy — NCERT Class 9 Physics (Science)
    5 chapters: Motion, Force & Laws, Gravitation, Work & Energy, Sound
    ============================================================ */
 'use strict';
