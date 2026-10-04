@@ -37,10 +37,24 @@ export default defineConfig({
     // doing by hand, without having to bump a number on every asset
     assetsDir: 'assets',
     rollupOptions: {
-      // index.html is the entry, NOT js/main.js. Naming the JS file here makes
-      // Vite build only that chunk and skip HTML entirely, so dist/ has no
-      // index.html and the hashed-asset rewriting never happens.
-      input: { index: path.resolve('index.html') }
+      // Every root page must be an input, not just the SPA. Vercel runs this
+      // build (package.json has a "build" script, and "framework": null does
+      // not suppress it), then serves dist/. An HTML file that is not an input
+      // is simply never emitted, which is how privacy.html, terms.html,
+      // 404.html, motion-graphs.html and scroll-reveal-demo.html all started
+      // returning 404 in production.
+      //
+      // The three zero-byte root stubs (collision2d/energy/incline.html) are
+      // deliberately absent: they are empty files whose real pages live in
+      // html5-sims/, and an empty document is not a valid input.
+      input: {
+        index: 'index.html',
+        '404': '404.html',
+        privacy: 'privacy.html',
+        terms: 'terms.html',
+        'motion-graphs': 'motion-graphs.html',
+        'scroll-reveal-demo': 'scroll-reveal-demo.html'
+      }
     }
   },
   server: { port: 5173, strictPort: false },
