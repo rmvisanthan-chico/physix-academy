@@ -352,8 +352,19 @@ function viewLesson(id) {
       else if(k==='h' && typeof v==='string') parts.push(v);
       else if(k==='ul' && Array.isArray(v)) parts.push(v.join('. '));
       else if(k==='revise' && Array.isArray(v)) parts.push(v.join('. '));
+      /* Equations used to be skipped entirely, so a lesson on Newton's law
+         was heard with no law in it. LaTeX is converted to spoken English
+         rather than having only its $ delimiters stripped, which left
+         "\frac{G m_1 m_2}{r^2}" being read as "backslash frac brace...". */
+      else if(k==='formula' && v){
+        if(v.name) parts.push(String(v.name).replace(/<[^>]+>/g,''));
+        if(v.tex) parts.push(typeof texToSpeech==='function' ? texToSpeech(v.tex) : String(v.tex).replace(/\$/g,''));
+        if(v.note) parts.push(String(v.note).replace(/<[^>]+>/g,''));
+      }
     });
-    return parts.join('. ').replace(/<[^>]+>/g,'').replace(/\$/g,'').slice(0,4000);
+    const joined = parts.join('. ').replace(/<[^>]+>/g, ' ');
+    const clean = (typeof speechifyText === 'function') ? speechifyText(joined) : joined.replace(/\$/g, '');
+    return clean.replace(/\s{2,}/g, ' ').slice(0, 4000);
   }
   speakBtn?.addEventListener('click',()=>{
     if(window.speechSynthesis.speaking){
