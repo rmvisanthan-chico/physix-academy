@@ -52,8 +52,9 @@ export default defineConfig({
         '404': '404.html',
         privacy: 'privacy.html',
         terms: 'terms.html',
-        'motion-graphs': 'motion-graphs.html',
-        'scroll-reveal-demo': 'scroll-reveal-demo.html'
+        'motion-graphs': 'motion-graphs.html'
+        // scroll-reveal-demo.html is intentionally absent: it is gitignored as
+        // a local dev demo, so it does not exist in a fresh clone.
       }
     }
   },
