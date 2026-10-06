@@ -15,7 +15,7 @@
   /* Page-specific layout only. Colours all come from the site's own variables,
      so this follows the active theme and accent without extra rules. */
   .profile-shell { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1.2rem; }
-  .profile-card { width: 100%; max-width: 460px; padding: 2rem 1.8rem; }
+  .profile-card { width: 100%; max-width: 460px; padding: 2rem 1.8rem; position: relative; overflow: hidden; }
   .profile-brand { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.4rem; }
   .profile-brand img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
   .profile-stack { display: grid; gap: 1.05rem; margin: 1.4rem 0; }
@@ -28,7 +28,7 @@
   .profile-input:focus { outline: 2px solid var(--acc); outline-offset: 1px; }
   .profile-err { color: var(--bad); font-size: .86rem; margin: 0; min-height: 1.2em; }
   .profile-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
-  .profile-actions .btn { flex: 1 1 150px; justify-content: center; }
+  .profile-actions .btn { flex: 1 1 150px; justify-content: center; position: relative; overflow: hidden; }
   .profile-note { font-size: .82rem; color: var(--txt2); margin: 1.2rem 0 0; }
   .profile-saved { display: grid; gap: .9rem; text-align: center; }
   /* `display: grid` above would otherwise beat the [hidden] attribute's
@@ -40,31 +40,90 @@
     display: grid; place-items: center; font-size: 1.6rem; font-weight: 700;
     background: var(--grad); color: #fff;
   }
+
+  /* ---------- Shiny Text ---------- */
+  .p-shiny {
+    background-image: linear-gradient(105deg, var(--txt2) 0%, var(--txt) 38%, #fff 50%, var(--txt) 62%, var(--txt2) 100%);
+    background-size: 260% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+    animation: p-shine 5.5s linear infinite;
+  }
+  @keyframes p-shine { to { background-position: -260% 0; } }
+
+  /* ---------- Blur Text: each word rises out of blur ---------- */
+  .p-word {
+    display: inline-block; white-space: pre;
+    opacity: 0; filter: blur(9px); transform: translateY(0.5em);
+    animation: p-rise .55s cubic-bezier(.22,.61,.36,1) forwards;
+  }
+  .p-word:nth-child(1) { animation-delay: .05s }  .p-word:nth-child(2) { animation-delay: .13s }
+  .p-word:nth-child(3) { animation-delay: .21s }  .p-word:nth-child(4) { animation-delay: .29s }
+  .p-word:nth-child(5) { animation-delay: .37s }  .p-word:nth-child(6) { animation-delay: .45s }
+  .p-word:nth-child(n+7) { animation-delay: .53s }
+  @keyframes p-rise { to { opacity: 1; filter: blur(0); transform: none; } }
+
+  /* Fields drift in just after the heading. */
+  .p-field { animation: p-rise .5s cubic-bezier(.22,.61,.36,1) both; }
+  .p-field:nth-of-type(1) { animation-delay: .34s }
+  .p-field:nth-of-type(2) { animation-delay: .44s }
+
+  /* ---------- Spotlight Card ---------- */
+  .p-spotlight::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%),
+                color-mix(in srgb, var(--acc) 16%, transparent), transparent 70%);
+    opacity: 0; transition: opacity .3s ease;
+  }
+  .p-spotlight:hover::before { opacity: 1; }
+
+  /* ---------- Specular Button: shine that tracks the pointer ---------- */
+  .p-specular::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%,
+                rgba(255,255,255,.45) 50%, transparent 62%);
+    transform: translateX(-130%); transition: transform .55s ease;
+  }
+  .p-specular:hover::after { transform: translateX(130%); }
+
+  /* ---------- Click Spark canvas ---------- */
+  .profile-spark { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .profile-spark canvas { display: block; }
+
+  /* ---------- Reduced motion: kill every effect, keep the layout ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    .p-shiny { animation: none; background-image: none; color: var(--txt); -webkit-text-fill-color: currentColor; }
+    .p-word, .p-field { animation: none !important; opacity: 1 !important; filter: none !important; transform: none !important; }
+    .p-specular::after { display: none; }
+    .p-spotlight::before { display: none; }
+  }
+  .p-still .p-word, .p-still .p-field { animation: none !important; opacity: 1 !important; filter: none !important; transform: none !important; }
 </style>
 </head>
 <body>
 <main class="profile-shell">
-  <div class="card profile-card">
+  <div class="card profile-card" id="p-card">
+    <canvas class="profile-spark" id="p-spark" aria-hidden="true"></canvas>
 
     <div class="profile-brand">
       <img src="assets/logo.png" alt="" width="40" height="40">
-      <span class="brand-name">PhysiX<span class="brand-accent">Academy</span></span>
+      <span class="brand-name p-shiny" id="p-wordmark">PhysiX<span class="brand-accent">Academy</span></span>
     </div>
 
     <!-- Signed out: ask for a name. -->
     <div id="p-form-wrap">
-      <h1 style="margin:0 0 .3rem;font-size:1.5rem">Who are you learning with?</h1>
+      <h1 id="p-heading" style="margin:0 0 .3rem;font-size:1.5rem">Who are you learning with?</h1>
       <p class="muted" style="margin:0">Optional. This only changes what the site calls you.</p>
 
       <form id="p-form" novalidate>
         <div class="profile-stack">
-          <div>
+          <div class="p-field">
             <label class="profile-label" for="p-name">First name</label>
             <input class="profile-input" id="p-name" name="name" type="text"
                    autocomplete="given-name" maxlength="40" placeholder="e.g. Aarav"
                    aria-describedby="p-err">
           </div>
-          <div>
+          <div class="p-field">
             <label class="profile-label" for="p-cls">Class or exam</label>
             <select class="profile-input" id="p-cls" name="cls">
               <option value="">Prefer not to say</option>
@@ -82,7 +141,7 @@
         <p class="profile-err" id="p-err" role="alert"></p>
 
         <div class="profile-actions">
-          <button class="btn btn-primary" type="submit" id="p-save">Save and continue</button>
+          <button class="btn btn-primary p-specular" type="submit" id="p-save">Save and continue</button>
           <a class="btn btn-ghost" href="./" id="p-skip">Skip for now</a>
         </div>
 
@@ -112,9 +171,21 @@
 
 <script type="module">
 import { readUser, writeUser, clearUser } from '/js/profile.js';
+import { initProfileFx } from '/js/fx-profile.js';
 
 const $ = (s) => document.querySelector(s);
 const form = $('#p-form'), nameEl = $('#p-name'), err = $('#p-err');
+
+/* Decoration only, and deliberately last: if it throws, the form below is
+   already wired and still works. */
+try {
+  initProfileFx({
+    card: $('#p-card'),
+    heading: $('#p-heading'),
+    wordmark: $('#p-wordmark'),
+    sparkHost: $('#p-card')
+  });
+} catch (e) { /* no effects, no problem */ }
 
 function initial(u) {
   // Surrogate-pair safe so an emoji or accented first letter is not cut in half.
