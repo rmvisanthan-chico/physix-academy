@@ -7,10 +7,11 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "bundle": "vite build",
     "preview": "vite preview",
     "verify": "node tools/verify.mjs http://localhost:4173 preview",
     "verify:live": "node tools/verify.mjs https://physix-academy.vercel.app live",
+    "verify:profile": "node tools/verify-profile.mjs http://localhost:4173 preview",
     "astra": "node astra/server/index.mjs",
     "astra:smoke": "node astra/tools/smoke.mjs",
     "start": "electron .",

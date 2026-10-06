@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your profile — PhysiX Academy</title>
+<meta name="description" content="Optional learner profile for PhysiX Academy. Stored only in this browser.">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" href="assets/logo.png" type="image/png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="css/style.css?v=74">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Space+Grotesk:wght@500;700&family=Bricolage+Grotesque:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Page-specific layout only. Colours all come from the site's own variables,
+     so this follows the active theme and accent without extra rules. */
+  .profile-shell { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1.2rem; }
+  .profile-card { width: 100%; max-width: 460px; padding: 2rem 1.8rem; }
+  .profile-brand { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.4rem; }
+  .profile-brand img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+  .profile-stack { display: grid; gap: 1.05rem; margin: 1.4rem 0; }
+  .profile-label { display: block; font-size: .86rem; font-weight: 600; color: var(--txt2); margin-bottom: .35rem; }
+  .profile-input {
+    width: 100%; padding: .7rem .8rem; border-radius: 10px;
+    border: 1px solid var(--card-brd, var(--line)); background: var(--panel2); color: inherit;
+    font: inherit; font-size: 1rem;
+  }
+  .profile-input:focus { outline: 2px solid var(--acc); outline-offset: 1px; }
+  .profile-err { color: var(--bad); font-size: .86rem; margin: 0; min-height: 1.2em; }
+  .profile-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .profile-actions .btn { flex: 1 1 150px; justify-content: center; }
+  .profile-note { font-size: .82rem; color: var(--txt2); margin: 1.2rem 0 0; }
+  .profile-saved { display: grid; gap: .9rem; text-align: center; }
+  /* `display: grid` above would otherwise beat the [hidden] attribute's
+     UA `display: none`, leaving the empty signed-in panel visible on first
+     paint. Same specificity battle, so state it explicitly. */
+  .profile-saved[hidden] { display: none; }
+  .profile-avatar {
+    width: 62px; height: 62px; border-radius: 50%; margin: 0 auto;
+    display: grid; place-items: center; font-size: 1.6rem; font-weight: 700;
+    background: var(--grad); color: #fff;
+  }
+</style>
+</head>
+<body>
+<main class="profile-shell">
+  <div class="card profile-card">
+
+    <div class="profile-brand">
+      <img src="assets/logo.png" alt="" width="40" height="40">
+      <span class="brand-name">PhysiX<span class="brand-accent">Academy</span></span>
+    </div>
+
+    <!-- Signed out: ask for a name. -->
+    <div id="p-form-wrap">
+      <h1 style="margin:0 0 .3rem;font-size:1.5rem">Who are you learning with?</h1>
+      <p class="muted" style="margin:0">Optional. This only changes what the site calls you.</p>
+
+      <form id="p-form" novalidate>
+        <div class="profile-stack">
+          <div>
+            <label class="profile-label" for="p-name">First name</label>
+            <input class="profile-input" id="p-name" name="name" type="text"
+                   autocomplete="given-name" maxlength="40" placeholder="e.g. Aarav"
+                   aria-describedby="p-err">
+          </div>
+          <div>
+            <label class="profile-label" for="p-cls">Class or exam</label>
+            <select class="profile-input" id="p-cls" name="cls">
+              <option value="">Prefer not to say</option>
+              <option value="Class 9">Class 9</option>
+              <option value="Class 10">Class 10</option>
+              <option value="Class 11">Class 11</option>
+              <option value="Class 12">Class 12</option>
+              <option value="JEE">JEE</option>
+              <option value="NEET">NEET</option>
+              <option value="Other">Something else</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="profile-err" id="p-err" role="alert"></p>
+
+        <div class="profile-actions">
+          <button class="btn btn-primary" type="submit" id="p-save">Save and continue</button>
+          <a class="btn btn-ghost" href="./" id="p-skip">Skip for now</a>
+        </div>
+
+        <p class="profile-note">
+          Nothing is uploaded or sent anywhere. Your name, and all your progress,
+          stay in this browser only.
+        </p>
+      </form>
+    </div>
+
+    <!-- Signed in: confirm and offer a way out. -->
+    <div id="p-done-wrap" class="profile-saved" hidden>
+      <div class="profile-avatar" id="p-avatar" aria-hidden="true"></div>
+      <h1 style="margin:0;font-size:1.4rem" id="p-hello"></h1>
+      <p class="muted" style="margin:0" id="p-sub"></p>
+      <div class="profile-actions" style="justify-content:center">
+        <a class="btn btn-primary" href="#/" id="p-go">Start learning</a>
+        <button class="btn btn-ghost" type="button" id="p-clear">Forget me</button>
+      </div>
+      <p class="profile-note" id="p-switch-wrap">
+        <button class="btn btn-sm" type="button" id="p-switch">Use a different name</button>
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<script type="module">
+import { readUser, writeUser, clearUser } from '/js/profile.js';
+
+const $ = (s) => document.querySelector(s);
+const form = $('#p-form'), nameEl = $('#p-name'), err = $('#p-err');
+
+function initial(u) {
+  // Surrogate-pair safe so an emoji or accented first letter is not cut in half.
+  return [...u.name.trim()][0].toUpperCase();
+}
+
+function showForm(prefill) {
+  $('#p-done-wrap').hidden = true;
+  $('#p-form-wrap').hidden = false;
+  nameEl.value = prefill || '';
+  err.textContent = '';
+  if (!prefill) nameEl.focus();
+}
+
+function showSaved(u) {
+  $('#p-form-wrap').hidden = true;
+  const done = $('#p-done-wrap');
+  done.hidden = false;
+  $('#p-avatar').textContent = initial(u);
+  $('#p-hello').textContent = u.name;
+  $('#p-sub').textContent = u.cls
+    ? `Learning ${u.cls} physics.`
+    : 'Your progress is saved in this browser.';
+  $('#p-go').href = u.cls ? './#/topics' : './#/';
+  $('#p-switch-wrap').hidden = false;
+}
+
+const existing = readUser();
+if (existing) showSaved(existing); else showForm();
+
+form.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const name = nameEl.value.trim();
+  if (!name) {
+    err.textContent = 'Please enter a first name, or use “Skip for now”.';
+    nameEl.focus();
+    return;
+  }
+  const saved = writeUser(name, $('#p-cls').value);
+  // A failed write must not trap anyone here; carry on as a guest instead.
+  showSaved(saved || { name, cls: $('#p-cls').value, since: Date.now() });
+});
+
+$('#p-clear').addEventListener('click', () => { clearUser(); showForm(); });
+$('#p-switch').addEventListener('click', () => showForm(nameEl.value));
+
+// Enter from the signed-in view should not reload the page.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !$('#p-form-wrap').hidden) e.preventDefault();
+});
+</script>
+</body>
+</html>

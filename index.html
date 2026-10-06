@@ -15,7 +15,19 @@
 <meta property="og:image" content="/assets/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/logo.png" type="image/png">
-<!-- Login gate DISABLED for now - enable later after login alterations
+<!-- Optional profile gate — intentionally DISABLED, and it should stay that way
+     unless you have a reason to change your mind. login.html now exists and
+     works (js/profile.js), so this would function; it is off because:
+       1. Nothing in the app needs it. No route or feature reads the profile, so
+          a gate is pure friction for zero benefit.
+       2. It is a client-side redirect, so Googlebot (which executes JS) would
+          land on login.html and never see any lesson content — bad for a site
+          whose whole purpose is free indexable learning material.
+       3. It contradicts the "works fully offline, no account needed" promise in
+          the footer.
+     To turn it on, move the next <script> block out of this comment.
+     The profile is optional and surfaced on the Progress page instead. -->
+<!--
 <script>
 (function(){try{var u=JSON.parse(localStorage.getItem('physix-user'));if(!u||!u.name||!u.class){window.location.replace('login.html');}}catch(e){window.location.replace('login.html');}})();
 </script>

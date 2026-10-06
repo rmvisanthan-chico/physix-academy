@@ -37,12 +37,13 @@ export default defineConfig({
     // doing by hand, without having to bump a number on every asset
     assetsDir: 'assets',
     rollupOptions: {
-      // Every root page must be an input, not just the SPA. Vercel runs this
-      // build (package.json has a "build" script, and "framework": null does
-      // not suppress it), then serves dist/. An HTML file that is not an input
-      // is simply never emitted, which is how privacy.html, terms.html,
-      // 404.html, motion-graphs.html and scroll-reveal-demo.html all started
-      // returning 404 in production.
+      /* Every root page must be an input, not just the SPA, so that `npm run
+        bundle` emits a complete dist/. Production does not currently run this
+        build at all - package.json has no "build" script and "framework": null
+        pins Vercel to serving the repo as authored - but an input list that
+        quietly drops half the site is a trap for whoever reintroduces bundling.
+        The five pages that were once missing here are exactly what made
+        privacy.html, terms.html, 404.html and motion-graphs.html return 404. */
       //
       // The three zero-byte root stubs (collision2d/energy/incline.html) are
       // deliberately absent: they are empty files whose real pages live in
@@ -52,6 +53,7 @@ export default defineConfig({
         '404': '404.html',
         privacy: 'privacy.html',
         terms: 'terms.html',
+        login: 'login.html',
         'motion-graphs': 'motion-graphs.html'
         // scroll-reveal-demo.html is intentionally absent: it is gitignored as
         // a local dev demo, so it does not exist in a fresh clone.

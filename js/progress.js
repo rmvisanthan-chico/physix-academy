@@ -1,4 +1,5 @@
 import { $, DIFFS, esc, Store, toast } from './utils.js';
+import { userLabel } from './profile.js';
 import { QUIZ_BANK } from './data-quiz-a.js';
 import { flatLessons, levelDoneCount, levelPct, levelTotalCount, overallPct, Quiz } from './blocks.js';
 import { App } from './core.js';
@@ -52,10 +53,30 @@ export function viewProgress() {
   const qById = {};
   QUIZ_BANK.forEach(q => qById[q.id] = q);
 
+  /* Optional profile. Signed out is the normal state and must read as a
+     deliberate choice, not as a broken or missing field. */
+  const who = userLabel();
+
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>📈 Your Progress</h1>
       <p class="sub">Everything is stored locally in this browser — your data never leaves your machine.</p></div>
+
+    <div class="card" style="display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;margin-bottom:1.2rem">
+      ${who
+        ? `<span class="profile-avatar" aria-hidden="true"
+             style="width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--grad);color:#fff">${esc([...who][0].toUpperCase())}</span>
+           <div style="flex:1;min-width:180px">
+             <div style="font-weight:600">${esc(who)}</div>
+             <div class="small muted">Signed in on this browser</div>
+           </div>
+           <a class="btn btn-sm btn-ghost" href="login.html">Change</a>`
+        : `<div style="flex:1;min-width:180px">
+             <div style="font-weight:600">Learning as a guest</div>
+             <div class="small muted">Add a name so the site can greet you. Optional.</div>
+           </div>
+           <a class="btn btn-sm" href="login.html">Add your name</a>`}
+    </div>
 
     <div class="grid g2" style="align-items:center">
       <div class="card center" style="text-align:center">
