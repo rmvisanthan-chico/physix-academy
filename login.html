@@ -14,8 +14,40 @@
 <style>
   /* Page-specific layout only. Colours all come from the site's own variables,
      so this follows the active theme and accent without extra rules. */
-  .profile-shell { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1.2rem; }
+  .profile-shell {
+    min-height: 100vh; display: grid; place-items: center;
+    padding: 2rem 1.2rem; position: relative; isolation: isolate;
+    /* Deliberately a self-sufficient background: if no video is supplied, or
+       the viewer prefers reduced motion, or they are on a metered connection,
+       this is what they see, and it has to look finished on its own. */
+    background:
+      radial-gradient(60rem 40rem at 15% 10%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 60%),
+      radial-gradient(50rem 36rem at 88% 85%, color-mix(in srgb, var(--acc2, #22d3ee) 16%, transparent), transparent 62%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+
+  /* ---------- Video backdrop ---------- */
+  .profile-bg {
+    position: absolute; inset: 0; z-index: -2;
+    width: 100%; height: 100%; object-fit: cover;
+    /* Fades in so the swap from gradient to video is not a hard cut. */
+    opacity: 0; transition: opacity .8s ease;
+    pointer-events: none;
+  }
+  .profile-bg.is-ready { opacity: .55; }
+  /* Scrim: keeps the card legible over whatever is moving behind it. Without
+     this the text contrast depends entirely on the footage. */
+  .profile-shell::after {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(closest-side at 50% 50%, color-mix(in srgb, var(--bg) 55%, transparent), var(--bg) 92%),
+      linear-gradient(color-mix(in srgb, var(--bg) 42%, transparent), color-mix(in srgb, var(--bg) 42%, transparent));
+    backdrop-filter: blur(2px);
+  }
+
   .profile-card { width: 100%; max-width: 460px; padding: 2rem 1.8rem; position: relative; overflow: hidden; }
+
   .profile-brand { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.4rem; }
   .profile-brand img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
   .profile-stack { display: grid; gap: 1.05rem; margin: 1.4rem 0; }
@@ -96,12 +128,17 @@
     .p-word, .p-field { animation: none !important; opacity: 1 !important; filter: none !important; transform: none !important; }
     .p-specular::after { display: none; }
     .p-spotlight::before { display: none; }
+    .profile-bg { display: none; }
   }
+
   .p-still .p-word, .p-still .p-field { animation: none !important; opacity: 1 !important; filter: none !important; transform: none !important; }
 </style>
 </head>
 <body>
 <main class="profile-shell">
+  <video class="profile-bg" id="p-bg" muted loop playsinline preload="none"
+         disablepictureinpicture disableremoteplayback aria-hidden="true" tabindex="-1"></video>
+
   <div class="card profile-card" id="p-card">
     <canvas class="profile-spark" id="p-spark" aria-hidden="true"></canvas>
 
@@ -183,7 +220,8 @@ try {
     card: $('#p-card'),
     heading: $('#p-heading'),
     wordmark: $('#p-wordmark'),
-    sparkHost: $('#p-card')
+    sparkHost: $('#p-card'),
+    video: $('#p-bg')
   });
 } catch (e) { /* no effects, no problem */ }
 

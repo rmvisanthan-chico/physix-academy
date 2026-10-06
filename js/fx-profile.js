@@ -116,8 +116,67 @@ function attachSparks(canvas, host) {
   if (btn) btn.addEventListener('click', kick, { passive: true });
 }
 
+/* ---------- Video backdrop ----------
+   Decorative only. Rules it obeys, all of which matter more than the effect:
+     - muted + playsinline is mandatory, without them every browser blocks autoplay
+     - never loaded under prefers-reduced-motion, or on a metered connection
+     - paused whenever the tab is hidden, so it costs nothing in the background
+     - probed with HEAD first, so a missing file produces no request, no 404 in
+       the console, and simply leaves the CSS gradient standing there
+   Candidates are tried in order and the first one that exists wins, so shipping
+   just the webm costs a single request. Order matters: webm is smaller and
+   better compressed, so it is preferred and mp4 is only the fallback.
+
+   Keep the file small. This sits behind a login form, so it should be a short
+   silent loop - a few hundred KB, a couple of seconds, no audio track. Anything
+   heavier costs every visitor bandwidth before they have typed a character, and
+   on a metered connection we skip it anyway (see saveDataOn above). */
+const BG_CANDIDATES = ['assets/login-bg.webm', 'assets/login-bg.mp4'];
+
+function saveDataOn() {
+  const c = navigator.connection;
+  return !!(c && (c.saveData || /2g/.test(c.effectiveType || '')));
+}
+
+async function attachVideoBackdrop(video) {
+  if (!video) return false;
+  if (noMotion() || saveDataOn()) {
+    video.remove();
+    return false;
+  }
+  const found = [];
+  for (const url of BG_CANDIDATES) {
+    try {
+      const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (r.ok) { found.push(url); break; }   // first hit wins: avoids probing
+    } catch (e) { /* not there, or no network: just skip this candidate */ }
+  }
+  if (!found.length) {
+    video.remove();
+    return false;
+  }
+  video.innerHTML = found.map(u => `<source src="${u}">`).join('');
+  video.load();
+  /* Fade in on real playback, not on load: a video that loaded but refused to
+     autoplay would otherwise reveal a frozen first frame over the gradient. */
+  video.addEventListener('playing', () => video.classList.add('is-ready'), { once: true });
+  video.addEventListener('error', () => video.remove(), { once: true });
+  video.play().catch(() => { /* autoplay refused: gradient stands, no harm */ });
+  return true;
+}
+
+/* Pause while hidden. Cheaper and more reliable than an IntersectionObserver
+   for a full-bleed background that is visible whenever the tab is. */
+function pauseWhenHidden(video) {
+  const onVis = () => {
+    if (document.hidden) video.pause();
+    else video.play().catch(() => {});
+  };
+  document.addEventListener('visibilitychange', onVis);
+}
+
 /* Called once from login.html after the DOM exists. */
-export function initProfileFx({ card, heading, wordmark, sparkHost }) {
+export function initProfileFx({ card, heading, wordmark, sparkHost, video }) {
   if (wordmark) wordmark.classList.add('p-shiny');
   splitWords(heading);
   if (card) {
@@ -126,8 +185,12 @@ export function initProfileFx({ card, heading, wordmark, sparkHost }) {
   }
   attachSparks(sparkHost && sparkHost.querySelector('canvas'), sparkHost);
 
+  const ready = attachVideoBackdrop(video);
+  if (ready) pauseWhenHidden(video);
+
   /* Honour a mid-session change to the OS motion setting. */
   const onChange = () => { if (noMotion()) document.body.classList.add('p-still'); };
   reduced.addEventListener?.('change', onChange);
   onChange();
 }
+
