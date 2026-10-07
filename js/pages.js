@@ -130,7 +130,7 @@ export function viewSimsPage(id) {
     App.el.innerHTML = `
     <div class="wrap">
       <div class="page-head"><h1>Simulations</h1>
-      <p class="sub">Physics you can poke. Every simulation runs live in your browser &mdash;" drag the sliders and watch the equations respond.</p></div>
+      <p class="sub">Physics you can poke. Every simulation runs live in your browser &mdash; drag the sliders and watch the equations respond.</p></div>
       ${items.length ? '<div class="grid g3">' + items.map(d => `
         <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
           ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">dYs? Official PhET</em></div>' : ''}
