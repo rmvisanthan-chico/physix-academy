@@ -73,6 +73,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Space+Grotesk:wght@500;700&family=Bricolage+Grotesque:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<!-- Error boundary. Must be a CLASSIC script placed before the deferred module
+     entry, so it is already listening by the time the module graph runs: if
+     any import in js/main.js throws, no module can report it, and without this
+     the visitor gets a blank page. -->
+<script src="js/boot-guard.js?v=74"></script>
 </head>
 <body>
 <script>if (navigator.userAgent.includes('Electron')) document.documentElement.classList.add('desktop-shell');</script>

@@ -23,12 +23,21 @@ function navActive(name) {
 
 export function afterRender(root) {
   const host = root || App.el;
-  $$('.sim-slot', host).forEach(slot => Sims.mount(slot.dataset.sim, slot));
-  $$('.quiz-slot', host).forEach(slot => Quiz.renderList(slot, slot.dataset.quiz.split(',')));
-  $$('.acc-head', host).forEach(h =>
-    h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
-  $$('.reveal', host).forEach(el => io.observe(el));
-  Tex.render(host);
+  /* Each step is isolated. core.js claims the hooks "run isolated" and the hook
+     loop below does, but the three lines above it never did: one sim slot that
+     threw while mounting would abort every remaining mount, Quiz.renderList and
+     Tex.render, leaving a page that rendered text but no maths and no canvas.
+     Isolating is what makes one bad slot cost one slot. */
+  const step = (name, fn) => {
+    try { fn(); }
+    catch (e) { console.error('[afterRender:' + name + ']', e); }
+  };
+  step('sims', () => $$('.sim-slot', host).forEach(slot => Sims.mount(slot.dataset.sim, slot)));
+  step('quiz', () => $$('.quiz-slot', host).forEach(slot => Quiz.renderList(slot, slot.dataset.quiz.split(','))));
+  step('accordion', () => $$('.acc-head', host).forEach(h =>
+    h.addEventListener('click', () => h.parentElement.classList.toggle('open'))));
+  step('reveal', () => $$('.reveal', host).forEach(el => io.observe(el)));
+  step('tex', () => Tex.render(host));
   for (const hook of renderHooks) {
     try { hook(root); }
     catch (e) { console.error('[afterRender]', e); }
@@ -40,7 +49,6 @@ export const io = ('IntersectionObserver' in window)
       if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
     }), { threshold: 0.06 })
   : { observe(el) { el.classList.add('in'); } };
-
 export function route() {
   const doRoute = () => {
     const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
@@ -67,19 +75,40 @@ export function route() {
         default: viewHome();
       }
     }
+
     navActive(nav);
   };
+
+  /* A view that throws used to end the page here: without a ViewTransition the
+     exception escaped route() and left a half-built DOM, and with one it was
+     swallowed by the transition's own rejected promise, so it looked like a
+     mysteriously blank screen. Either way the visitor had no way forward, so
+     the boundary renders a panel with Try again and Back to home. */
+  const guarded = () => {
+    try {
+      doRoute();
+      return true;
+    } catch (e) {
+      console.error('[route]', e);
+      const detail = (e && (e.stack || e.message)) || String(e);
+      if (window.physixRenderFailed) window.physixRenderFailed(detail);
+      else { App.el.innerHTML = ''; }        /* guard absent: at least drop the corpse */
+      navActive('');
+      return false;
+    }
+  };
+
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!prefersReduced && document.startViewTransition) {
     /* startViewTransition returns a ViewTransition whose .ready and .finished
        promises REJECT when the transition is skipped (rapid navigation, tab
        hidden, another transition starting). Unhandled, that surfaces as an
        uncaught error in the console on almost every route change. */
-    const vt = document.startViewTransition(() => doRoute());
+    const vt = document.startViewTransition(guarded);
     if (vt && vt.ready && vt.ready.catch) { vt.ready.catch(() => { }); }
     if (vt && vt.finished && vt.finished.catch) { vt.finished.catch(() => { }); }
   } else {
-    doRoute();
+    guarded();
   }
 }
 

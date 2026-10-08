@@ -52,3 +52,8 @@ import './hero3d.js';
 import './3d.js';
 import './scroll-cinema.js';
 import './app.js';
+
+/* Disarms the boot watchdog in js/boot-guard.js. This line only runs if every
+   import above evaluated cleanly, which is exactly the condition the watchdog
+   is waiting for. */
+window.__PHYSIX_BOOTED = true;
