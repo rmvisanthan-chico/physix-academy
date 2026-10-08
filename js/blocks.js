@@ -114,9 +114,39 @@ export const Quiz = {
           else bb.classList.add('dim');
         });
         fb.className = 'feedback show ' + (correct ? 'ok' : 'bad');
+        /* Diagnostic feedback instead of a bare "Not quite". Naming the mistake
+           the student actually made is the difference between feedback and
+           marking: "you treated velocity as constant" teaches, "wrong" does not.
+           The pattern checks are deliberately narrow and specific - a vague
+           guess here would be worse than saying nothing, so anything that does
+           not clearly match a known misconception falls back to the real
+           explanation rather than inventing one. */
+        let diagnose = '';
+        if (!correct && q.choices.length >= 2) {
+          const picked = q.choices[i] || '';
+          const answerTxt = q.choices[q.answer] || '';
+          const n = (s) => String(s).toLowerCase();
+          if (n(picked) !== n(answerTxt)) {
+            /* scalar-vs-vector style confusion: the right words, wrong category */
+            if (/scalar|vector/.test(n(picked)) && /scalar|vector/.test(n(answerTxt))) {
+              diagnose = 'These are the same *kind* of quantity, so the distinction is not about category. Look at what each one includes that the other leaves out.';
+            }
+            /* "it does not change" vs "it is zero" */
+            else if (/\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(picked)) &&
+                     /\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(answerTxt))) {
+              diagnose = 'Both options talk about the quantity not changing, so read the difference between "stays the same" and "goes to zero".';
+            }
+            /* proportional vs inverse */
+            else if (/\bproportional\b|\binversely\b/.test(n(picked)) && /\bproportional\b|\binversely\b/.test(n(answerTxt))) {
+              diagnose = 'These differ in direction, not in kind. Try a specific case: double one quantity and see which way the other moves.';
+            }
+          }
+        }
+
         fb.innerHTML = (correct ? '<b>✓ Correct!</b> ' : '<b>✗ Not quite.</b> ') +
+          (diagnose ? '<div class="q-diagnose"><b>What went wrong:</b> ' + diagnose + '</div>' : '') +
           '<div class="q-explain"><b>Why:</b> ' + mdInline(q.why) + '</div>';
-        Store.recordAnswer(q, correct);
+        Store.recordAnswer(q, correct, i);
         if (typeof onAnswered === 'function') onAnswered(correct, fb);
       });
       optsBox.appendChild(b);

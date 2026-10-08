@@ -62,7 +62,43 @@
   .profile-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
   .profile-actions .btn { flex: 1 1 150px; justify-content: center; position: relative; overflow: hidden; }
   .profile-note { font-size: .82rem; color: var(--txt2); margin: 1.2rem 0 0; }
-  .profile-saved { display: grid; gap: .9rem; text-align: center; }
+  /* ---------- Mistake notebook ---------- */
+.mistake-card { margin-bottom: .9rem; }
+.mistake-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.mistake-given {
+  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  border-left: 3px solid var(--bad); font-size: .9rem;
+}
+.mistake-correct {
+  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--good, #10b981) 12%, transparent);
+  border-left: 3px solid var(--good, #10b981); font-size: .9rem;
+}
+.mistake-why { margin-top: .7rem; font-size: .9rem; }
+.mistake-why summary { cursor: pointer; color: var(--txt2); font-weight: 600; }
+.retry-slot:not(:empty) { margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed var(--card-brd, var(--line)); }
+
+/* Diagnostic feedback: distinct from the plain explanation so the student can
+   see "here is what you did wrong" separately from "here is the answer". */
+.q-diagnose {
+  margin: .5rem 0; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent);
+  border-left: 3px solid var(--warn, #f59e0b);
+}
+
+/* ---------- Mastery ---------- */
+.mastery-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 1fr auto; gap: .9rem; align-items: center; margin-bottom: .8rem; }
+.mastery-name { font-weight: 600; }
+.mastery-track { height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.mastery-fill { height: 100%; border-radius: 99px; background: var(--grad); }
+.mastery-fill.weak { background: linear-gradient(90deg, #ef4444, #f59e0b); }
+.mastery-fill.ok   { background: linear-gradient(90deg, #f59e0b, #10b981); }
+.mastery-fill.good { background: linear-gradient(90deg, #10b981, #34d399); }
+.mastery-pct { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3ch; text-align: right; }
+.mastery-prov { opacity: .6; font-size: .78rem; }
+
+.profile-saved { display: grid; gap: .9rem; text-align: center; }
   /* `display: grid` above would otherwise beat the [hidden] attribute's
      UA `display: none`, leaving the empty signed-in panel visible on first
      paint. Same specificity battle, so state it explicitly. */

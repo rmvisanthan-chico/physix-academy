@@ -220,15 +220,82 @@ export const Store = {
   },
   completeLesson(id) { this.data.completed[id] = Date.now(); this.touchToday(); this.save(); },
   isComplete(id) { return !!this.data.completed[id]; },
-  recordAnswer(q, correct) {
+  recordAnswer(q, correct, given) {
     this.touchToday();
     this.data.solved++;
-    this.data.quiz.history.push({ qid: q.id, topic: q.topic, difficulty: q.difficulty, correct, t: Date.now() });
+    const entry = { qid: q.id, topic: q.topic, difficulty: q.difficulty, correct, t: Date.now() };
+    /* Keep what the student actually chose, but only on a miss. It is the whole
+       point of the mistake notebook: "wrong" alone cannot be learned from,
+       whereas "picked Mass instead of Velocity" can. The index is cheap and
+       small, and only written when wrong, so history stays lean. */
+    if (!correct && given != null) entry.given = given;
+    this.data.quiz.history.push(entry);
     if (!this.data.quiz.perTopic[q.topic]) this.data.quiz.perTopic[q.topic] = { correct: 0, total: 0 };
     const pt = this.data.quiz.perTopic[q.topic];
     pt.total++; if (correct) pt.correct++;
     if (this.data.quiz.history.length > 1000) this.data.quiz.history.shift();
     this.save();
+  },
+
+  /* ---------- mistake notebook ----------
+     A view over quiz.history, not a new data store. Every miss already had
+     topic, difficulty and a question id that points at an explanation. */
+mistakes(opts) {
+    const only = (opts && opts.topic) || null;
+    const out = [];
+    /* Walk backwards so "most recent first" is natural, and collapse repeats of
+       the same question into one card with a count: being wrong three times is
+       one thing to fix, not three rows of nagging. */
+    const seen = new Map();
+    for (let i = this.data.quiz.history.length - 1; i >= 0 && out.length < 40; i--) {
+      const h = this.data.quiz.history[i];
+      if (h.correct) continue;
+      if (only && h.topic !== only) continue;
+      /* Collapse on the question id, whichever direction we walk. Counting both
+         ways needs one map and no ordering assumption, which is what the earlier
+         version got wrong: it kept the object in `seen` but pushed a separate
+         copy into `out`, so the increments landed on an object nobody renders
+         and every badge read 1x. */
+      const prev = seen.get(h.qid);
+      if (prev) {
+        prev.times++;
+        if (h.t > prev.last) prev.last = h.t;
+        continue;
+      }
+      const row = { ...h, times: 1, last: h.t };
+      seen.set(h.qid, row);
+      out.push(row);
+    }
+    return out;
+  },
+
+  /* The one list the UI should render: repeats collapsed AND anything since
+     fixed reliably dropped. mistakes() stays unfiltered because the retry
+     callback needs to re-check a specific question as the student answers it. */
+  openMistakes(opts) {
+    return this.mistakes(opts).filter(m => !this.clearedSinceMiss(m.qid));
+  },
+
+  /* Has this question been answered correctly *since* the most recent miss?
+
+     This is what retires a mistake from the notebook. Answering it right once
+     does not mean it is fixed - guessing right proves nothing - so a mistake
+     clears only after CLEAN_STREAK correct answers, with the streak counted
+     from the most recent miss. Until then it stays, because a notebook that
+     quietly empties itself the first time you guess right is worse than
+     useless: it teaches the student that the list is arbitrary. */
+  CLEAN_STREAK: 2,
+  clearedSinceMiss(qid) {
+    const hist = this.data.quiz.history;
+    let missedAt = -1;
+    let streak = 0;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const h = hist[i];
+      if (h.qid !== qid) continue;
+      if (!h.correct) { missedAt = h.t; break; }
+      streak++;
+    }
+    return missedAt > 0 && streak >= this.CLEAN_STREAK;
   },
   topicMastery(topic) {
     const pt = this.data.quiz.perTopic[topic];
