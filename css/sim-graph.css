@@ -1,0 +1,83 @@
+/* PhysiX Academy — physics graph (js/graph-engine.js)
+ *
+ * Deliberately plain. The graph is always placed inside a .sim-frame, which is
+ * already a bordered panel, so it carries no card chrome of its own: a second
+ * nested panel would make an instrument reading look like a dashboard widget.
+ *
+ * Loaded by index.html only. login.html has no simulations and no graphs.
+ */
+
+/* ---------- Frame ---------- */
+.pgraph { border-top: 1px solid var(--card-brd); background: var(--panel2); }
+.pgraph-title {
+  padding: .55rem .8rem .3rem;
+  font-size: .78rem; font-weight: 700; color: var(--txt2);
+}
+
+/* ---------- Plot ---------- */
+/* Plot + axis captions laid out as a CSS grid.
+   The y caption rotates on the left, the x caption sits under the plot. Doing
+   this in DOM rather than painting the captions onto the canvas is what keeps
+   them selectable, zoomable and legible to a screen reader. */
+.pgraph-axes {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr auto;
+  align-items: stretch;
+}
+.pgraph-ycap {
+  grid-column: 1; grid-row: 1;
+  align-self: center; justify-self: center;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: .68rem; color: var(--txt3); white-space: nowrap;
+  padding: 0 .25rem;
+}
+.pgraph-inner { grid-column: 2; grid-row: 1; min-width: 0; }
+.pgraph-xcap {
+  grid-column: 2; grid-row: 2;
+  text-align: center; font-size: .68rem; color: var(--txt3);
+  padding-top: .1rem;
+}
+.pgraph-plot { position: relative; width: 100%; }
+.pgraph-plot canvas { display: block; width: 100%; }
+
+/* ---------- Legend ----------
+   This is also the accessible text representation of the plot. Each entry
+   carries a swatch, a name, the live value and the x it refers to, so the graph
+   is readable with any form of colour blindness and by a screen reader. Colour
+   is never the only channel. */
+.pgraph-foot {
+  display: flex; flex-wrap: wrap; gap: .3rem .9rem;
+  padding: .4rem .8rem .6rem; font-size: .78rem;
+}
+.pgraph-entry {
+  display: inline-flex; align-items: baseline; gap: .3rem; color: var(--txt2);
+}
+.pgraph-entry.off { opacity: .45; }
+.pgraph-swatch {
+  width: 14px; height: 3px; border-radius: 2px;
+  background: var(--c, var(--acc2));
+  align-self: center; flex: 0 0 auto;
+}
+.pgraph-name { font-weight: 600; }
+.pgraph-entry b { color: var(--txt); font-variant-numeric: tabular-nums; }
+.pgraph-at {
+  color: var(--txt3); font-family: "DM Mono", monospace; font-size: .72rem;
+}
+
+/* ---------- Phone ----------
+   The legend stacks rather than shrinking into an unreadable row, and the plot
+   keeps a usable height instead of being scaled down to fit the width. */
+@media (max-width: 560px) {
+  .pgraph-title { font-size: .74rem; padding: .5rem .6rem .25rem; }
+  .pgraph-foot {
+    flex-direction: column; gap: .2rem;
+    padding: .35rem .6rem .55rem; font-size: .74rem;
+  }
+  .pgraph-at { font-size: .68rem; }
+}
+
+/* ---------- Reduced motion ----------
+   The plot itself is not motion - it is a live data display, and suppressing
+   it would remove information a student asked for. Nothing here animates: the
+   canvas redraws on new data only, never on a timer. */

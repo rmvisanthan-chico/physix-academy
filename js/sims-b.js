@@ -1,5 +1,6 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
+import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 'use strict';
 
@@ -149,8 +150,41 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
+  /* Phase 3A graph. This sim already keeps `hist` as [t, x, v] triples for its
+     own hand-drawn plot; the graph is fed from the same three numbers, and the
+     old canvas plot is left in place because it scales x and v independently
+     while the shared engine auto-scales both together. */
+  const graph = createGraph(frame, {
+    xLabel: 'Time', xUnit: 's', xKey: 't',
+    yLabel: 'x, v', yUnit: 'm, m/s',
+    title: 'Position and velocity — a straight line and a straight line',
+    height: 190, capacity: 900
+  }, [
+    { id: 'x', label: 'Position x', unit: 'm', color: GC.a },
+    { id: 'v', label: 'Velocity v', unit: 'm/s', color: GC.b }
+  ]);
+  const gTog = SU.el('div', 'sim-actions'); frame.appendChild(gTog);
+  const gtog = (id, label) => {
+    const b = document.createElement('button');
+    b.className = 'btn btn-sm'; b.type = 'button'; b.textContent = label;
+    let on = true; b.setAttribute('aria-pressed', 'true');
+    b.addEventListener('click', () => {
+      on = !on; graph.setVisible(id, on);
+      b.setAttribute('aria-pressed', String(on));
+      b.style.opacity = on ? '' : '.55';
+    });
+    gTog.appendChild(b);
+  };
+  gtog('x', 'Position'); gtog('v', 'Velocity');
+  if (window.MutationObserver) {
+    const mo = new MutationObserver(() => {
+      if (!frame.isConnected) { graph.destroy(); mo.disconnect(); }
+    });
+    mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+  }
+
   let t = 0, hist = [];
-  const reset = () => { t = 0; hist = []; };
+  const reset = () => { t = 0; hist = []; graph.clear(); };
   const U = SU.slider(ctr, 'Initial u (m/s)', -15, 15, 0.5, 4, reset);
   const A = SU.slider(ctr, 'Acceleration a (m/s²)', -4, 4, 0.1, 1, reset);
   const rT = SU.readout(ro, 't'), rX = SU.readout(ro, 'x'), rV = SU.readout(ro, 'v');
@@ -163,6 +197,7 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
     const x = u * t + 0.5 * a * t * t;
     const v = u + a * t;
     hist.push([t, x, v]); if (hist.length > 1200) hist.shift();
+    graph.push({ t, x, v });
     rT.set(t.toFixed(1) + ' s');
     rV.set(v.toFixed(1) + ' m/s');
     rX.set(Math.max(-999, Math.min(x, 999)).toFixed(1) + ' m');
