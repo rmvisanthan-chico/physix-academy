@@ -314,6 +314,27 @@ ol.sol-steps li{margin:.45rem 0}
 .ctl label{display:flex;justify-content:space-between;font-size:.8rem;color:var(--txt2);font-weight:600;margin-bottom:.25rem}
 .ctl label output{color:var(--acc2);font-variant-numeric:tabular-nums}
 input[type="range"]{width:100%;accent-color:var(--acc);cursor:pointer}
+/* Sliders are the primary control in 38 of the 51 simulations, and a bare
+   range input is only 16px tall on every platform. On a phone that is a poor
+   thumb target and is genuinely fiddly to drag. The element keeps its native
+   16px rendering; the touch area around it is what grows. */
+@media (pointer:coarse),(max-width:820px){
+  .ctl input[type="range"]{
+    /* Chrome reports getBoundingClientRect().height as the CONTENT box for a
+       range input, excluding vertical padding, so padding alone does not grow
+       the measured box. An explicit height does. 1rem padding keeps the visual
+       track centred while taking the real box past 32px. */
+    height:44px; padding:.6rem 0; margin:-.6rem 0;
+    background:transparent;
+  }
+  /* Safari/iOS needs the height on the input itself to enlarge the hit box */
+  .ctl input[type="range"]::-webkit-slider-runnable-track{height:.5rem}
+  .ctl input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:1.35rem;height:1.35rem;border-radius:50%;background:var(--acc);margin-top:-.42rem;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  .ctl input[type="range"]::-moz-range-track{height:.5rem;background:var(--card-brd);border-radius:99px}
+  .ctl input[type="range"]::-moz-range-thumb{width:1.35rem;height:1.35rem;border:none;border-radius:50%;background:var(--acc)}
+  /* the label sits above the control; give the row room so they cannot overlap */
+  .ctl label{margin-bottom:.35rem}
+}
 .sim-readouts{display:flex;flex-wrap:wrap;gap:.5rem;padding:0 1rem 1rem}
 .readout{background:var(--card);border:1px solid var(--card-brd);border-radius:9px;padding:.4rem .75rem;font-size:.8rem}
 .readout b{color:var(--acc2);font-variant-numeric:tabular-nums}

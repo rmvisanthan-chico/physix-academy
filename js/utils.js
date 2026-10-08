@@ -203,6 +203,41 @@ export const Store = {
     this.data.timeLog[iso] = (this.data.timeLog[iso] || 0) + sec;
     this.save();
   },
+  /* ---------- simulation activity ----------
+     The minimum needed to connect Phase 3 to Phase 2, and deliberately no more.
+
+     Two fields, not a log. A per-interaction event stream would be the wrong
+     shape: it would grow unboundedly, it would record browsing rather than
+     learning, and nothing in the product would read it. What Phase 2 actually
+     needs is "has this student worked with this concept", so that is what is
+     kept.
+
+     sims maps simId -> { opens, ms }. Counters, not timestamps: a student's
+     history stays a fixed few hundred bytes no matter how long they play, and
+     a dashboard can say "you have used 6 simulations" without scanning a log. */
+  noteSimOpened(simId, ms) {
+    if (!simId) return;
+    if (!this.data.sims) this.data.sims = {};
+    const e = this.data.sims[simId] || (this.data.sims[simId] = { opens: 0, ms: 0 });
+    e.opens++;
+    /* Guard against a runaway tab: an hour on one simulation is already plenty,
+       and the value only feeds a "how much have you practised" signal. */
+    e.ms = Math.min(e.ms + Math.max(0, Math.round(ms || 0)), 3600000);
+    this.save();
+  },
+  simActivity() {
+    const all = (this.data && this.data.sims) || {};
+    const ids = Object.keys(all);
+    const totalMs = ids.reduce((n, k) => n + (all[k].ms || 0), 0);
+    return {
+      count: ids.length,
+      totalMs,
+      totalMin: Math.round(totalMs / 60000),
+      list: ids.map(id => ({ id, ...all[id] }))
+        .sort((a, b) => b.ms - a.ms)
+    };
+  },
+
   streak() {
     let count = 0; const day = new Date();
     // allow "yesterday only" streak to still be alive today

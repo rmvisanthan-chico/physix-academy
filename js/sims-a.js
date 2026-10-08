@@ -1,5 +1,5 @@
 import { pxArrow, pxLabel, SU } from './core.js';
-import { esc } from './utils.js';
+import { esc, Store } from './utils.js';
 /* PhysiX Academy — Simulations Part A: registry, helpers + mechanics */
 'use strict';
 
@@ -9,20 +9,62 @@ export const Sims = {
   register(id, title, desc, icon, run) {
     this.reg[id] = { id, title, desc, icon, run };
   },
-  mount(id, host) {
-    host.innerHTML = '';
-    const def = this.reg[id];
-    if (!def) {
-      host.innerHTML = '<div class="empty-state"><div class="big">🚧</div><p>Simulation “' + esc(id) + '” is coming soon.</p></div>';
-      return;
+mount(id, host) {
+      host.innerHTML = '';
+      const def = this.reg[id];
+      if (!def) {
+        host.innerHTML = '<div class="empty-state"><div class="big">🚧</div><p>Simulation “' + esc(id) + '” is coming soon.</p></div>';
+        return;
+      }
+      const frame = SU.el('div', 'sim-frame');
+      frame.innerHTML = '<div class="sim-head"><span class="dot"></span><b>' + esc(def.title) +
+        '</b><span class="muted small">' + esc(def.desc) + '</span></div>';
+      host.appendChild(frame);
+      /* The per-simulation page passes a .sim-slot-lg that lives INSIDE #main,
+         so observing that host is not enough: the router replaces #main's
+         innerHTML wholesale, which detaches the host without ever mutating it.
+         The first version of this observer watched the host and therefore
+         never fired, so nothing was ever recorded - caught by a test that
+         clicked links the way a student does.
+
+         #main is the reliable ancestor: it IS mutated on every route change. */
+      const root = document.getElementById('main') || host;
+
+      /* Phase 2 integration, in one place so 51 simulations need no changes.
+         Previously no simulation file referenced Store at all, which meant the
+         dashboard could say a student had never touched a simulation even
+         after an hour of using them.
+
+         Mounted at the FRAME level rather than per-simulation because SU.loop
+         already pauses on document.hidden: time is measured with a running
+         clock that excludes hidden time, so an idle tab left open overnight
+         does not become "4000 minutes of study". Reported on unmount and on
+         pagehide, since either can be the last event. */
+      const startedAt = performance.now();
+      let counted = false;
+      const report = () => {
+        if (counted) return;
+        counted = true;
+        /* A mount that lasted under 2s was a mis-click, not study. */
+        const ms = performance.now() - startedAt;
+        if (ms < 2000) return;
+        try { Store.noteSimOpened(id, ms); }
+        catch (e) { /* storage unavailable: never block a simulation on it */ }
+      };
+      /* Unmount is the only reliable signal available for an SPA route change. */
+      if (window.MutationObserver) {
+        const mo = new MutationObserver(() => {
+          if (!frame.isConnected) { report(); mo.disconnect(); }
+        });
+        /* subtree:true because #main's children are replaced wholesale, so a
+           mutation can land on a descendant rather than on #main itself. */
+        mo.observe(root, { childList: true, subtree: true });
+      }
+      window.addEventListener('pagehide', report, { once: true });
+
+      try { def.run(frame); }
+      catch (err) { console.error('Sim error:', id, err); frame.insertAdjacentHTML('beforeend', '<div class="empty-state">This simulation failed to start.</div>'); }
     }
-    const frame = SU.el('div', 'sim-frame');
-    frame.innerHTML = '<div class="sim-head"><span class="dot"></span><b>' + esc(def.title) +
-      '</b><span class="muted small">' + esc(def.desc) + '</span></div>';
-    host.appendChild(frame);
-    try { def.run(frame); }
-    catch (err) { console.error('Sim error:', id, err); frame.insertAdjacentHTML('beforeend', '<div class="empty-state">This simulation failed to start.</div>'); }
-  }
 };
 
 /* ---------------- Newton's second law ---------------- */
