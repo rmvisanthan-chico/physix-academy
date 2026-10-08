@@ -47,6 +47,7 @@ import './graph.js';
 import './progress.js';
 import './mastery.js';
 import './mistakes.js';
+import './dashboard.js';
 import './scientists.js';
 import './cinematic.js';
 import './anime-demo.js';

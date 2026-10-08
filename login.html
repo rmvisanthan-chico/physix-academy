@@ -9,6 +9,7 @@
 <link rel="icon" href="assets/logo.png" type="image/png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <link rel="stylesheet" href="css/style.css?v=74">
+<link rel="stylesheet" href="css/progress-dashboard.css?v=74">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Space+Grotesk:wght@500;700&family=Bricolage+Grotesque:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
@@ -62,102 +63,6 @@
   .profile-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
   .profile-actions .btn { flex: 1 1 150px; justify-content: center; position: relative; overflow: hidden; }
   .profile-note { font-size: .82rem; color: var(--txt2); margin: 1.2rem 0 0; }
-  /* ---------- Mistake notebook ---------- */
-.mistake-card { margin-bottom: .9rem; }
-.mistake-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .6rem; }
-.mistake-given {
-  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
-  background: color-mix(in srgb, var(--bad) 12%, transparent);
-  border-left: 3px solid var(--bad); font-size: .9rem;
-}
-.mistake-correct {
-  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
-  background: color-mix(in srgb, var(--good, #10b981) 12%, transparent);
-  border-left: 3px solid var(--good, #10b981); font-size: .9rem;
-}
-.mistake-why { margin-top: .7rem; font-size: .9rem; }
-.mistake-why summary { cursor: pointer; color: var(--txt2); font-weight: 600; }
-.retry-slot:not(:empty) { margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed var(--card-brd, var(--line)); }
-
-/* Diagnostic feedback: distinct from the plain explanation so the student can
-   see "here is what you did wrong" separately from "here is the answer". */
-.q-diagnose {
-  margin: .5rem 0; padding: .55rem .7rem; border-radius: 9px;
-  background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent);
-  border-left: 3px solid var(--warn, #f59e0b);
-}
-
-/* ---------- Mastery ---------- */
-.mastery-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 1fr auto; gap: .9rem; align-items: center; margin-bottom: .8rem; }
-.mastery-name { font-weight: 600; }
-.mastery-track { height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
-.mastery-fill { height: 100%; border-radius: 99px; background: var(--grad); }
-.mastery-fill.weak { background: linear-gradient(90deg, #ef4444, #f59e0b); }
-.mastery-fill.ok   { background: linear-gradient(90deg, #f59e0b, #10b981); }
-.mastery-fill.good { background: linear-gradient(90deg, #10b981, #34d399); }
-.mastery-pct { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3ch; text-align: right; }
-.mastery-prov { opacity: .6; font-size: .78rem; }
-
-.profile-saved { display: grid; gap: .9rem; text-align: center; }
-  /* `display: grid` above would otherwise beat the [hidden] attribute's
-     UA `display: none`, leaving the empty signed-in panel visible on first
-     paint. Same specificity battle, so state it explicitly. */
-  .profile-saved[hidden] { display: none; }
-  .profile-avatar {
-    width: 62px; height: 62px; border-radius: 50%; margin: 0 auto;
-    display: grid; place-items: center; font-size: 1.6rem; font-weight: 700;
-    background: var(--grad); color: #fff;
-  }
-
-  /* ---------- Shiny Text ---------- */
-  .p-shiny {
-    background-image: linear-gradient(105deg, var(--txt2) 0%, var(--txt) 38%, #fff 50%, var(--txt) 62%, var(--txt2) 100%);
-    background-size: 260% 100%;
-    -webkit-background-clip: text; background-clip: text;
-    color: transparent; -webkit-text-fill-color: transparent;
-    animation: p-shine 5.5s linear infinite;
-  }
-  @keyframes p-shine { to { background-position: -260% 0; } }
-
-  /* ---------- Blur Text: each word rises out of blur ---------- */
-  .p-word {
-    display: inline-block; white-space: pre;
-    opacity: 0; filter: blur(9px); transform: translateY(0.5em);
-    animation: p-rise .55s cubic-bezier(.22,.61,.36,1) forwards;
-  }
-  .p-word:nth-child(1) { animation-delay: .05s }  .p-word:nth-child(2) { animation-delay: .13s }
-  .p-word:nth-child(3) { animation-delay: .21s }  .p-word:nth-child(4) { animation-delay: .29s }
-  .p-word:nth-child(5) { animation-delay: .37s }  .p-word:nth-child(6) { animation-delay: .45s }
-  .p-word:nth-child(n+7) { animation-delay: .53s }
-  @keyframes p-rise { to { opacity: 1; filter: blur(0); transform: none; } }
-
-  /* Fields drift in just after the heading. */
-  .p-field { animation: p-rise .5s cubic-bezier(.22,.61,.36,1) both; }
-  .p-field:nth-of-type(1) { animation-delay: .34s }
-  .p-field:nth-of-type(2) { animation-delay: .44s }
-
-  /* ---------- Spotlight Card ---------- */
-  .p-spotlight::before {
-    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%),
-                color-mix(in srgb, var(--acc) 16%, transparent), transparent 70%);
-    opacity: 0; transition: opacity .3s ease;
-  }
-  .p-spotlight:hover::before { opacity: 1; }
-
-  /* ---------- Specular Button: shine that tracks the pointer ---------- */
-  .p-specular::after {
-    content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(105deg, transparent 38%,
-                rgba(255,255,255,.45) 50%, transparent 62%);
-    transform: translateX(-130%); transition: transform .55s ease;
-  }
-  .p-specular:hover::after { transform: translateX(130%); }
-
-  /* ---------- Click Spark canvas ---------- */
-  .profile-spark { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-  .profile-spark canvas { display: block; }
-
   /* ---------- Reduced motion: kill every effect, keep the layout ---------- */
   @media (prefers-reduced-motion: reduce) {
     .p-shiny { animation: none; background-image: none; color: var(--txt); -webkit-text-fill-color: currentColor; }

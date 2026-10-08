@@ -1,0 +1,272 @@
+/* PhysiX Academy - mistake notebook, mastery and dashboard.
+   Loaded by index.html (SPA routes) AND by login.html.
+
+   This was originally inline in login.html, which is a separate document that
+   the SPA never loads - so every rule here silently did nothing on #/progress,
+   #/mistakes and #/dashboard. Invisible bars, an unstyled ring, raw text. The
+   markup was correct and the tests passed, because neither can see a missing
+   stylesheet. Caught by looking at a screenshot. */
+/* ---------- Mistake notebook ---------- */
+.mistake-card { margin-bottom: .9rem; }
+.mistake-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.mistake-given {
+  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  border-left: 3px solid var(--bad); font-size: .9rem;
+}
+.mistake-correct {
+  margin-top: .6rem; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--good, #10b981) 12%, transparent);
+  border-left: 3px solid var(--good, #10b981); font-size: .9rem;
+}
+.mistake-why { margin-top: .7rem; font-size: .9rem; }
+.mistake-why summary { cursor: pointer; color: var(--txt2); font-weight: 600; }
+.retry-slot:not(:empty) { margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed var(--card-brd, var(--line)); }
+
+/* Diagnostic feedback: distinct from the plain explanation so the student can
+   see "here is what you did wrong" separately from "here is the answer". */
+.q-diagnose {
+  margin: .5rem 0; padding: .55rem .7rem; border-radius: 9px;
+  background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent);
+  border-left: 3px solid var(--warn, #f59e0b);
+}
+
+/* ---------- Mastery ---------- */
+.mastery-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 1fr auto; gap: .9rem; align-items: center; margin-bottom: .8rem; }
+.mastery-name { font-weight: 600; }
+.mastery-track { height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.mastery-fill { height: 100%; border-radius: 99px; background: var(--grad); }
+.mastery-fill.weak { background: linear-gradient(90deg, #ef4444, #f59e0b); }
+.mastery-fill.ok   { background: linear-gradient(90deg, #f59e0b, #10b981); }
+.mastery-fill.good { background: linear-gradient(90deg, #10b981, #34d399); }
+.mastery-pct { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3ch; text-align: right; }
+.mastery-prov { opacity: .6; font-size: .78rem; }
+
+/* ---------- Mastery ring ----------
+   .ring is defined twice in the project: style.css carves the hole with a
+   ::before overlay, pages-premium.css uses a CSS mask. Both are loaded, and
+   pages-premium comes later, so its mask wins - and that mask also clips the
+   percentage text, which is why the dashboard ring rendered as an empty donut.
+
+   Redefined here as a self-contained class so the number is always legible and
+   the two older definitions cannot interfere with it. */
+.dash-ring {
+  --ring-size: 118px;
+  --ring-hole: 9px;
+  position: relative;
+  width: var(--ring-size); height: var(--ring-size);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  margin: 0 auto; flex: 0 0 auto;
+  /* The gradient is drawn by ::before, and masked to a ring by ::after, so the
+     ::before disc that used to cover the text is not needed at all. */
+  -webkit-mask: radial-gradient(circle calc(var(--ring-size) / 2 - var(--ring-hole)) at 50% 50%, transparent calc(var(--ring-size) / 2 - var(--ring-hole)), #000 calc(var(--ring-size) / 2 - var(--ring-hole) + 1px));
+  mask: radial-gradient(circle calc(var(--ring-size) / 2 - var(--ring-hole)) at 50% 50%, transparent calc(var(--ring-size) / 2 - var(--ring-hole)), #000 calc(var(--ring-size) / 2 - var(--ring-hole) + 1px));
+  background: conic-gradient(var(--acc) calc(var(--p) * 1%), var(--card) 0);
+}
+.dash-ring > .rv {
+  -webkit-mask: none; mask: none;      /* undo the parent's mask on the label */
+  background: var(--panel);
+  width: calc(var(--ring-size) - var(--ring-hole) * 2);
+  height: calc(var(--ring-size) - var(--ring-hole) * 2);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Dashboard ----------
+   Reuses the site's existing primitives (.wrap, .card, .sec, .sec-title, .ring,
+   .progress-track, .bar-row, .chip) rather than importing a new visual system.
+   Layout is single-column-first with a max width, so it reads on a phone
+   without a separate mobile design, and the roadmap collapses from a timeline
+   to a plain list. */
+.dash-hello { padding: 1.2rem 0 1.6rem; max-width: 62ch; }
+.dash-kicker { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--txt3); font-weight: 700; }
+.dash-title { margin: .3rem 0 .6rem; font-size: clamp(1.7rem, 5vw, 2.6rem); line-height: 1.1; }
+.dash-lede { color: var(--txt2); font-size: 1.02rem; margin: 0; max-width: 58ch; }
+
+.dash-next-card {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  border-left: 3px solid var(--acc);
+}
+.dash-next-body { flex: 1 1 260px; min-width: 0; }
+.dash-next-body h3 { margin: 0 0 .25rem; font-size: 1.15rem; }
+.dash-next-body p { margin: 0; }
+.dash-next-cta { flex: 0 0 auto; white-space: nowrap; }
+
+.dash-where { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.dash-where-icon {
+  width: 52px; height: 52px; border-radius: 14px; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 1.6rem;
+  background: var(--grad); color: #fff;
+}
+.dash-where-body { flex: 1 1 260px; min-width: 0; }
+.dash-where-body h3 { margin: .1rem 0 .25rem; }
+
+.dash-mastery { display: flex; gap: 1.6rem; align-items: center; flex-wrap: wrap; }
+.dash-mastery-ring { flex: 0 0 auto; text-align: center; }
+.dash-skills { flex: 1 1 260px; display: grid; gap: .9rem; min-width: 0; }
+.dash-skill .small { margin-top: .15rem; }
+
+.dash-topics { display: grid; gap: .5rem; margin-top: 1rem; }
+.dash-topic {
+  display: grid; grid-template-columns: minmax(90px, 1.3fr) 2fr auto auto;
+  gap: .8rem; align-items: center;
+}
+.dash-topic-name { font-weight: 600; text-decoration: none; }
+.dash-topic-name:hover { color: var(--acc); }
+.dash-topic .mastery-pct { min-width: 3ch; text-align: right; }
+
+.dash-review { display: grid; gap: .7rem; }
+.dash-review-item {
+  display: flex; align-items: center; gap: 1rem; text-decoration: none;
+  padding: .9rem 1rem;
+}
+.dash-review-item:hover { border-color: var(--acc); transform: translateY(-1px); }
+.dash-review-topic { font-weight: 600; }
+.dash-review-pct { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+
+.dash-mistakes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: .8rem; }
+.dash-mistake { display: flex; flex-direction: column; gap: .4rem; }
+.dash-mistake-top { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+.dash-progress-line { display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap; }
+.dash-progress-big { font-size: 2.6rem; font-weight: 800; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1; }
+.dash-progress-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: .9rem; flex: 1 1 260px; }
+.dash-progress-facts > div { display: flex; flex-direction: column; }
+.dash-progress-facts b { font-size: 1.35rem; line-height: 1.15; }
+
+/* Roadmap: a vertical timeline. The spine is drawn on the <ol> so it is one
+   element rather than n pseudo-elements, and the dots sit on it. */
+.dash-roadmap { list-style: none; margin: 0; padding: 0 0 0 1.1rem; position: relative; }
+.dash-roadmap::before {
+  content: ''; position: absolute; left: 6px; top: 14px; bottom: 14px;
+  width: 2px; background: var(--card-brd); border-radius: 2px;
+}
+.dash-node {
+  position: relative; display: flex; gap: .9rem; align-items: flex-start;
+  padding: .7rem 0;
+}
+.dash-node-dot {
+  position: absolute; left: -1.1rem; top: .85rem;
+  width: 14px; height: 14px; border-radius: 50%;
+  display: grid; place-items: center; font-size: .62rem; line-height: 1;
+  background: var(--card); border: 2px solid var(--card-brd); color: var(--txt3);
+}
+.dash-node.is-learning .dash-node-dot { border-color: var(--warn); color: var(--warn); }
+.dash-node.is-mastered .dash-node-dot { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 18%, var(--card)); }
+.dash-node.is-current { background: color-mix(in srgb, var(--acc) 7%, transparent); border-radius: 10px; }
+.dash-node-body { flex: 1 1 auto; min-width: 0; }
+.dash-node-title { font-weight: 600; }
+.dash-node-meta { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; min-width: 0; margin: .15rem 0 .45rem; }
+.dash-node-state { font-size: .78rem; color: var(--txt2); font-weight: 600; }
+.dash-node-track { display: block; max-width: 320px; }
+.dash-node-go {
+  flex: 0 0 auto; align-self: center; width: 34px; height: 34px;
+  display: grid; place-items: center; border-radius: 10px;
+  text-decoration: none; font-weight: 700; color: var(--txt2);
+  border: 1px solid var(--card-brd); background: var(--card);
+  min-width: 34px; min-height: 34px;          /* touch target */
+}
+.dash-node-go:hover { border-color: var(--acc); color: var(--acc); }
+.dash-node.is-mastered .dash-node-go { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+
+/* Levels are collapsible so 108 chapters stay navigable. */
+.dash-levels { display: grid; gap: .6rem; }
+.dash-level { border: 1px solid var(--card-brd); border-radius: 12px; background: var(--card); }
+.dash-level > summary {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .8rem .95rem; cursor: pointer; list-style: none; min-height: 46px;
+}
+.dash-level > summary::-webkit-details-marker { display: none; }
+.dash-level > summary::after {
+  content: '▾'; margin-left: auto; color: var(--txt3); transition: transform .2s;
+}
+.dash-level[open] > summary::after { transform: rotate(180deg); }
+.dash-level > summary:hover { color: var(--acc); }
+.dash-level-icon {
+  width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+  display: grid; place-items: center; font-size: 1rem; background: var(--panel2);
+}
+.dash-level-name { font-weight: 700; }
+.dash-level-pct { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--txt2); }
+.dash-level .dash-roadmap { padding: 0 .95rem 1rem 2rem; border-top: 1px solid var(--card-brd); padding-top: .6rem; }
+.dash-level .dash-roadmap::before { left: 6px; }
+
+@media (max-width: 620px) {
+  .dash-topic { grid-template-columns: 1fr auto; }
+  .dash-topic .mastery-track { grid-column: 1 / -1; }
+  .dash-next-cta, .dash-where > .btn { width: 100%; text-align: center; }
+  .dash-mastery { gap: 1.1rem; }
+  .dash-progress-big { font-size: 2.1rem; }
+  .dash-node-go { width: 40px; height: 40px; }
+  /* Long chip rows wrap rather than forcing the page wider. This was the
+     single cause of horizontal overflow on a phone. */
+  .dash-node-meta { gap: .35rem; }
+  .dash-level > summary { gap: .4rem; }
+  .dash-level-pct { margin-left: auto; }
+  .dash-node-title { font-size: .95rem; }
+}
+
+.profile-saved { display: grid; gap: .9rem; text-align: center; }
+  /* `display: grid` above would otherwise beat the [hidden] attribute's
+     UA `display: none`, leaving the empty signed-in panel visible on first
+     paint. Same specificity battle, so state it explicitly. */
+  .profile-saved[hidden] { display: none; }
+  .profile-avatar {
+    width: 62px; height: 62px; border-radius: 50%; margin: 0 auto;
+    display: grid; place-items: center; font-size: 1.6rem; font-weight: 700;
+    background: var(--grad); color: #fff;
+  }
+
+  /* ---------- Shiny Text ---------- */
+  .p-shiny {
+    background-image: linear-gradient(105deg, var(--txt2) 0%, var(--txt) 38%, #fff 50%, var(--txt) 62%, var(--txt2) 100%);
+    background-size: 260% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+    animation: p-shine 5.5s linear infinite;
+  }
+  @keyframes p-shine { to { background-position: -260% 0; } }
+
+  /* ---------- Blur Text: each word rises out of blur ---------- */
+  .p-word {
+    display: inline-block; white-space: pre;
+    opacity: 0; filter: blur(9px); transform: translateY(0.5em);
+    animation: p-rise .55s cubic-bezier(.22,.61,.36,1) forwards;
+  }
+  .p-word:nth-child(1) { animation-delay: .05s }  .p-word:nth-child(2) { animation-delay: .13s }
+  .p-word:nth-child(3) { animation-delay: .21s }  .p-word:nth-child(4) { animation-delay: .29s }
+  .p-word:nth-child(5) { animation-delay: .37s }  .p-word:nth-child(6) { animation-delay: .45s }
+  .p-word:nth-child(n+7) { animation-delay: .53s }
+  @keyframes p-rise { to { opacity: 1; filter: blur(0); transform: none; } }
+
+  /* Fields drift in just after the heading. */
+  .p-field { animation: p-rise .5s cubic-bezier(.22,.61,.36,1) both; }
+  .p-field:nth-of-type(1) { animation-delay: .34s }
+  .p-field:nth-of-type(2) { animation-delay: .44s }
+
+  /* ---------- Spotlight Card ---------- */
+  .p-spotlight::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%),
+                color-mix(in srgb, var(--acc) 16%, transparent), transparent 70%);
+    opacity: 0; transition: opacity .3s ease;
+  }
+  .p-spotlight:hover::before { opacity: 1; }
+
+  /* ---------- Specular Button: shine that tracks the pointer ---------- */
+  .p-specular::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%,
+                rgba(255,255,255,.45) 50%, transparent 62%);
+    transform: translateX(-130%); transition: transform .55s ease;
+  }
+  .p-specular:hover::after { transform: translateX(130%); }
+
+  /* ---------- Click Spark canvas ---------- */
+  .profile-spark { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .profile-spark canvas { display: block; }
+
+  

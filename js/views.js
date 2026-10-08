@@ -11,6 +11,7 @@ import { viewFormulas } from './formulas.js';
 import { App, renderHooks } from './core.js';
 import { viewProgress } from './progress.js';
 import { viewMistakes } from './mistakes.js';
+import { viewDashboard } from './dashboard.js';
 import { viewCalculators } from './calculators.js';
 import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Router + Home/Learn/Lesson/Topics views */
@@ -70,6 +71,7 @@ export function route() {
         case 'calculators': viewCalculators(); nav = 'calculators'; break;
         case 'graph': viewGraph(); nav = 'graph'; break;
         case 'scientists': viewScientists(); nav = 'scientists'; break;
+        case 'dashboard': viewDashboard(); nav = 'dashboard'; break;
         case 'progress': viewProgress(); nav = 'progress'; break;
         case 'mistakes': viewMistakes(); nav = 'mistakes'; break;
         case 'support': viewSupport(); nav = ''; break;

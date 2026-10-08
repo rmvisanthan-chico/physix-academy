@@ -28,6 +28,12 @@ html.hc[data-theme="light"]{ --txt2:#1c2740; --txt3:#33405c; }
 
 *,*::before,*::after{box-sizing:border-box}
 html{font-size:calc(16px * var(--user-font-scale)); scroll-behavior:smooth}
+/* The mobile drawer is parked off-screen with translateX(105%) and nothing
+   clips it, so on a 390px phone a 300px panel extended the page ~315px to the
+   right and every page could be dragged sideways. This was pre-existing and
+   affected every route, not just the dashboard. Clipping here fixes it at the
+   root: an off-canvas element must not contribute to scrollable width. */
+html,body{overflow-x:hidden}
 :root{
   --ff-body:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
   --ff-head:"Bricolage Grotesque","Space Grotesk","Segoe UI",sans-serif;

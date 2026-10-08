@@ -6,8 +6,22 @@ import path from 'node:path';
    html5-sims/ in particular must NOT be rebundled: each simulation is a
    self-contained document that also has to work opened directly from disk via
    file://, loading ../js/vendor/three.min.js and lib/physix3d.js by relative
-   path. Rewriting those references into hashed chunks would break that. */
-const VERBATIM = ['html5-sims', 'assets', 'blog', 'js/vendor'];
+   path. Rewriting those references into hashed chunks would break that.
+
+   css/ is here for a specific reason: it is referenced by plain <link> tags in
+   index.html and login.html and is never imported by any JS module, so Vite has
+   no reason to emit it. Without this entry `npm run bundle` produced a dist/
+   with zero stylesheets - an entirely unstyled site - and nothing failed.
+
+   boot-guard.js is NOT in this list on purpose: it is a CLASSIC script, not a
+   module, and the whole reason it works is that it sits outside the module
+   graph. Copying it individually below keeps that property intact, because
+   copying all of js/ would ship 50 unbundled module duplicates alongside the
+   hashed chunks. */
+const VERBATIM = ['html5-sims', 'assets', 'blog', 'js/vendor', 'css'];
+
+/* Classic scripts loaded by <script src>, so Vite will never emit them. */
+const CLASSIC_SCRIPTS = ['js/boot-guard.js'];
 
 function copyVerbatim() {
   let outDir = 'dist';
@@ -20,7 +34,17 @@ function copyVerbatim() {
         if (!fs.existsSync(from)) continue;
         fs.cpSync(from, path.resolve(outDir, dir), { recursive: true });
       }
-      console.log(`  copied verbatim: ${VERBATIM.join(', ')}`);
+      for (const f of CLASSIC_SCRIPTS) {
+        const from = path.resolve(f);
+        if (!fs.existsSync(from)) {
+          this.error(`classic script missing: ${f}`);
+          return;
+        }
+        const to = path.resolve(outDir, f);
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.copyFileSync(from, to);
+      }
+      console.log(`  copied verbatim: ${VERBATIM.join(', ')}, ${CLASSIC_SCRIPTS.join(', ')}`);
     }
   };
 }

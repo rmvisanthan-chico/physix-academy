@@ -40,6 +40,12 @@ function walk(dir, out = []) {
   return out;
 }
 
+/* The detector's own marker list necessarily contains the markers it looks for,
+   so it always flags itself. Skipping these files is not a loophole - they are
+   the tools that repair the damage, and their "corruption" is the specification
+   of what to look for. */
+const SELF = new Set(['tools/audit-encoding.mjs', 'tools/fix-mojibake.mjs']);
+
 const files = walk(ROOT);
 const rows = [];
 let invalidTotal = 0, fffdTotal = 0, mojiTotal = 0;
@@ -60,7 +66,7 @@ for (const f of files) {
   const hits = MOJIBAKE.filter(m => text.includes(m));
   const nMoji = hits.reduce((n, m) => n + text.split(m).length - 1, 0);
 
-  if (invalid || fffd || nMoji) {
+  if ((invalid || fffd || nMoji) && !SELF.has(rel)) {
     rows.push({ rel, invalid, fffd, nMoji, hits });
     invalidTotal += invalid; fffdTotal += fffd; mojiTotal += nMoji;
   }
