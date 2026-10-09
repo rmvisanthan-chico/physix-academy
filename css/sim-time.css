@@ -1,0 +1,157 @@
+/* PhysiX Academy — simulation time controls (js/sim-controls.js)
+ *
+ * Loaded by index.html only.
+ *
+ * Design intent: this bar sits under the readouts and ABOVE the graph, so a
+ * student looking at a curve can see what state the simulation is in without
+ * scrolling. It therefore stays on one line on desktop and wraps to two on a
+ * phone - it must never push the graph off screen, because the graph is the
+ * thing the controls exist to interrogate.
+ */
+
+.sim-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .5rem;
+  padding: .5rem .8rem;
+  border-top: 1px solid var(--card-brd);
+  background: var(--panel2);
+}
+
+/* Buttons keep the project's .btn look. The min-height is the touch target:
+   36px is enough to hit reliably on a phone without making the row taller than
+   the readout block above it. */
+.sim-time .btn {
+  min-height: 36px;
+  min-width: 44px;
+  padding: .3rem .6rem;
+  font-size: .8rem;
+}
+
+/* The play/pause button is the one control a student reaches for mid-run, so it
+   is the one that gets the filled treatment. Colour alone never carries the
+   running/paused state - the label text changes between "⏸ Pause" and "▶ Play"
+   and the state chip spells it out - but the filled style gives the row a
+   clear starting point. */
+.sim-time-play {
+  background: rgba(107, 93, 246, .18);
+  border-color: rgba(107, 93, 246, .5);
+  color: #fff;
+}
+.sim-time-play:hover { background: rgba(107, 93, 246, .3); }
+
+/* While paused the play button goes solid, so the control the student should
+   press next is the one that looks pressed-in. */
+.sim-time.is-paused .sim-time-play {
+  background: var(--accent, #6d5df6);
+  border-color: var(--accent, #6d5df6);
+}
+
+.sim-time-step { color: #cbd5f5; }
+.sim-time-reset { color: #a9b6d6; }
+
+/* ---------- Step size ---------- */
+.sim-time-stepwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .72rem;
+  color: var(--txt3);
+}
+
+.sim-time-stepsize {
+  /* Native select, restyled only enough to match the panel. A custom listbox
+     would need full keyboard/focus handling to not be a regression against the
+     native control. */
+  min-height: 36px;
+  padding: .2rem .3rem;
+  font-size: .76rem;
+  color: var(--txt);
+  background: var(--panel);
+  border: 1px solid var(--card-brd);
+  border-radius: 6px;
+}
+
+/* ---------- State chip + clock ---------- */
+/* role="status" is on .sim-time-state in JS. It is kept visually compact but is
+   a real live region, so a screen reader announces "Paused" / "Running" on
+   change without stealing focus. */
+.sim-time-state {
+  font-size: .74rem;
+  font-weight: 700;
+  padding: .18rem .45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.sim-time.is-running .sim-time-state {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, .35);
+  background: rgba(52, 211, 153, .1);
+}
+.sim-time.is-paused .sim-time-state {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, .4);
+  background: rgba(251, 191, 36, .12);
+}
+
+.sim-time-clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;   /* digits do not jitter as t advances */
+  font-size: .74rem;
+  color: var(--txt3);
+  white-space: nowrap;
+}
+.sim-time-clock.is-paused { color: #fbbf24; }
+
+/* ---------- Focus ---------- */
+/* Visible focus on every control. The offsets keep the ring clear of the
+   button's own border so it stays visible against the panel background. */
+.sim-time :is(button, select):focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+/* ---------- 390px phone ---------- */
+@media (max-width: 520px) {
+  .sim-time {
+    padding: .45rem .6rem;
+    gap: .3rem .35rem;
+  }
+  .sim-time .btn {
+    /* 44px: the smallest reliably hittable target. Three of these plus gaps fit
+       across 390px without the row wrapping awkwardly mid-button. */
+    min-height: 44px;
+    min-width: 44px;
+    flex: 1 1 auto;
+    padding: .4rem .5rem;
+    font-size: .78rem;
+  }
+  /* Step size gets its own line rather than squeezing the buttons. */
+  .sim-time-stepwrap {
+    order: 5;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .sim-time-stepsize { min-height: 44px; flex: 1 1 auto; max-width: 9rem; }
+  .sim-time-state { order: 4; }
+  .sim-time-clock {
+    order: 6;
+    width: 100%;
+    margin-left: 0;
+    text-align: right;
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+/* The controls are buttons and a select, so there is no animation to disable.
+   This rule is kept deliberately: if a future change adds a transition to the
+   play button, it inherits the project's existing preference rather than
+   quietly ignoring it. */
+@media (prefers-reduced-motion: reduce) {
+  .sim-time *, .sim-time *::before, .sim-time *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

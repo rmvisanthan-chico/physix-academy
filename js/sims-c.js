@@ -2,6 +2,7 @@ import { pxArrow, pxLabel, SU } from './core.js';
 import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
+import { createSimControls } from './sim-controls.js';
 /* PhysiX Academy — Simulations Part C: projectile, SHM, doppler */
 'use strict';
 
@@ -62,10 +63,20 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
 
   let st, trail = [];
   const G = 9.8;
-  const SP = SU.slider(ctr, 'Speed u (m/s)', 5, 45, 1, 25, () => launch());
-  const AN = SU.slider(ctr, 'Angle θ (°)', 10, 80, 1, 45, () => launch());
-  const H0 = SU.slider(ctr, 'Launch height (m)', 0, 30, 1, 0, () => launch());
-  const DR = SU.slider(ctr, 'Air drag k', 0, 0.4, 0.01, 0, () => launch(), v => v.toFixed(2));
+  /* Phase 3C: a slider move has to invalidate any pending prediction. The
+     question names a target instant derived from these sliders, so moving one
+     after the question was built leaves the student answering "how high at
+     t = 1.44 s" while the screen now asks something else - and the reveal poller
+     would keep waiting for a target belonging to the previous launch.
+     The handler is a mutable binding rather than a direct call because `pred` is
+     declared much further down (see the Phase 3B note); it starts as a plain
+     relaunch and is upgraded once the prediction exists. */
+  let predApi = null;
+  let onParamsChanged = () => launch();
+  const SP = SU.slider(ctr, 'Speed u (m/s)', 5, 45, 1, 25, () => onParamsChanged());
+  const AN = SU.slider(ctr, 'Angle θ (°)', 10, 80, 1, 45, () => onParamsChanged());
+  const H0 = SU.slider(ctr, 'Launch height (m)', 0, 30, 1, 0, () => onParamsChanged());
+  const DR = SU.slider(ctr, 'Air drag k', 0, 0.4, 0.01, 0, () => onParamsChanged(), v => v.toFixed(2));
   const rR = SU.readout(ro, 'Range'), rH = SU.readout(ro, 'Max height'), rT = SU.readout(ro, 'Flight');
   function ideal() {
     const u = SP.get(), th = AN.get() * Math.PI / 180, h = H0.get();
@@ -82,22 +93,45 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
     graph.clear();
   }
   launch();
-  SU.loop(cv.c, dt => {
+
+  /* Phase 3C: the physics, the sampling and the drawing are now three separate
+     functions instead of one fused closure. That separation is the whole point:
+     Pause has to skip integration while still drawing, and Step has to integrate
+     exactly once and then draw - which is impossible if integration, sampling and
+     rendering share a body and nobody can say which half runs when.
+     advance() integrates one fixed sub-step and never touches the canvas or the
+     graph; sample() records one graph point; render() draws and never integrates. */
+
+  /* One fixed sub-step of physics. Semantics unchanged from the old code - the
+     same semi-implicit Euler update, just handed a constant h instead of a
+     frame-dependent dt, so the answer no longer depends on the display's
+     refresh rate. */
+  function advance(h) {
+    if (!st || st.done) return;
+    const k = DR.get();
+    st.t += h;
+    const sp = Math.hypot(st.vx, st.vy);
+    st.vx += (-k * st.vx * sp) * h; st.vy += (-G - k * st.vy * sp) * h;
+    st.x += st.vx * h; st.y += st.vy * h;
+    if (st.y > st.hmax) st.hmax = st.y;
+    if (st.y <= 0 && st.t > 0.05) { st.y = 0; st.done = true; }
+    trail.push([st.x, st.y]); if (trail.length > 400) trail.shift();
+  }
+
+  /* Exactly one graph point per completed step. Called once per sub-step batch
+     by the controls, never by render() - so pausing genuinely stops the graph
+     growing rather than just stopping it being drawn. */
+  function sample() {
+    if (!st) return;
+    graph.push({ x: st.t, y: st.y, vx: st.vx, vy: st.vy });
+  }
+
+  /* Draws only. Runs on every frame including while paused, which is what keeps
+     the frozen ball and the existing curve on screen when the student hits
+     Pause to inspect them. */
+  function render() {
     const k = DR.get(), id = ideal();
     const scale = Math.min((cv.W - 70) / Math.max(5, id.R), (cv.H - 50) / Math.max(5, id.Hmax)) * 0.9;
-    if (st && !st.done) {
-      st.t += dt;
-      const sp = Math.hypot(st.vx, st.vy);
-      st.vx += (-k * st.vx * sp) * dt; st.vy += (-G - k * st.vy * sp) * dt;
-      st.x += st.vx * dt; st.y += st.vy * dt;
-      if (st.y > st.hmax) st.hmax = st.y;
-      if (st.y <= 0 && st.t > 0.05) { st.y = 0; st.done = true; }
-      trail.push([st.x, st.y]); if (trail.length > 400) trail.shift();
-      /* one call, fed from the values already integrated above. The engine
-         decides which series use which key; this sim never touches a canvas
-         for the graph and never learns how one is drawn. */
-      graph.push({ x: st.t, y: st.y, vx: st.vx, vy: st.vy });
-    }
     const g = cv.g, groundY = cv.H - 30, x0 = 34;
     g.fillStyle = '#05070d'; g.fillRect(0, 0, cv.W, cv.H);
     g.strokeStyle = '#33415c'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(20, groundY); g.lineTo(cv.W - 10, groundY); g.stroke();
@@ -117,7 +151,49 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
       rR.set(st.x.toFixed(1) + ' m' + (k > 0 ? '  (ideal ' + id.R.toFixed(1) + ')' : ''));
       rH.set(st.hmax.toFixed(1) + ' m'); rT.set(st.t.toFixed(2) + ' s' + (st.done ? ' ✔' : ''));
     }
+  }
+
+  /* ---------- Phase 3C time controls ----------
+     One control bar owns one animation loop for this simulation. It is created
+     here - after advance/sample/render exist, and after the sliders, because
+     reset() re-reads the sliders and launch() re-seeds the state from them. */
+  const controls = createSimControls({
+    parent: frame,
+    advance, sample, render,
+    reset: launch,
+    getTime: () => (st ? st.t : 0),
+    timeUnit: 's',
+    /* Once the ball has landed there is nothing left to integrate, so Step must
+       not keep advancing the clock into empty air - canAdvance stops the
+       sub-step loop and leaves the run honestly finished. */
+    canAdvance: () => !!(st && !st.done),
+    stepLabel: 'flight time step'
   });
+
+  /* Phase 3C test probe: reads the simulation's real state and the graph's real
+     sample count. Exposed so tools/verify-timecontrols.mjs can assert on physics
+     rather than on repainted pixels - "the loop stopped integrating" and "the
+     canvas was not repainted" are different failures and a DOM check cannot tell
+     them apart. */
+  const probe = () => ({
+    t: st ? st.t : 0,
+    x: st ? st.x : 0,
+    y: st ? st.y : 0,
+    vy: st ? st.vy : 0,
+    y0: H0.get(),
+    done: !!(st && st.done),
+    paused: controls.isPaused(),
+    /* Counted on ONE named series, not summed across all three. Summing would
+       triple every sample, which would quietly turn a test for "exactly one
+       sample per step" into a test for "exactly three" and stop meaning
+       anything. */
+    samples: graph.sampleCount('y'),
+    calls: controls.advanceCalls()
+  });
+  window.__tcProbe = probe;
+  /* Only clear the global if it is still ours. A later simulation may already
+     have mounted and claimed it, and blanking that one's probe would break it. */
+  const clearProbe = () => { if (window.__tcProbe === probe) window.__tcProbe = null; };
 
   /* ---------- Phase 3B prediction ----------
      Built HERE, after the sliders, launch() and the loop exist. Placed earlier
@@ -201,6 +277,15 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
          parameters the student was actually shown. */
       launch();
       pendingReveal = targetFor();
+      /* Phase 3C: locking a prediction must RESUME the run. Before the time
+         controls existed, the simulation always ran, so the target was always
+         reached on its own. With Pause available, a student who paused, read the
+         question, typed an estimate and locked it would then sit watching a
+         frozen ball forever with the reveal never firing - the poller waits on
+         the graph's recorded time range, and a paused graph does not grow. The
+         student asked a question that requires the run, so the run starts. */
+      controls.play();
+      pred.refresh();
       watchForTarget();
     },
     onReset() {
@@ -210,13 +295,25 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
       pred.refresh();
     }
   });
+  /* Now that the prediction exists, a slider move can refresh the question and
+     cancel a stale reveal as well as relaunching. Assigned once, here. */
+  predApi = pred;
+  onParamsChanged = () => {
+    launch();
+    pendingReveal = null;
+    stopWatching();
+    predApi.refresh();
+  };
   pred.refresh();
 
   /* Lifecycle: the poller must die with the frame. Without this it keeps
-     firing against a detached graph after every route change. */
-  if (window.MutationObserver) {
+     firing against a detached graph after every route change. The time controls
+     are torn down here too - they own their own rAF loop, and unlike SU.loop's
+     chain it has to be cancelled explicitly or it keeps calling render() on a
+     detached canvas. */
+if (window.MutationObserver) {
     const mo2 = new MutationObserver(() => {
-      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+      if (!frame.isConnected) { stopWatching(); controls.destroy(); clearProbe(); mo2.disconnect(); }
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
@@ -227,7 +324,6 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
   const cv = SU.canvas(frame, 260);
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-  const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   /* Phase 3A graph. x and v are already integrated below; time is accumulated
      here rather than inside the sim, so no physics was changed. */
   const graph = createGraph(frame, {
@@ -275,19 +371,29 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
   AM = SU.slider(ctr, 'Amplitude A (px)', 30, 110, 5, 80, () => reset());
   function reset() { xPix = AM ? AM.get() : 80; v = 0; trace = []; gt = 0; graph.clear(); }
   reset();
-  SU.btn(act, '⟲ Restart', reset);
-  SU.loop(cv.c, dt => {
+
+  /* Phase 3C: same three-way split as the projectile - advance integrates one
+     fixed sub-step, sample records one graph point, render draws only. The SHM
+     integrator is unchanged; only the timestep is now constant. */
+  function advance(h) {
     const m = M.get(), k = K.get(), dmp = D.get();
     /* physics, in PIXELS per second - exactly as before this change */
-    v += (-k / m * xPix - dmp * v) * dt;
-    xPix += v * dt;
-    gt += dt;
+    v += (-k / m * xPix - dmp * v) * h;
+    xPix += v * h;
+    gt += h;
     trace.push(xPix); if (trace.length > 320) trace.shift();
+  }
+
+  function sample() {
     /* Graph and readout both report displacement in metres (px / 60), so the
        plotted curve and the number beside it agree. Velocity is converted with
        the same factor - the first version pushed raw px/s and the legend read
        "-295 m/s", which is not a velocity anything in this sim produces. */
     graph.push({ gt, x: xPix / 60, v: v / 60 });
+  }
+
+  function render() {
+    const m = M.get(), k = K.get(), dmp = D.get();
     rT.set((2 * Math.PI * Math.sqrt(m / k)).toFixed(2) + ' s');
     rX.set((xPix / 60).toFixed(2) + ' m');
     rV.set((v / 60).toFixed(2) + ' m/s');
@@ -320,7 +426,33 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
     g.stroke();
     g.fillStyle = '#6b7a99'; g.font = '10px Segoe UI';
     g.fillText('x(t) trace', gx0, gy0 + 2);
+  }
+
+  /* The old "⟲ Restart" button is replaced by the shared control bar's Reset.
+     Left in place it would have been a second, differently-behaved reset - this
+     one would re-run while the bar's would hold the pause state - and a student
+     would have no way to tell which rule applied. */
+  const controls = createSimControls({
+    parent: frame,
+    advance, sample, render,
+    reset,
+    getTime: () => gt,
+    timeUnit: 's',
+    /* The mass never runs out of oscillation - damping can only slow it, and
+       with d = 0 it swings forever - so Step is never blocked here. */
+    canAdvance: () => true,
+    stepLabel: 'oscillation time step'
   });
+
+  const shmProbe = () => ({
+    t: gt, x: xPix / 60, v: v / 60,
+    y0: (AM ? AM.get() : 80) / 60,
+    paused: controls.isPaused(),
+    samples: graph.sampleCount('x'),   /* one series only - see the projectile note */
+    calls: controls.advanceCalls()
+  });
+  window.__tcProbe = shmProbe;
+  const clearProbe = () => { if (window.__tcProbe === shmProbe) window.__tcProbe = null; };
 
   /* ---------- Phase 3B prediction ----------
      SHM's teaching moment is the QUARTER-PERIOD relationship: starting from
@@ -383,8 +515,14 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
         equilibrium — and that is where its speed is greatest.`;
     },
     onLock() {
+      /* Phase 3C: resume the run, same reason as the projectile - the reveal
+         poller waits on the graph's recorded time range, and a paused graph does
+         not grow, so a student who locked a prediction while paused would wait
+         forever. The question requires the run, so the run starts. */
       reset();
       pendingReveal = targetFor();
+      controls.play();
+      pred.refresh();
       watchForTarget();
     },
     onReset() {
@@ -398,7 +536,7 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
 
   if (window.MutationObserver) {
     const mo2 = new MutationObserver(() => {
-      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+      if (!frame.isConnected) { stopWatching(); controls.destroy(); clearProbe(); mo2.disconnect(); }
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }

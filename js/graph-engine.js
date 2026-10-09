@@ -358,6 +358,22 @@ export class Graph {
     this._kick();
   }
 
+  /* Total recorded points, summed over every series.
+     Phase 3C uses this to prove "pausing stops the graph growing" and "one Step
+     adds exactly one sample" against the real sample buffer rather than against
+     repainted pixels - a canvas that simply was not redrawn looks identical to a
+     simulation that genuinely stopped integrating, and those are different bugs.
+     Deliberately read-only: nothing here can be used to corrupt a series. */
+  sampleCount(seriesId) {
+    if (seriesId) {
+      const s = this.byId[seriesId];
+      return s ? s.len : 0;
+    }
+    let n = 0;
+    for (const s of this.series) n += s.len;
+    return n;
+  }
+
   reset() { this.clear(); }
 
   setVisible(id, on) {

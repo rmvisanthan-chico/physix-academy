@@ -2,6 +2,7 @@ import { SU } from './core.js';
 import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
+import { createSimControls } from './sim-controls.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 'use strict';
 
@@ -104,7 +105,6 @@ Sims.register('bfield', 'Charge in a B Field', 'Cyclotron motion: r = mv / qB.',
   const cv = SU.canvas(frame, 300);
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-  const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   let pos, vel, trail;
   const reset = () => { pos = [cv.W * 0.3, cv.H / 2]; vel = [0, -V0.get()]; trail = []; };
   const V0 = SU.slider(ctr, 'Speed v', 60, 260, 5, 140, reset);
@@ -189,16 +189,34 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
   const U = SU.slider(ctr, 'Initial u (m/s)', -15, 15, 0.5, 4, reset);
   const A = SU.slider(ctr, 'Acceleration a (m/s²)', -4, 4, 0.1, 1, reset);
   const rT = SU.readout(ro, 't'), rX = SU.readout(ro, 'x'), rV = SU.readout(ro, 'v');
-  SU.btn(act, '⟲ Replay', reset);
   const XMAX = 60;
-  SU.loop(cv.c, dt => {
-    t += dt;
+
+  /* Phase 3C: three-way split, same as projectile and SHM. Kinematics 1D is the
+     one case where the "physics" is closed-form - x(t) = ut + ½at² evaluated
+     directly from the clock - so advance() here only has to move the clock and
+     recompute. That is exactly why splitting advance from sample is worth doing
+     here: there is no integrator to guard, so Step is trivially exact. */
+  function advance(h) {
+    t += h;
+    /* The 14s auto-replay is preserved. It is a deliberate feature: the car
+       driving off the right edge and restarting keeps the demo alive. Note it
+       fires inside advance, so it cannot run while paused - a paused sim at
+       t = 14.01 stays paused rather than silently resetting. */
     if (t > 14) reset();
+  }
+
+  function sample() {
     const u = U.get(), a = A.get();
     const x = u * t + 0.5 * a * t * t;
     const v = u + a * t;
     hist.push([t, x, v]); if (hist.length > 1200) hist.shift();
     graph.push({ t, x, v });
+  }
+
+  function render() {
+    const u = U.get(), a = A.get();
+    const x = u * t + 0.5 * a * t * t;
+    const v = u + a * t;
     rT.set(t.toFixed(1) + ' s');
     rV.set(v.toFixed(1) + ' m/s');
     rX.set(Math.max(-999, Math.min(x, 999)).toFixed(1) + ' m');
@@ -234,7 +252,33 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
     };
     plot('#22d3ee', 1, xScale);
     plot('#34d399', 2, vScale);
+  }
+
+  /* The old "⟲ Replay" button is replaced by the shared bar's Reset - see the
+     note on the SHM side. Two differently-behaved resets in one panel is worse
+     than none. */
+  const controls = createSimControls({
+    parent: frame,
+    advance, sample, render,
+    reset,
+    getTime: () => t,
+    timeUnit: 's',
+    canAdvance: () => t <= 14,
+    stepLabel: 'time step'
   });
+
+  const kinProbe = () => {
+    const u = U.get(), a = A.get();
+    return {
+      t, x: u * t + 0.5 * a * t * t, v: u + a * t,
+      y0: 0,
+      paused: controls.isPaused(),
+      samples: graph.sampleCount('x'),   /* one series only - see the projectile note */
+      calls: controls.advanceCalls()
+    };
+  };
+  window.__tcProbe = kinProbe;
+  const clearProbe = () => { if (window.__tcProbe === kinProbe) window.__tcProbe = null; };
 
   /* ---------- Phase 3B prediction ----------
      Constant acceleration is the clearest prediction in the whole set, because
@@ -291,8 +335,14 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
         Try sliding a negative: the parabola curves the other way, and the position falls through zero.`;
     },
     onLock() {
+      /* Phase 3C: resume the run. The reveal poller waits on the graph's
+         recorded range and a paused graph does not grow, so locking a prediction
+         while paused would leave the student waiting on a reveal that can never
+         arrive. */
       reset();
       pendingReveal = targetFor();
+      controls.play();
+      pred.refresh();
       watchForTarget();
     },
     onReset() {
@@ -306,7 +356,7 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
 
   if (window.MutationObserver) {
     const mo2 = new MutationObserver(() => {
-      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+      if (!frame.isConnected) { stopWatching(); controls.destroy(); clearProbe(); mo2.disconnect(); }
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }

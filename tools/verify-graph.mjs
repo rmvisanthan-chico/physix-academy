@@ -357,9 +357,25 @@ for (const sim of SIMS) {
   ok('engine is addressable for the pause check', wrapped);
   const link = await page.$('a[href="#/sims/projectile"]');
   await link.click();
-  await page.waitForTimeout(1400);
 
+  /* Wait for sampling to actually START before measuring anything.
+     An earlier version slept 1400ms after the click and asserted on the push
+     count, which silently assumed the loop had been running for that entire
+     window. When route change plus module load was slower than the sleep - a
+     loaded machine, a cold cache - the assertion read a window that had only
+     been open for a few hundred ms and failed intermittently, reporting a bug
+     that was not there. Waiting for the first push makes the measurement start
+     where the thing being measured starts. */
+  await page.waitForFunction(() => window.__pushes > 0, { timeout: 15000 });
+  const atStart = await page.evaluate(() => window.__pushes);
+
+  /* Measure a known 1.0s of sampling. Threshold stays at > 30 pushes, which is
+     what ~60 sub-steps per second would produce at 60fps - the same bar the
+     previous fixed sleep was really trying to set. */
+  await page.waitForTimeout(1000);
   const before = await page.evaluate(() => window.__pushes);
+  const visible = before - atStart;
+
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
   });
@@ -371,7 +387,7 @@ for (const sim of SIMS) {
   await page.waitForTimeout(1200);
   const after = await page.evaluate(() => window.__pushes);
 
-  ok('sampling happens while visible', before > 30, `${before} pushes in ~1.4s`);
+  ok('sampling happens while visible', visible > 30, `${visible} pushes in 1.0s of visible running`);
   ok('paused/hidden: the graph receives no samples', during === before,
     `${during - before} pushes while hidden`);
   ok('resuming: sampling continues', after > during + 30, `${after - during} pushes after unhiding`);
