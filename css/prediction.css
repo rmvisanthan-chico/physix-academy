@@ -1,0 +1,100 @@
+/* ---------- Prediction system (js/prediction.js) ----------
+   Sits inside .sim-frame under the graph. Deliberately quiet: a bordered block,
+   not a card-with-a-gradient, so it reads as part of the instrument. */
+
+.predict {
+  border-top: 1px solid var(--card-brd);
+  background: color-mix(in srgb, var(--panel2) 92%, var(--acc) 8%);
+  padding: .85rem .8rem .9rem;
+}
+.predict-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.predict-badge {
+  font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--acc2); border: 1px solid color-mix(in srgb, var(--acc2) 40%, transparent);
+  border-radius: 999px; padding: .12rem .5rem; align-self: center;
+}
+.predict-q { margin: 0; font-size: .98rem; line-height: 1.35; }
+.predict-sub { margin: .3rem 0 0; flex-basis: 100%; }
+
+.predict-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; }
+.predict-label { font-size: .8rem; font-weight: 600; color: var(--txt2); }
+.predict-inputwrap { display: inline-flex; align-items: center; gap: .4rem; }
+.predict-input {
+  width: 8.5rem; padding: .5rem .6rem; font: inherit; font-size: .95rem;
+  font-variant-numeric: tabular-nums;
+  border-radius: 9px; border: 1px solid var(--card-brd);
+  background: var(--card); color: var(--txt);
+  /* 44px: this is the one control a student has to hit precisely on a phone */
+  min-height: 44px;
+}
+.predict-input:focus { outline: 2px solid var(--acc); outline-offset: 1px; }
+.predict-input[aria-invalid="true"] { border-color: var(--bad); }
+.predict-input:disabled { opacity: .6; }
+.predict-unit { font-size: .85rem; color: var(--txt3); font-family: "DM Mono", monospace; }
+
+.predict-actions { margin-top: .55rem; }
+.predict-actions .btn { min-height: 40px; }
+/* A disabled primary button keeps the accent gradient and turns into a muddy
+   block that reads like an error. Once the estimate is locked the button is
+   not an action at all, so it becomes a plain confirmation chip instead. */
+.predict-actions .btn:disabled,
+.predict-actions .btn[disabled] {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  cursor: default;
+}
+
+.predict-err {
+  margin: .5rem 0 0; font-size: .84rem; color: var(--bad);
+  /* empty by default so it never reserves a gap */
+  min-height: 0;
+}
+.predict-err:empty { display: none; }
+
+.predict.is-locked .predict-q { color: var(--txt2); }
+
+/* ---------- result ----------
+   Correctness is never carried by colour alone: the verdict has a ✓/✗ mark AND
+   a sentence saying how close or how far off, and every row states the numbers
+   in text. */
+.predict-out { margin-top: .8rem; display: grid; gap: .6rem; }
+.predict-verdict {
+  display: flex; gap: .6rem; align-items: flex-start;
+  padding: .6rem .7rem; border-radius: 10px;
+  border-left: 3px solid var(--txt3); background: var(--card);
+}
+.predict-verdict.is-near { border-left-color: var(--ok); }
+.predict-verdict.is-off  { border-left-color: var(--warn); }
+.predict-mark { font-weight: 800; font-size: 1.05rem; line-height: 1.3; }
+.predict-verdict.is-near .predict-mark { color: var(--ok); }
+.predict-verdict.is-off  .predict-mark { color: var(--warn); }
+.predict-verdict-title { font-weight: 700; font-size: .9rem; }
+
+.predict-rows { margin: 0; display: grid; gap: .25rem; }
+.predict-rows > div { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+.predict-rows dt { font-size: .84rem; color: var(--txt3); min-width: 12rem; }
+.predict-rows dd {
+  margin: 0; font-size: .9rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+.predict-why {
+  font-size: .87rem; line-height: 1.5; color: var(--txt2);
+  padding: .6rem .7rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--acc) 8%, transparent);
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 560px) {
+  .predict { padding: .75rem .6rem .8rem; }
+  .predict-row { flex-direction: column; align-items: stretch; }
+  .predict-inputwrap { width: 100%; }
+  .predict-input { flex: 1; width: auto; }
+  .predict-actions .btn { width: 100%; }
+  /* rows stack: a 12rem min-width label leaves no room for the number */
+  .predict-rows > div { flex-direction: column; gap: 0; }
+  .predict-rows dt { min-width: 0; }
+}

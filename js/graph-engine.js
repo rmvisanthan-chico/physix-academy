@@ -71,6 +71,59 @@ class Series {
       fn(this.x[idx], this.y[idx], i);
     }
   }
+
+  /* Value at an arbitrary x, by linear interpolation between the two samples
+     that bracket it.
+
+     Interpolation is the honest choice here and the alternative is worse. The
+     simulation integrates on a fixed ~60Hz timestep, so asking for t = 1.500 s
+     will essentially never land on a sample. Snapping to the nearest sample
+     would report "0 m at 1.5s" when the ball was at 14.2 m, which is a wrong
+     answer presented as a measurement. Linear interpolation between neighbours
+     is exact for constant acceleration over one 16ms step, which is precisely
+     the regime this engine is asked about.
+
+     Returns null rather than a guess when the target is outside the recorded
+     window or bracketed by fewer than two samples - a caller must never receive
+     a fabricated measurement. */
+  sampleAt(xq) {
+    if (!this.len || !isFinite(xq)) return null;
+    const start = this.len < this.capacity ? 0 : this.head;
+    const n = this.len;
+    const at = (i) => {
+      const idx = (start + i) % this.capacity;
+      return { x: this.x[idx], y: this.y[idx] };
+    };
+    const first = at(0), lastPt = at(n - 1);
+    /* A single sample has no bracket to interpolate between, but the exact
+       instant is still a real measurement. The first version required two
+       samples and returned null, which would have made a prediction unanswerable
+       in the first second of any run. */
+    if (n === 1) {
+      return xq === first.x ? { x: xq, y: first.y, exact: true } : null;
+    }
+    if (xq < first.x || xq > lastPt.x) return null;      // outside recorded time
+    for (let i = 0; i < n - 1; i++) {
+      const a = at(i), b = at(i + 1);
+      if (xq >= a.x && xq <= b.x) {
+        if (xq === a.x) return { x: xq, y: a.y, exact: true };
+        if (xq === b.x) return { x: xq, y: b.y, exact: true };
+        const span = b.x - a.x;
+        if (span <= 0) return { x: xq, y: a.y, exact: true };
+        const f = (xq - a.x) / span;
+        return { x: xq, y: a.y + f * (b.y - a.y), exact: false };
+      }
+    }
+    return null;
+  }
+
+  /* Recorded time range, so a caller can ask "is t = 1.5 s reachable?" before
+     promising anything. */
+  timeRange() {
+    if (!this.len) return null;
+    const start = this.len < this.capacity ? 0 : this.head;
+    return { from: this.x[start], to: this.x[(start + this.len - 1) % this.capacity] };
+  }
   extent() {
     if (!this.len) return null;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -280,6 +333,21 @@ export class Graph {
       if (s.push(xv, y)) touched = true;
     }
     if (touched) { this._needsDraw = true; this._kick(); }
+  }
+
+  /* ---------- read-only query ----------
+     A simulation's own state is authoritative, but anything that needs a value
+     the student did not read off a readout can ask the record of what actually
+     happened. Returns null when the question cannot be answered from real data,
+     so no caller is tempted to substitute a guess. */
+  valueAt(seriesId, xq) {
+    const s = this.byId[seriesId];
+    if (!s) return null;
+    return s.sampleAt(xq);
+  }
+  timeRange(seriesId) {
+    const s = this.byId[seriesId];
+    return s ? s.timeRange() : null;
   }
 
   clear() {

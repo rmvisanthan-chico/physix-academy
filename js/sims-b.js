@@ -1,6 +1,7 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
+import { createPrediction } from './prediction.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 'use strict';
 
@@ -234,4 +235,79 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
     plot('#22d3ee', 1, xScale);
     plot('#34d399', 2, vScale);
   });
+
+  /* ---------- Phase 3B prediction ----------
+     Constant acceleration is the clearest prediction in the whole set, because
+     both curves are exactly straight lines and the answer can be checked with
+     arithmetic. "Where is it at t = 3 s?" is the canonical first kinematics
+     question, and it is reachable for every value of u and a since the run
+     lasts 14 s. Target is clamped to stay inside that run even at the extremes
+     of both sliders. */
+  const T_MAX = 14;                        /* must match the loop's reset point */
+  const targetFor = () => Math.min(3, T_MAX * 0.6);
+
+  let pendingReveal = null;
+  let revealTimer = 0;
+  function stopWatching() {
+    if (revealTimer) { clearInterval(revealTimer); revealTimer = 0; }
+  }
+  function watchForTarget() {
+    stopWatching();
+    revealTimer = setInterval(() => {
+      if (!pendingReveal || pred.prediction === null || pred.result) return;
+      const range = graph.timeRange('x');
+      if (range && range.to >= pendingReveal) {
+        if (pred.reveal()) { pendingReveal = null; stopWatching(); }
+      }
+    }, 120);
+  }
+
+  const pred = createPrediction(frame, {
+    graph,
+    series: 'x',
+    unit: 'm',
+    quantity: 'position',
+    absFloor: 0.4,          /* metres; positions here run to tens of metres */
+    context() {
+      const u = U.get(), a = A.get();
+      return {
+        u, a,
+        paramsText: `u = ${u} m/s, a = ${a} m/s²`
+      };
+    },
+    targetTime: targetFor,
+    question() {
+      return `Predict first: where is the car at t = ${targetFor().toFixed(1)} s?`;
+    },
+    observe() {
+      const hit = graph.valueAt('x', targetFor());
+      return hit ? { value: hit.y, exact: hit.exact } : null;
+    },
+    explain(r, ctx) {
+      const t = targetFor();
+      const x = ctx.u * t + 0.5 * ctx.a * t * t;
+      return `Constant acceleration means <b>x = ut + ½at²</b>, and it is a straight line in t².
+        Here x = (${ctx.u})(t) + ½(${ctx.a})(${t})² = ${x.toFixed(1)} m.
+        Try sliding a negative: the parabola curves the other way, and the position falls through zero.`;
+    },
+    onLock() {
+      reset();
+      pendingReveal = targetFor();
+      watchForTarget();
+    },
+    onReset() {
+      pendingReveal = null;
+      stopWatching();
+      reset();
+      pred.refresh();
+    }
+  });
+  pred.refresh();
+
+  if (window.MutationObserver) {
+    const mo2 = new MutationObserver(() => {
+      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+    });
+    mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+  }
 });

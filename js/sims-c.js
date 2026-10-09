@@ -1,6 +1,7 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
+import { createPrediction } from './prediction.js';
 /* PhysiX Academy — Simulations Part C: projectile, SHM, doppler */
 'use strict';
 
@@ -47,6 +48,9 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
   mkToggle('y', 'Height');
   mkToggle('vx', 'vₓ');
   mkToggle('vy', 'v_y');
+
+  /* Prediction is built at the very END of this simulation, after the sliders,
+     launch() and the animation loop exist. See the block below. */
   /* destroy on unmount. SU.loop already stops on disconnect, but the graph
      owns its own rAF loop and a ResizeObserver, so it must be told. */
   if (window.MutationObserver) {
@@ -114,6 +118,108 @@ Sims.register('projectile', 'Projectile Motion', 'Launch a ball — v splits int
       rH.set(st.hmax.toFixed(1) + ' m'); rT.set(st.t.toFixed(2) + ' s' + (st.done ? ' ✔' : ''));
     }
   });
+
+  /* ---------- Phase 3B prediction ----------
+     Built HERE, after the sliders, launch() and the loop exist. Placed earlier
+     it threw "Cannot access 'SP' before initialization" and the whole
+     simulation failed to start: the prediction reads the slider values to build
+     its question, and they are `const`s declared further down.
+
+     The observed value is read from the graph's own record of what the
+     simulation integrated - never recomputed from theory - so the comparison
+     and the curve on screen cannot disagree. */
+  const targetFor = () => {
+    const u = SP.get(), th = AN.get() * Math.PI / 180, h = H0.get();
+    const vy0 = u * Math.sin(th);
+    /* Ideal flight time; drag has no closed form, so this only PROPOSES an
+       instant. The reveal waits for the real recorded range and reports
+       honestly if the target turns out to be unreachable. */
+    const tFly = (vy0 + Math.sqrt(vy0 * vy0 + 2 * G * h)) / G;
+    /* 40% of the flight, not 60%. Apex sits at 50% of the flight, so 60% asked
+       "how high is it on the way DOWN" - measurably true, but it throws away
+       the teaching moment, because the interesting prediction is the one made
+       while the ball is still climbing. Clamped to at least 0.3s so a slow,
+       low-angle launch still gets a readable question, and to 92% of flight so
+       a very fast one stays inside the run. */
+    return Math.min(Math.max(0.3, tFly * 0.4), tFly * 0.92);
+  };
+
+  let pendingReveal = null;
+  let revealTimer = 0;
+  function stopWatching() {
+    if (revealTimer) { clearInterval(revealTimer); revealTimer = 0; }
+  }
+  function watchForTarget() {
+    stopWatching();
+    revealTimer = setInterval(() => {
+      if (!pendingReveal || pred.prediction === null || pred.result) return;
+      const range = graph.timeRange('y');
+      if (range && range.to >= pendingReveal) {
+        if (pred.reveal()) { pendingReveal = null; stopWatching(); }
+      }
+    }, 120);
+  }
+
+  const pred = createPrediction(frame, {
+    graph,
+    series: 'y',
+    unit: 'm',
+    quantity: 'height',
+    absFloor: 0.2,          /* metres; 20% of a small height would be silly */
+    context() {
+      const u = SP.get(), th = AN.get() * Math.PI / 180, h = H0.get(), k = DR.get();
+      return {
+        u, th, h, k,
+        paramsText: `u = ${u} m/s, θ = ${Math.round(th * 180 / Math.PI)}°, h₀ = ${h} m, drag k = ${k}`
+      };
+    },
+    targetTime: targetFor,
+    question() {
+      return `Predict before you launch: how high is the ball at t = ${targetFor().toFixed(2)} s?`;
+    },
+    /* The measured value. Same instant the question named, because both call
+       targetFor() - so the number asked about and the number measured can
+       never drift apart. */
+    observe() {
+      const hit = graph.valueAt('y', targetFor());
+      return hit ? { value: hit.y, exact: hit.exact } : null;
+    },
+    explain(r, ctx) {
+      const t = targetFor();
+      const ideal = ctx.h + ctx.u * Math.sin(ctx.th) * t - 0.5 * G * t * t;
+      if (ctx.k > 0) {
+        return `With drag on, the ball bleeds vertical speed as it climbs, so it sits a little below the
+          ${ideal.toFixed(1)} m the drag-free formula gives. Drag only ever removes energy.`;
+      }
+      return `Height follows <b>y = h₀ + (u·sin θ)t − ½gt²</b>. Here that is
+        ${ctx.h} + ${(ctx.u * Math.sin(ctx.th) * t).toFixed(1)} − ${(0.5 * G * t * t).toFixed(1)}
+        = ${ideal.toFixed(1)} m. The launch term lifts the ball, gravity subtracts, and the subtraction grows
+        with t² — which is exactly why the height curve bends over instead of rising forever.`;
+    },
+    onLock() {
+      /* A new estimate means a new run, so the measured height belongs to the
+         parameters the student was actually shown. */
+      launch();
+      pendingReveal = targetFor();
+      watchForTarget();
+    },
+    onReset() {
+      pendingReveal = null;
+      stopWatching();
+      launch();
+      pred.refresh();
+    }
+  });
+  pred.refresh();
+
+  /* Lifecycle: the poller must die with the frame. Without this it keeps
+     firing against a detached graph after every route change. */
+  if (window.MutationObserver) {
+    const mo2 = new MutationObserver(() => {
+      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+    });
+    mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+  }
 });
 
 /* ---------------- Spring-mass SHM ---------------- */
@@ -215,6 +321,87 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
     g.fillStyle = '#6b7a99'; g.font = '10px Segoe UI';
     g.fillText('x(t) trace', gx0, gy0 + 2);
   });
+
+  /* ---------- Phase 3B prediction ----------
+     SHM's teaching moment is the QUARTER-PERIOD relationship: starting from
+     maximum displacement with zero velocity, the mass reaches equilibrium
+     after T/4. Asking "where is it at T/4" forces the student to work out
+     what a quarter of an oscillation looks like, and the graph shows the
+     crossing rather than a peak - which is the intuition the curve exists to
+     give. Target is one quarter of the period this configuration actually has,
+     so it always lands inside the run. */
+  const periodOf = () => 2 * Math.PI * Math.sqrt(M.get() / K.get());
+  const targetFor = () => periodOf() * 0.25;
+
+  let pendingReveal = null;
+  let revealTimer = 0;
+  function stopWatching() {
+    if (revealTimer) { clearInterval(revealTimer); revealTimer = 0; }
+  }
+  function watchForTarget() {
+    stopWatching();
+    revealTimer = setInterval(() => {
+      if (!pendingReveal || pred.prediction === null || pred.result) return;
+      const range = graph.timeRange('x');
+      if (range && range.to >= pendingReveal) {
+        if (pred.reveal()) { pendingReveal = null; stopWatching(); }
+      }
+    }, 120);
+  }
+
+  const pred = createPrediction(frame, {
+    graph,
+    series: 'x',
+    unit: 'm',
+    quantity: 'displacement',
+    absFloor: 0.05,        /* metres; displacement is small in this sim */
+    context() {
+      return {
+        m: M.get(), k: K.get(), d: D.get(),
+        T: periodOf(),
+        paramsText: `m = ${M.get()} kg, k = ${K.get()} N/m, T = ${periodOf().toFixed(2)} s`
+      };
+    },
+    targetTime: targetFor,
+    question() {
+      return `Predict first: starting from maximum displacement, what is the displacement at
+        t = ${targetFor().toFixed(2)} s?`;
+    },
+    observe() {
+      const hit = graph.valueAt('x', targetFor());
+      return hit ? { value: hit.y, exact: hit.exact } : null;
+    },
+    explain(r, ctx) {
+      const t = targetFor();
+      if (ctx.d > 0.02) {
+        return `Damped, so the mass arrives a little before zero and slightly under the ideal amplitude.
+          Remove damping (set it to 0) and this becomes exactly zero: it is the crossing point.`;
+      }
+      return `This is the quarter-period. Starting at maximum displacement with v = 0, simple harmonic motion is
+        <b>x(t) = A·cos(ωt)</b>, and at t = T/4 we have ωt = π/2, so cos(π/2) = 0 and
+        x = 0. A quarter of an oscillation after the start, the mass is passing through
+        equilibrium — and that is where its speed is greatest.`;
+    },
+    onLock() {
+      reset();
+      pendingReveal = targetFor();
+      watchForTarget();
+    },
+    onReset() {
+      pendingReveal = null;
+      stopWatching();
+      reset();
+      pred.refresh();
+    }
+  });
+  pred.refresh();
+
+  if (window.MutationObserver) {
+    const mo2 = new MutationObserver(() => {
+      if (!frame.isConnected) { stopWatching(); mo2.disconnect(); }
+    });
+    mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+  }
 });
 
 /* ---------------- Doppler effect ---------------- */
