@@ -99,31 +99,27 @@ export function createSimControls(opts) {
      lets a test drive the physics. */
   let advanceCalls = 0;
 
-  /* ---------- the one integration path ---------- */
+  /* ---------- optional graph support ----------
+     Most of the platform's simulations predate the Graph Engine and have no
+     graph. Forcing a chart onto every one of them to satisfy a numerical target
+     would be inventing data, so sample() is allowed to be absent: the controls
+     then simply have no series to feed, which is honest. Simulators that DO have
+     a graph pass sample() and get exact sampling. */
+  const hasGraph = typeof sample === 'function';
 
-  /* n fixed sub-steps, then one graph sample. Free-running calls this with however
-     many sub-steps the elapsed time bought; Step calls it with the number of
-     sub-steps in the configured step. They share it, which is what makes "the step
-     handler and the loop cannot double-integrate" a property of the code rather
-     than a promise in a comment. */
   function advanceFixed(n) {
     let done = 0;
     for (let i = 0; i < n; i++) {
       if (!canAdvance()) break;      /* landed, or the run is otherwise finished */
       advance(FIXED_DT);
-      /* One sample PER SUB-STEP, not one per frame.
-         The old SU.loop code pushed once per animation frame, which coincided
-         with one physics step only because the old dt was frame-derived and
-         nominally 60Hz. Once the timestep became fixed that coincidence stopped
-         being guaranteed, and the graph would have become a sampled sketch of
-         the trajectory instead of a record of it: two sub-steps inside one frame
-         would leave only the final one on the plot.
-
-         Sampling here rather than after the loop is what makes the graph an exact
-         record of every instant the physics visited, and what makes Step exact -
-         one step is one point. It also keeps the sample spacing independent of
-         the display refresh rate. */
-      sample();
+      /* One sample PER SUB-STEP, not one per frame. The old SU.loop code pushed
+         once per animation frame, which coincided with one physics step only
+         because the old dt was frame-derived and nominally 60Hz. Once the
+         timestep became fixed that coincidence stopped being guaranteed and the
+         graph would have become a sampled sketch of the trajectory rather than a
+         record of it. Sampling here makes the graph an exact record of every
+         instant the physics visited, and makes Step exact: one step, one point. */
+      if (hasGraph) sample();
       advanceCalls++;
       done++;
     }
@@ -306,11 +302,12 @@ export function createSimControls(opts) {
     alive = false;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
-    /* The test probe is a global, so a stale one would survive navigation and
-       keep answering with a simulation that no longer exists. Cleared here so a
-       later sim cannot be mistaken for this one. Only removed if it is still
-       OURS - another sim may have mounted and claimed it since. */
+    /* Test probes and any per-simulation release hook are globals or holders that
+       would otherwise outlive the simulation and keep answering for a panel that
+       no longer exists. Released here; each is removed only if it is still OURS,
+       since a newer simulation may already have claimed it. */
     if (opts.onDestroy) opts.onDestroy();
+    if (opts.onRelease) opts.onRelease();
   }
 
   /* Initial UI, then the one and only loop. */

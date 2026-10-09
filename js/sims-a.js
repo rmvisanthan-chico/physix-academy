@@ -1,5 +1,6 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { esc, Store } from './utils.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part A: registry, helpers + mechanics */
 'use strict';
 
@@ -74,24 +75,30 @@ Sims.register('newton', "Newton's Second Law", 'Push a cart — full force diagr
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   const G = 9.8, kf = 0.9;
-  let x = 0, v = 0;
-  const reset = () => { x = 0; v = 0; };
+  let x = 0, v = 0, t = 0;
+  const reset = () => { x = 0; v = 0; t = 0; };
   const F = SU.slider(ctr, 'Force F (N)', -60, 60, 1, 20, reset);
   const M = SU.slider(ctr, 'Mass m (kg)', 1, 20, 0.5, 6, () => {});
   const MU = SU.slider(ctr, 'Friction μ', 0, 0.4, 0.01, 0.1, () => {}, v => v.toFixed(2));
   const rA = SU.readout(ro, 'a'), rN = SU.readout(ro, 'Normal N'), rFr = SU.readout(ro, 'Friction f'), rNet = SU.readout(ro, 'Net F');
-  SU.btn(act, '⟲ Reset', reset);
-  SU.loop(cv.c, dt => {
+  /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
+     - same three-branch friction logic, same semi-implicit Euler - it just no
+     longer shares a body with the drawing. */
+  let a = 0, fr = 0, N = 0;
+  function advance(h) {
+    t += h;
     const f = F.get(), m = M.get(), mu = MU.get();
     const dir = v > 0.01 ? 1 : v < -0.01 ? -1 : 0;
-    const N = m * G, fmax = mu * N;
-    let a, fr;
+    N = m * G; const fmax = mu * N;
     if (dir !== 0) { fr = -dir * fmax; a = (f + fr) / m; }
     else if (Math.abs(f) <= fmax) { fr = -f; a = 0; v = 0; }
     else { fr = -Math.sign(f) * fmax; a = (f + fr) / m; }
-    v += a * dt; x += v * dt;
+    v += a * h; x += v * h;
     if (x > 34) { x = 34; v = 0; }
     if (x < -34) { x = -34; v = 0; }
+  }
+  function render() {
+    const f = F.get(), m = M.get();
     rA.set(a.toFixed(2) + ' m/s²'); rN.set(N.toFixed(0) + ' N'); rFr.set(fr.toFixed(0) + ' N'); rNet.set(f.toFixed(0) + ' N');
     const g = cv.g, gy = cv.H * 0.72;
     g.fillStyle = '#05070d'; g.fillRect(0, 0, cv.W, cv.H);
@@ -112,6 +119,22 @@ Sims.register('newton', "Newton's Second Law", 'Push a cart — full force diagr
     pxLabel(g, cx + 10, cyc + m * G * kf + 4, 'mg', '#f87171');
     pxLabel(g, cx + 10, cyc - N * kf - 4, 'N', '#9aa8c3');
     pxLabel(g, cx + f * kf + 8, cyc - m * G * kf - 4, 'F', '#fbbf24');
+  }
+  attachTimeControls({
+    frame, advance, render, reset, replaceButtons: ['Reset'],
+    getTime: () => t,
+    /* The cart stops at the walls - the original code clamps x and zeroes v -
+       so once it is against a wall there is nothing left to integrate. Without
+       this the clock would keep advancing while the cart sat still, which reads
+       as a broken Step button. */
+    canAdvance: () => x < 34 && x > -34,
+    stepLabel: 'time step',
+    /* Phase 3C.1 test probe, matching the three Phase 3C simulations so the
+       shared suite can drive every simulation through one code path. */
+    probe: () => ({
+      t, x, v, a, N: N, fr, calls: 0,
+      state: { x: +x.toFixed(6), v: +v.toFixed(6) }
+    })
   });
 });
 
@@ -121,12 +144,12 @@ Sims.register('energy', 'Energy Conservation', 'PE ⇄ KE — the total never li
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
-  let th = 48 * Math.PI / 180, om = 0;
+  let th = 48 * Math.PI / 180, om = 0, t = 0;
   const L = SU.slider(ctr, 'Length L', 90, 200, 5, 150, () => {});
   const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 3, 0.25, 1, () => {});
   const D = SU.slider(ctr, 'Damping', 0, 0.06, 0.005, 0, () => {}, v => v.toFixed(3));
   const rP = SU.readout(ro, 'PE'), rK = SU.readout(ro, 'KE'), rT = SU.readout(ro, 'Total'), rTh = SU.readout(ro, 'Angle θ');
-  SU.btn(act, '⟲ Re-swing', () => { th = 48 * Math.PI / 180; om = 0; });
+  const reSwing = () => { th = 48 * Math.PI / 180; om = 0; t = 0; };
   const G = 340;
   function bar(g, x, base, h, col, lab) {
     h = Math.max(1, Math.min(h, cv.H - 60));
@@ -134,10 +157,21 @@ Sims.register('energy', 'Energy Conservation', 'PE ⇄ KE — the total never li
     g.fillStyle = '#9aa8c3'; g.font = '11px Segoe UI'; g.textAlign = 'center';
     g.fillText(lab, x + 13, base + 13); g.textAlign = 'left';
   }
-  SU.loop(cv.c, dt => {
-    const l = L.get(), m = M.get(), dmp = D.get();
-    om += (-G / l * Math.sin(th) - dmp * om) * dt;
-    th += om * dt;
+  /* Phase 3C.1: same pendulum integrator, split from the drawing. Note the
+     integrator is the original semi-implicit Euler with a constant h - it is NOT
+     an energy-conserving scheme, so total energy drifts slightly at 1/60s. That
+     was true before this change too (it was worse: the step was frame-rate
+     dependent). Not "fixed" here because this simulation's whole point is that
+     the total stays flat, and switching to a symplectic scheme would change the
+     teaching claim rather than the plumbing. Worth revisiting deliberately. */
+  function advance(h) {
+    t += h;
+    const l = L.get(), dmp = D.get();
+    om += (-G / l * Math.sin(th) - dmp * om) * h;
+    th += om * h;
+  }
+  function render() {
+    const l = L.get(), m = M.get();
     const pe = m * G * l * (1 - Math.cos(th)) / 1e6;
     const ke = 0.5 * m * l * l * om * om / 1e6;
     rP.set(pe.toFixed(2) + ' J'); rK.set(ke.toFixed(2) + ' J'); rT.set((pe + ke).toFixed(2) + ' J'); rTh.set((th * 180 / Math.PI).toFixed(0) + '°');
@@ -161,6 +195,21 @@ Sims.register('energy', 'Energy Conservation', 'PE ⇄ KE — the total never li
     g.beginPath(); g.arc(bx, by, 9 + m * 4, 0, 7); g.fill();
     pxArrow(g, bx, by, l * om * Math.cos(th) * 0.05, -l * om * Math.sin(th) * 0.05, '#34d399');
     pxLabel(g, bx + 14, by - 4, 'v', '#34d399');
+  }
+  attachTimeControls({
+    frame, advance, render, reset: reSwing, replaceButtons: ['Re-swing'],
+    getTime: () => t,
+    canAdvance: () => true,
+    stepLabel: 'oscillation time step',
+    probe: () => {
+      const l = L.get(), m = M.get();
+      const pe = m * G * l * (1 - Math.cos(th)) / 1e6;
+      const ke = 0.5 * m * l * l * om * om / 1e6;
+      return {
+        t, th, om, pe, ke, total: pe + ke,
+        state: { th: +th.toFixed(8), om: +om.toFixed(8) }
+      };
+    }
   });
 });
 
@@ -170,7 +219,7 @@ Sims.register('collision', 'Collision Lab', 'Momentum always survives; KE may no
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
-  let a, b, KE0 = 1;
+  let a, b, KE0 = 1, t = 0;
   const rad = m => 10 + Math.sqrt(m) * 5;
   const relaunch = () => {
     a = { m: 0, v: V1.get(), x: cv.W * 0.22, r: 0 };
@@ -178,6 +227,7 @@ Sims.register('collision', 'Collision Lab', 'Momentum always survives; KE may no
     a.m = M1.get(); a.r = rad(a.m);
     b.m = M2.get(); b.r = rad(b.m);
     KE0 = 0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v || 1;
+    t = 0;
   };
   const M1 = SU.slider(ctr, 'Mass 1 (kg)', 0.5, 8, 0.5, 3, relaunch);
   const M2 = SU.slider(ctr, 'Mass 2 (kg)', 0.5, 8, 0.5, 1, relaunch);
@@ -186,10 +236,15 @@ Sims.register('collision', 'Collision Lab', 'Momentum always survives; KE may no
   const E = SU.slider(ctr, 'Elasticity e', 0, 1, 0.05, 1, () => {}, v => v.toFixed(2));
   const rP = SU.readout(ro, 'Total p'), rK = SU.readout(ro, 'Total KE'), rSt = SU.readout(ro, 'Type'), rLoss = SU.readout(ro, 'KE lost');
   relaunch();
-  SU.btn(act, '⟲ Relaunch', relaunch, true);
   const gy = () => cv.H * 0.66;
-  SU.loop(cv.c, dt => {
-    a.x += a.v * 30 * dt; b.x += b.v * 30 * dt;
+  /* Phase 3C.1: the collision resolution and wall bounces are unchanged. Worth
+     noting WHY this is a good Step simulation: the interesting instant - the
+     impulse - happens between two samples. A student can walk up to the contact
+     with Step and watch momentum before, during and after the collision, which
+     is exactly the kind of thing a running simulation makes impossible to see. */
+  function advance(h) {
+    t += h;
+    a.x += a.v * 30 * h; b.x += b.v * 30 * h;
     const gap = a.r + b.r;
     if (Math.abs(b.x - a.x) < gap && a.v !== b.v) {
       const u1 = a.v, u2 = b.v, e = E.get();
@@ -197,10 +252,12 @@ Sims.register('collision', 'Collision Lab', 'Momentum always survives; KE may no
       b.v = (e * a.m * (u1 - u2) + a.m * u1 + b.m * u2) / (a.m + b.m);
       const mid = (a.x + b.x) / 2; a.x = mid - gap / 2; b.x = mid + gap / 2;
     }
-    [[a], [b]].forEach(([p]) => {
+    [a, b].forEach(p => {
       if (p.x < p.r) { p.x = p.r; p.v = Math.abs(p.v); }
       if (p.x > cv.W - p.r) { p.x = cv.W - p.r; p.v = -Math.abs(p.v); }
     });
+  }
+  function render() {
     rP.set((a.m * a.v + b.m * b.v).toFixed(2) + ' kg·m/s');
     rK.set((0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v).toFixed(1) + ' J');
     rSt.set(E.get() >= 0.95 ? 'Elastic' : E.get() <= 0.05 ? 'Sticky' : 'Partly elastic');
@@ -216,6 +273,23 @@ Sims.register('collision', 'Collision Lab', 'Momentum always survives; KE may no
       g.fillStyle = '#6b7a99'; g.font = '11px Segoe UI'; g.textAlign = 'center';
       g.fillText(p.m + ' kg', p.x, gy() + 16); g.textAlign = 'left';
     });
+  }
+  attachTimeControls({
+    frame, advance, render, reset: relaunch, replaceButtons: ['Relaunch'],
+    getTime: () => t,
+    /* Elastic walls mean the balls never settle; Step stays meaningful for the
+       whole run. */
+    canAdvance: () => true,
+    stepLabel: 'collision time step',
+    probe: () => {
+      const p = a.m * a.v + b.m * b.v;
+      /* Momentum before the run, for the conservation check in the suite. */
+      return {
+        t, p, p0: M1.get() * V1.get() + M2.get() * V2.get(),
+        ke: 0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v,
+        state: { ax: +a.x.toFixed(6), av: +a.v.toFixed(6) }
+      };
+    }
   });
 });
 
@@ -227,27 +301,33 @@ Sims.register('orbit', 'Orbit Simulator', 'Sideways speed turns falling into orb
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   const GM = 420000;
   const CX = () => cv.W / 2, CY = cv.H / 2;
-  let pl, trail = [], dead = 0;
-  const launch = () => { pl = { x: CX() + 190, y: CY, vx: 0, vy: -V0.get() }; trail = []; };
+let pl, trail = [], dead = 0, t = 0;
+  const launch = () => { pl = { x: CX() + 190, y: CY, vx: 0, vy: -V0.get() }; trail = []; dead = 0; t = 0; };
   const V0 = SU.slider(ctr, 'Launch speed', 30, 120, 1, 66, launch);
   const rV = SU.readout(ro, 'Speed'), rR = SU.readout(ro, 'Distance'), rS = SU.readout(ro, 'Status');
-  SU.btn(act, '⟲ Relaunch', launch);
   launch();
-  SU.loop(cv.c, dt => {
-    if (!pl) pl = {};
-    if (dead > 0) { dead -= dt; if (dead <= 0) { dead = 0; launch(); } }
-    else {
-      const dx = pl.x - CX(), dy = pl.y - CY, r = Math.hypot(dx, dy) || 1;
-      const acc = GM / (r * r);
-      pl.vx -= acc * dx / r * dt; pl.vy -= acc * dy / r * dt;
-      pl.x += pl.vx * dt; pl.y += pl.vy * dt;
-      trail.push([pl.x, pl.y]); if (trail.length > 600) trail.shift();
-      const en = 0.5 * (pl.vx * pl.vx + pl.vy * pl.vy) - GM / r;
-      rV.set(Math.hypot(pl.vx, pl.vy).toFixed(0) + ' px/s');
-      rR.set(r.toFixed(0) + ' px');
-      rS.set(en < 0 ? '🟢 Bound' : '🔴 Escaping');
-      if (r < 18 || r > 1500) { rS.set(r < 18 ? '💥 Crashed!' : '🌌 Lost to space'); dead = 1.2; }
-    }
+  /* Phase 3C.1: split from the drawing.
+
+     The 1.2s "dead" countdown after a crash or an escape is preserved - it is
+     what auto-restarts a run that ended - but it now counts down only while the
+     simulation is running. That is a deliberate behaviour change from the old
+     setTimeout-free code: previously a paused, crashed orbit would still
+     relaunch itself a second later, silently discarding the frozen state the
+     student had just paused to look at. Pausing to examine a crashed trajectory
+     is precisely the case these controls exist for, so the countdown respects
+     the pause. */
+  function advance(h) {
+    t += h;
+    if (dead > 0) { dead -= h; if (dead <= 0) launch(); return; }
+    if (!pl) { pl = {}; return; }
+    const dx = pl.x - CX(), dy = pl.y - CY, r = Math.hypot(dx, dy) || 1;
+    const acc = GM / (r * r);
+    pl.vx -= acc * dx / r * h; pl.vy -= acc * dy / r * h;
+    pl.x += pl.vx * h; pl.y += pl.vy * h;
+    trail.push([pl.x, pl.y]); if (trail.length > 600) trail.shift();
+    if (r < 18 || r > 1500) dead = 1.2;
+  }
+  function render() {
     const g = cv.g;
     g.fillStyle = '#05070d'; g.fillRect(0, 0, cv.W, cv.H);
     g.strokeStyle = 'rgba(107,122,153,.18)'; g.lineWidth = 1;
@@ -261,6 +341,40 @@ Sims.register('orbit', 'Orbit Simulator', 'Sideways speed turns falling into orb
     g.fillStyle = grd; g.beginPath(); g.arc(CX(), CY, 24, 0, 7); g.fill();
     g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(CX(), CY, 11, 0, 7); g.fill();
     g.fillStyle = '#22d3ee'; g.beginPath(); g.arc(pl.x, pl.y, 6, 0, 7); g.fill();
+  }
+  /* Readouts are drawn here rather than inside advance() so that they update on
+     a render triggered by a slider change while PAUSED. If they lived in
+     advance(), changing the launch speed while paused would leave the readout
+     showing the old run's numbers with nothing to explain why. */
+  const updateReadouts = () => {
+    if (!pl || dead > 0) return;
+    const dx = pl.x - CX(), dy = pl.y - CY, r = Math.hypot(dx, dy) || 1;
+    const en = 0.5 * (pl.vx * pl.vx + pl.vy * pl.vy) - GM / r;
+    rV.set(Math.hypot(pl.vx, pl.vy).toFixed(0) + ' px/s');
+    rR.set(r.toFixed(0) + ' px');
+    if (r < 18) rS.set('💥 Crashed!');
+    else if (r > 1500) rS.set('🌌 Lost to space');
+    else rS.set(en < 0 ? '🟢 Bound' : '🔴 Escaping');
+  };
+  updateReadouts();
+  /* Re-run the readout whenever the slider changes. onStateChange fires on every
+     pause/resume/reset too, which keeps the numbers honest without duplicating
+     the update logic. */
+  attachTimeControls({
+    onStateChange: updateReadouts,
+    frame, advance, render, reset: launch, replaceButtons: ['Relaunch'],
+    getTime: () => t,
+    /* While the crash countdown is running there is no state to integrate, so
+       Step should not march the clock on through it. */
+    canAdvance: () => dead <= 0 && !!pl,
+    stepLabel: 'orbital time step',
+    probe: () => {
+      const dx = pl.x - CX(), dy = pl.y - CY;
+      return {
+        t, speed: Math.hypot(pl.vx, pl.vy), r: Math.hypot(dx, dy),
+        state: { x: +pl.x.toFixed(6), y: +pl.y.toFixed(6) }
+      };
+    }
   });
 });
 

@@ -1,5 +1,6 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { Sims } from './sims-a.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part E: richer, more realistic, classroom-friendly sims */
 'use strict';
 
@@ -13,20 +14,36 @@ Sims.register('incline', 'Inclined Plane', 'Weight splits into a slide-force and
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   const G = 9.8, Lp = 220, kf = 0.72;
-  let s = 0, v = 0;
-  const reset = () => { s = 0; v = 0; };
+  let s = 0, v = 0, t = 0;
+  const reset = () => { s = 0; v = 0; t = 0; };
   const TH = SU.slider(ctr, 'Angle θ (°)', 0, 65, 1, 32, reset);
   const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 12, 0.5, 4, reset);
   const MU = SU.slider(ctr, 'Friction μ', 0, 0.7, 0.01, 0.12, reset, v => v.toFixed(2));
   const rA = SU.readout(ro, 'a'), rN = SU.readout(ro, 'Normal N'), rFr = SU.readout(ro, 'Friction f'), rSt = SU.readout(ro, 'Status');
-  SU.btn(act, '⟲ Reset', reset);
-  SU.loop(cv.c, dt => {
+  /* Phase 3C.1: split from the drawing.
+
+     This one earns Step particularly well. The block is held by friction until
+     tan(theta) > mu, so the interesting question is "at what angle does it let
+     go?" - and the answer is a threshold, not a trajectory. A student can park
+     the angle a degree below the threshold, pause, and step to watch the block
+     start moving. Running, the transition happens between two frames and is
+     invisible. */
+  function advance(h) {
+    t += h;
+    const th = TH.get() * Math.PI / 180, mu = MU.get();
+    const N = M.get() * G * Math.cos(th), fp = M.get() * G * Math.sin(th);
+    const slides = fp > mu * N && th > 0.001;
+    if (slides) {
+      const a = G * (Math.sin(th) - mu * Math.cos(th));
+      v += a * h; s += v * h;
+      if (s > Lp) { s = Lp; v = 0; }
+    }
+  }
+  function render() {
     const th = TH.get() * Math.PI / 180, m = M.get(), mu = MU.get(), mg = m * G;
     const N = mg * Math.cos(th), fp = mg * Math.sin(th), fmax = mu * N;
     const slides = fp > fmax && th > 0.001;
     const a = slides ? G * (Math.sin(th) - mu * Math.cos(th)) : 0;
-    if (slides) { v += a * dt; s += v * dt; }
-    if (s > Lp) { s = Lp; v = 0; }
     rA.set(a.toFixed(2) + ' m/s²'); rN.set(N.toFixed(1) + ' N'); rFr.set((slides ? fmax : fp).toFixed(1) + ' N');
     rSt.set(!slides && th < 0.001 ? 'Flat — no slide' : slides ? 'Sliding ⏷' : 'Held by friction');
     const g = cv.g, Bx = 70, By = 250;
@@ -49,6 +66,20 @@ Sims.register('incline', 'Inclined Plane', 'Weight splits into a slide-force and
     pxLabel(g, bx + 8, by + mg * kf + 4, 'mg', '#f87171');
     pxLabel(g, bx - Math.sin(th) * N * kf - 30, by - Math.cos(th) * N * kf, 'N', '#22d3ee');
     pxLabel(g, bx + Math.cos(th) * fNow * kf + 6, by - Math.sin(th) * fNow * kf, 'f', '#34d399');
+  }
+  attachTimeControls({
+    frame, advance, render, reset, replaceButtons: ['Reset'],
+    getTime: () => t,
+    /* At the foot of the ramp the block has stopped for good, so there is
+       nothing to integrate. Step stops advancing rather than walking the clock
+       forward past the end of the run. */
+    canAdvance: () => s < Lp,
+    stepLabel: 'time step',
+    probe: () => ({
+      t, s, v,
+      a: 9.8 * (Math.sin(TH.get() * Math.PI / 180) - MU.get() * Math.cos(TH.get() * Math.PI / 180)),
+      state: { s: +s.toFixed(6), v: +v.toFixed(6) }
+    })
   });
 });
 
@@ -59,18 +90,22 @@ Sims.register('atwood', 'Atwood Machine', 'Two masses, one rope, one acceleratio
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
   const act = SU.el('div', 'sim-actions'); frame.appendChild(act);
   const G = 9.8, kf = 0.9, PMAX = 84;
-  let d = 0, v = 0;
-  const reset = () => { d = 0; v = 0; };
+  let d = 0, v = 0, t = 0;
+  const reset = () => { d = 0; v = 0; t = 0; };
   const M1 = SU.slider(ctr, 'Mass m₁ (kg)', 0.5, 8, 0.5, 2, reset);
   const M2 = SU.slider(ctr, 'Mass m₂ (kg)', 0.5, 8, 0.5, 5, reset);
   const rA = SU.readout(ro, 'a'), rT = SU.readout(ro, 'Tension T'), rDir = SU.readout(ro, 'Heavier');
-  SU.btn(act, '⟲ Reset', reset);
-  SU.loop(cv.c, dt => {
+  function advance(h) {
+    t += h;
+    const m1 = M1.get(), m2 = M2.get();
+    const aMag = Math.abs(m2 - m1) * G / (m1 + m2);
+    if (d < PMAX) { v += aMag * h; d += v * h; }
+    if (d > PMAX) { d = PMAX; v = 0; }
+  }
+  function render() {
     const m1 = M1.get(), m2 = M2.get();
     const heavyRight = m2 >= m1;
     const aMag = Math.abs(m2 - m1) * G / (m1 + m2);
-    if (d < PMAX) { v += aMag * dt; d += v * dt; }
-    if (d > PMAX) { d = PMAX; v = 0; }
     const T = 2 * m1 * m2 * G / (m1 + m2);
     rA.set(aMag.toFixed(2) + ' m/s²'); rT.set(T.toFixed(1) + ' N'); rDir.set(heavyRight ? 'm₂ ↓' : 'm₁ ↓');
     const g = cv.g, cx = cv.W / 2, py = 42, y0 = 130;
@@ -88,6 +123,21 @@ Sims.register('atwood', 'Atwood Machine', 'Two masses, one rope, one acceleratio
     };
     if (heavyRight) { draw(cx - 26, yL, m1, '#22d3ee'); draw(cx + 26, yR, m2, '#fbbf24'); }
     else { draw(cx - 26, yL, m1, '#fbbf24'); draw(cx + 26, yR, m2, '#22d3ee'); }
+  }
+  attachTimeControls({
+    frame, advance, render, reset, replaceButtons: ['Reset'],
+    getTime: () => t,
+    canAdvance: () => d < PMAX,
+    stepLabel: 'time step',
+    probe: () => {
+      const m1 = M1.get(), m2 = M2.get();
+      return {
+        t, d, v,
+        a: Math.abs(m2 - m1) * G / (m1 + m2),
+        T: 2 * m1 * m2 * G / (m1 + m2),
+        state: { d: +d.toFixed(6), v: +v.toFixed(6) }
+      };
+    }
   });
 });
 

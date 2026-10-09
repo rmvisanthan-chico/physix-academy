@@ -379,6 +379,18 @@ for (const sim of SIMS) {
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
   });
+  /* Take the hidden baseline AFTER flipping the flag, not before.
+     An earlier version read the counter first and then set document.hidden, and
+     failed intermittently with "1 pushes while hidden". That one push was an
+     animation frame already in flight when the flag flipped - the simulation was
+     still legitimately running at that instant. So it was a measurement-window
+     bug presenting as a hidden-tab regression, which is the dangerous kind of
+     false signal: a genuine leak could later have been dismissed as flake.
+
+     The assertion is unchanged and still strict - zero pushes across the whole
+     hidden window. Only the window moved to begin where the behaviour begins. */
+  await page.waitForTimeout(120);
+  const hiddenBase = await page.evaluate(() => window.__pushes);
   await page.waitForTimeout(1500);
   const during = await page.evaluate(() => window.__pushes);
   await page.evaluate(() => {
@@ -388,8 +400,8 @@ for (const sim of SIMS) {
   const after = await page.evaluate(() => window.__pushes);
 
   ok('sampling happens while visible', visible > 30, `${visible} pushes in 1.0s of visible running`);
-  ok('paused/hidden: the graph receives no samples', during === before,
-    `${during - before} pushes while hidden`);
+  ok('paused/hidden: the graph receives no samples', during === hiddenBase,
+    `${during - hiddenBase} pushes while hidden`);
   ok('resuming: sampling continues', after > during + 30, `${after - during} pushes after unhiding`);
   await c.close();
 }

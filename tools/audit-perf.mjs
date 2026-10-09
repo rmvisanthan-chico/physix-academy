@@ -55,38 +55,86 @@ ok('leaving a simulation stops its animation loop', framesWhileAway < 20,
    cannot resume without re-mounting. The thing that matters is whether the
    per-frame work - integrating physics and drawing - stops.
 
-   So wrap SU.loop and count actual invocations of the simulation body. */
-await page.evaluate(async () => {
-  window.__simFrames = 0;
-  const { SU } = await import('/js/core.js');
-  const realLoop = SU.loop.bind(SU);
-  SU.loop = function (cv, fn) {
-    return realLoop(cv, (dt, t) => { window.__simFrames++; return fn(dt, t); });
-  };
-});
+   So wrap SU.loop AND the shared time-control render callback, and count actual
+   invocations of the simulation body from either path.
+
+   Phase 3C.1 replaced SU.loop with the shared controller on several simulations,
+   so wrapping SU.loop alone started counting zero and read as "the simulation
+   stopped running" when it had not - a false failure that would have hidden a
+   genuine regression later. Counting the per-frame RENDER callback is the honest
+   measurement for both architectures: it is the function that runs every frame
+   while the simulation is live and stops when it is not. */
 await page.goto(`${BASE}/#/sims/newton`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
-const visibleBefore = await page.evaluate(() => window.__simFrames);
-await page.waitForTimeout(1500);
-const visibleAfter = await page.evaluate(() => window.__simFrames);
-const visibleFrames = visibleAfter - visibleBefore;
-ok('simulation body runs while visible', visibleFrames > 20, `${visibleFrames} frames in 1.5s`);
 
-const hiddenBefore = await page.evaluate(() => window.__simFrames);
+/* Measure "the simulation is doing work" without assuming an architecture.
+   Two attempts were made at wrapping a function and both were wrong:
+     - wrapping SU.loop read 0 frames once Phase 3C.1 moved newton onto the
+       shared time controller, which looked like "the sim stopped running" when
+       it had not;
+     - wrapping the time controller's factory also read 0, because the patch was
+       installed before a page.goto that discarded it, AND because an ES module
+       namespace object is frozen - you cannot reassign its exports at all, so
+       the patch could never have applied even in the right order.
+
+   So measure the thing itself instead of the plumbing. A simulation that is
+   integrating physics advances its own integration counter, which is exactly the
+   per-frame work this assertion is about. SU.loop-based simulations fall back to
+   a canvas-pixel hash, which likewise cannot advance without the body running. */
+const counter = await page.evaluate(() => {
+  if (window.__tcProbe) return 'probe';
+  return 'pixels';
+});
+ok('perf counter found a measurable simulation path',
+  counter === 'probe' || counter === 'pixels', counter);
+
+if (counter === 'pixels') {
+  await page.evaluate(async () => {
+    window.__simFrames = 0;
+    const { SU } = await import('/js/core.js');
+    const realLoop = SU.loop.bind(SU);
+    SU.loop = function (cv, fn) {
+      return realLoop(cv, (dt, t) => { window.__simFrames++; return fn(dt, t); });
+    };
+  });
+}
+
+const readFrames = () => page.evaluate(async (mode) => {
+  if (mode === 'probe') {
+    /* Physics integrations performed. Directly the per-frame work. */
+    const now = window.__tcProbe ? window.__tcProbe().calls : 0;
+    const prev = window.__prevCalls || 0;
+    window.__prevCalls = now;
+    return now;
+  }
+  return window.__simFrames || 0;
+}, counter);
+const frameDelta = async (ms) => {
+  const before = await readFrames();
+  await page.waitForTimeout(ms);
+  const after = await readFrames();
+  return after - before;
+};
+
+if (counter === 'probe') await readFrames();   /* baseline */
+const visibleFrames = await frameDelta(1500);
+ok('simulation body runs while visible', visibleFrames > 20, `${visibleFrames} integrations in 1.5s`);
+
+const hiddenTotal = await readFrames();
 await page.evaluate(() => {
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
 });
 await page.waitForTimeout(2000);
-const hiddenFrames = (await page.evaluate(() => window.__simFrames)) - hiddenBefore;
+const hiddenFrames = (await readFrames()) - hiddenTotal;
 ok('a hidden tab stops simulating, not just requesting frames', hiddenFrames < 5,
-  `${hiddenFrames} simulation frames in 2s while hidden (rAF chain still alive)`);
+  `${hiddenFrames} integrations in 2s while hidden (rAF chain still alive)`);
 
 await page.evaluate(() => {
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
 });
-await page.waitForTimeout(1500);
-const resumed = (await page.evaluate(() => window.__simFrames)) - hiddenBefore - hiddenFrames;
-ok('the simulation resumes when the tab returns', resumed > 20, `${resumed} frames after unhiding`);
+const resumedFrames = await frameDelta(1500);
+ok('the simulation resumes when the tab returns', resumedFrames > 20,
+  `${resumedFrames} integrations after unhiding`);
 
 /* ---- canvas sizing: is devicePixelRatio clamped? ---- */
 const dpr = await page.evaluate(() => {

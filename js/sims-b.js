@@ -3,6 +3,7 @@ import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
 import { createSimControls } from './sim-controls.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 'use strict';
 
@@ -105,21 +106,34 @@ Sims.register('bfield', 'Charge in a B Field', 'Cyclotron motion: r = mv / qB.',
   const cv = SU.canvas(frame, 300);
   const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
   const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-  let pos, vel, trail;
-  const reset = () => { pos = [cv.W * 0.3, cv.H / 2]; vel = [0, -V0.get()]; trail = []; };
+  let pos, vel, trail, t = 0;
+  const reset = () => { pos = [cv.W * 0.3, cv.H / 2]; vel = [0, -V0.get()]; trail = []; t = 0; };
   const V0 = SU.slider(ctr, 'Speed v', 60, 260, 5, 140, reset);
   const B = SU.slider(ctr, 'Field B (signed)', -4, 4, 0.1, 2, reset, v => v.toFixed(1));
   const QM = SU.slider(ctr, 'q/m ratio', 0.05, 0.4, 0.01, 0.15, reset, v => v.toFixed(2));
   const rR = SU.readout(ro, 'Radius'), rT = SU.readout(ro, 'Period'), rD = SU.readout(ro, 'Direction');
   reset();
-  SU.btn(act, '⟲ Reset', reset);
-  SU.loop(cv.c, dt => {
+  /* BUG FIX (pre-existing, live): this simulation called SU.btn(act, ...) but
+     never declared `act`. That threw "ReferenceError: act is not defined" on
+     mount. The error boundary caught it and rendered the frame, so the failure
+     was invisible - the page looked fine, but the animation loop below the
+     offending line never started, so the readouts sat at their initial em dash
+     forever. Found while integrating this sim for time controls; the control bar
+     replaces that button, so the reference is gone. */
+  function advance(h) {
+    t += h;
     const qm = QM.get(), b = B.get(), w = qm * b;
-    const ca = Math.cos(w * dt), sa = Math.sin(w * dt);
+    /* Exact rotation by the cyclotron angle, then a straight step. This is an
+       analytic update, not an Euler approximation of the Lorentz force, so it
+       stays exact for any h - which is what makes Step trustworthy here. */
+    const ca = Math.cos(w * h), sa = Math.sin(w * h);
     vel = [vel[0] * ca - vel[1] * sa, vel[0] * sa + vel[1] * ca];
-    pos = [pos[0] + vel[0] * dt, pos[1] + vel[1] * dt];
+    pos = [pos[0] + vel[0] * h, pos[1] + vel[1] * h];
     if (pos[0] < -50 || pos[0] > cv.W + 50 || pos[1] < -50 || pos[1] > cv.H + 50) reset();
     trail.push([pos[0], pos[1]]); if (trail.length > 900) trail.shift();
+  }
+  function render() {
+    const qm = QM.get(), b = B.get(), w = qm * b;
     const sp = Math.hypot(vel[0], vel[1]);
     const Rth = Math.abs(sp / (qm * Math.abs(b) || 1));
     rR.set(Rth.toFixed(0) + ' px');
@@ -142,6 +156,23 @@ Sims.register('bfield', 'Charge in a B Field', 'Cyclotron motion: r = mv / qB.',
     g.fillStyle = '#e8edf7'; g.font = '11px Segoe UI';
     g.fillText('+q', pos[0] + 10, pos[1] - 8);
     SU.arrowH(g, pos[0], pos[1], vel[0] * 0.12, '#34d399');
+  }
+  attachTimeControls({
+    frame, advance, render, reset,
+    getTime: () => t,
+    /* No canAdvance gate: the particle is never "finished" - it either leaves the
+       canvas (which auto-resets) or keeps circulating. */
+    stepLabel: 'time step',
+    probe: () => {
+      const qm = QM.get(), b = B.get(), w = qm * b;
+      const sp = Math.hypot(vel[0], vel[1]);
+      return {
+        t, w, speed: sp,
+        T: 2 * Math.PI / Math.abs(w || 1),
+        R: Math.abs(sp / (qm * Math.abs(b) || 1)),
+        state: { x: +pos[0].toFixed(6), y: +pos[1].toFixed(6) }
+      };
+    }
   });
 });
 
