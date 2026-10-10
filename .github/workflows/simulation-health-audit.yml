@@ -103,14 +103,21 @@ jobs:
       # actually works.
       - name: Install audit dependencies
         run: |
-          mkdir -p "${RUNNER_TEMP}/ci-deps"
-          echo '{"name":"ci-deps","private":true}' > "${RUNNER_TEMP}/ci-deps/package.json"
-          npm install --prefix "${RUNNER_TEMP}/ci-deps" \
+          set -euo pipefail
+          DEPS="${RUNNER_TEMP}/ci-deps"
+          mkdir -p "$DEPS"
+          printf '{"name":"ci-deps","private":true}\n' > "$DEPS/package.json"
+          npm install --prefix "$DEPS" \
             --no-save --no-package-lock --ignore-scripts \
             playwright@1.63.0 vite@7.3.6
-          echo "NODE_PATH=${RUNNER_TEMP}/ci-deps/node_modules" >> "$GITHUB_ENV"
-          npx --prefix "${RUNNER_TEMP}/ci-deps" playwright install --with-deps chromium
-          NODE_PATH="${RUNNER_TEMP}/ci-deps/node_modules" \
+          echo "NODE_PATH=${DEPS}/node_modules" >> "$GITHUB_ENV"
+
+          # Install the browser from the tree we just created. This calls the
+          # binary directly instead of `npx --prefix`, which is not a real npx
+          # flag - the first version of this workflow used it and the run failed.
+          "$DEPS/node_modules/.bin/playwright" install --with-deps chromium
+
+          NODE_PATH="${DEPS}/node_modules" \
             node -e "require('playwright');require('vite');console.log('playwright + vite resolve OK')"
 
       - name: Run the simulation health audit
