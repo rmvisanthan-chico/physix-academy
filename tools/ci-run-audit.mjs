@@ -17,6 +17,8 @@
  * (which names the simulation and the check) is streamed to stdout as it runs.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -120,19 +122,52 @@ async function main() {
   const results = [];
   
   try {
-    if (!SKIP_BUILD && TARGETS.includes('bundled')) {
-      log('building production bundle (vite build) ...');
-      const built = runNode('vite build', [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']);
-      if (!built) {
-        log('BUILD FAILED - cannot test the bundled path');
-        results.push({ label: 'build', pass: false });
-      } else if (!fs.existsSync(path.join(DIST, 'index.html'))) {
-        log('BUILD REPORTED SUCCESS BUT dist/index.html IS MISSING');
-        results.push({ label: 'build', pass: false });
-      } else {
-        results.push({ label: 'build', pass: true });
-      }
+    const { spawn, spawnSync } = await import('node:child_process');
+  /* Resolve vite through Node's own resolution rather than a hardcoded path.
+     This looked fine locally and failed in CI, twice. tools/ci-run-audit.mjs
+     called ROOT/node_modules/vite/bin/vite.js directly - a path that happens to
+     exist on a developer machine with a warm node_modules, and does NOT exist on
+     a runner, where vite is installed into an isolated prefix and exposed via
+     NODE_PATH precisely so the repository's own dependency tree is left alone.
+     require.resolve honours NODE_PATH, so this works in both places and fails
+     with a legible message instead of a MODULE_NOT_FOUND from inside vite. */
+  /* Resolve vite, then drive its programmatic build API.
+     Two earlier approaches both looked right and were wrong:
+       - a hardcoded ROOT/node_modules/vite/bin/vite.js path, which exists on a
+         developer machine with a warm node_modules and does NOT exist on a CI
+         runner, where vite lives in an isolated prefix. That failed both remote
+         runs.
+       - require.resolve('vite/bin/vite.js'), which throws
+         ERR_PACKAGE_PATH_NOT_EXPORTED because vite's exports map does not
+         publish that path.
+     require.resolve('vite') is the supported entry point AND honours NODE_PATH,
+     which a bare import() does not. The resolved path becomes a file URL because
+     import() rejects raw Windows paths. */
+  let vite = null;
+  try {
+    const viteEntry = createRequire(path.join(ROOT, 'tools', 'ci-run-audit.mjs')).resolve('vite');
+    vite = await import(pathToFileURL(viteEntry).href);
+    log('  vite resolved: ' + viteEntry + (vite.version ? ' (v' + vite.version + ')' : ''));
+  } catch (e) {
+    log('CANNOT RESOLVE vite: ' + (e && e.message ? e.message : e));
+    log('  Install vite, or set NODE_PATH to a prefix that contains it.');
+    results.push({ label: 'build', pass: false });
+    vite = null;
+  }
+
+  if (!SKIP_BUILD && TARGETS.includes('bundled') && vite) {
+    log('building production bundle (vite build) ...');
+    let builtOk = false;
+    try {
+      await vite.build({ root: ROOT, logLevel: 'warn' });
+      builtOk = fs.existsSync(path.join(DIST, 'index.html'));
+      if (!builtOk) log('vite.build returned but dist/index.html is MISSING');
+    } catch (e) {
+      log('vite.build threw: ' + (e && e.message ? e.message : e));
+      builtOk = false;
     }
+    results.push({ label: 'build', pass: builtOk });
+  }
 
     if (TARGETS.includes('local')) {
       startServer(ROOT, PORT_LOCAL, 'local');
