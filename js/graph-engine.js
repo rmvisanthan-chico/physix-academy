@@ -267,14 +267,46 @@ export class Graph {
       window.addEventListener('resize', this._onResize);
     }
 
-    this._raf = requestAnimationFrame(this._frame);
+    /* Re-assert geometry when the tab comes back. Needed because the graph now
+       schedules only on demand: while the tab is hidden rAF does not run, so any
+       state change that landed while hidden is still pending, but the viewport
+       and devicePixelRatio may both have changed and the canvas backing store
+       has to be re-measured before the pending draw paints into a stale buffer.
+       Kicking unconditionally on return is deliberate - it is one draw, not a
+       loop. */
+    this._onVis = () => {
+      if (document.hidden) return;
+      this._resize();
+      this._needsDraw = true;
+      this._kick();
+    };
+    document.addEventListener('visibilitychange', this._onVis);
+
+    this._needsDraw = true;
+    this._kick();
   }
 
   /* Tick label widths, measured once per resize.
      The y labels are drawn INSIDE the canvas at the right edge, so they must
      not be allowed to run off it: reserve a gutter proportional to the widest
      label. An earlier version drew them flush right with no gutter, and on the
-     projectile graph "-21.4" was clipped to "21.4". */
+     projectile graph "-21.4" was clipped to "21.4".
+
+     ORDER MATTERS, and this is the whole reason it is a separate function called
+     before anything is positioned.
+
+     `measureText` depends on ctx.font AND on the actual label strings. The label
+     strings depend on the y-scale, which only exists once computeScale() has run.
+     So the gutter for THIS frame can only be known after the scale is known, and
+     must be measured before the plot width is derived from it.
+
+     The old code measured the gutter at line ~498 but derived PW = W - this._gut
+     at line ~483 - so the plot width came from the PREVIOUS frame's gutter while
+     the labels came from the current scale. It was off by exactly one frame
+     everywhere, and after a resize that meant a canvas laid out for the old
+     width: y labels overlapping the curve, or the 30% cap eating the plot. The
+     no-data path additionally zeroed _gut, so the first draw after that had a
+     gutter of literally 0. */
   _measureTicks(W) {
     const g = this.ctx;
     if (!g) return 0;
@@ -392,6 +424,7 @@ export class Graph {
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
     if (this._ro) this._ro.disconnect();
     else if (this._onResize) window.removeEventListener('resize', this._onResize);
+    if (this._onVis) { document.removeEventListener('visibilitychange', this._onVis); this._onVis = null; }
     this.series.length = 0;
     this.byId = {};
     this.el.remove();
@@ -433,6 +466,37 @@ export class Graph {
     return { x0, x1, y0, y1 };
   }
 
+  /* Scheduling is ON DEMAND.
+
+     The previous version re-armed itself unconditionally at the end of every
+     frame:
+         this._raf = requestAnimationFrame(this._frame);
+     with a comment claiming this was "cheap". It is not free. A graph is one
+     per simulation, so on a page with three graphs plus a running simulation the
+     browser was servicing three animation callbacks every 16ms that did
+     nothing at all, waking the main thread, defeating the browser's idle-frame
+     skipping, and keeping the compositor busy. On a dashboard route with a
+     mounted-but-idle simulation that is pure heat and battery.
+
+     The re-arm is now done by _kick() only, and _kick() only schedules when
+     _needsDraw is actually set. Every site that mutates state already calls
+     _kick() - push(), addSeries(), setVisible(), clear(), the ResizeObserver,
+     the window resize handler and the visibility handler below - so "something
+     changed, draw me" is already wired; the unconditional re-arm was only
+     papering over the fact that it was.
+
+     Behaviour that must NOT be lost by making this on-demand:
+       - live updates: push() sets _needsDraw and kicks.
+       - resizing: ResizeObserver (or the window fallback) sets it and kicks.
+       - tab return: while hidden, rAF callbacks do not run at all, so a
+         pending frame simply waits. But a resize that happened while hidden
+         could have been coalesced away, and more importantly the graph should
+         re-assert its own geometry on return, because devicePixelRatio and the
+         viewport can both change while a tab is backgrounded. Hence the
+         visibilitychange listener below, which kicks on becoming visible.
+       - a push that lands DURING a frame: _frame nulls _raf before drawing, so
+         a push from inside draw() calls _kick(), sees no pending frame, and
+         schedules the next one. No lost update, no double-schedule. */
   _kick() {
     if (!this._needsDraw || !this._alive) return;
     if (this._raf) return;                 /* already scheduled */
@@ -446,9 +510,10 @@ export class Graph {
       this._needsDraw = false;
       this.draw();
     }
-    /* keep the loop alive but idle: cheap, and it means a push between frames
-       draws on the next one without any scheduling bookkeeping. */
-    this._raf = requestAnimationFrame(this._frame);
+    /* Deliberately no re-arm. If draw() (or anything it calls) changed
+       something, _needsDraw is true again and _kick() will have scheduled the
+       next frame by the time we get here. Stopping here is what makes an idle
+       graph cost nothing. */
   };
 
   /* ---------- drawing ---------- */
@@ -480,9 +545,22 @@ this._gut = 0;
     return;
     }
     const { x0, x1, y0, y1 } = this.scale;
+
+    /* Gutter FIRST, then plot width.
+       The gutter is derived from the y tick labels, which come from `this.scale`
+       computed two lines above, so it can only be measured here - but every
+       x-coordinate below depends on the plot width, which depends on the gutter.
+       Measuring after deriving PW (as this did until Phase 3C.2) meant the plot
+       was laid out with the previous frame's gutter. */
+    this._gut = this._measureTicks(W);
     const PW = W - this._gut;               /* plot width, excluding y gutter  */
     const PH = H - BAND;                   /* plot height, excluding x band  */
     this._PH = PH;
+    /* Exposed for tests, like drawCount. PW + _gut must equal the canvas width
+       for the frame just drawn - if it does not, the plot was laid out against a
+       gutter from a different frame than the labels now beside it. Storing PW is
+       what makes that checkable at all; without it the only evidence is pixels. */
+    this._PW = PW;
     const fx = (x) => ((x - x0) / (x1 - x0)) * PW;
     const fy = (y) => PH - ((y - y0) / (y1 - y0)) * PH;
 
@@ -495,9 +573,13 @@ this._gut = 0;
        off the canvas edge. */
     g.fillStyle = txt;
     g.font = '10px "DM Mono", monospace';
-    const gut = this._measureTicks(W);
+    /* No re-measure here. _gut was already set above, BEFORE the plot width was
+       derived from it, and re-measuring now would compute the same value and
+       write it a second time - which is harmless in itself but hid the ordering
+       bug for so long because the assignment read as if it were the source of
+       truth. PW below is the value everything is actually drawn against. */
+    const gut = this._gut;
     const plotW = W - gut;
-    this._gut = gut;
 
     g.textAlign = 'center';
     g.textBaseline = 'top';
