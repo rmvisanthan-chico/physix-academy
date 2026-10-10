@@ -49,6 +49,15 @@ function loadPlaywright() {
 }
 const { chromium } = loadPlaywright();
 
+/* Browser selection.
+   Local runs use the system Chrome - what a developer already has. CI sets
+   PW_CHANNEL=chromium and provisions that browser itself, so the gate depends
+   only on what the workflow installed rather than on whichever Chrome version
+   happens to be baked into a runner image that is replaced every few weeks.
+   Defaulting to 'chrome' means no local behaviour changes and no local flag is
+   needed. */
+const PW_CHANNEL = process.env.PW_CHANNEL || 'chrome';
+
 const args = process.argv.slice(2);
 const BASE = args.find(a => !a.startsWith('--')) || 'http://localhost:4173';
 const ONLY = (args.find(a => a.startsWith('--only=')) || '').split('=')[1];
@@ -289,7 +298,7 @@ async function until(page, fn, arg, timeout = 2500) {
 }
 
 async function runAudit() {
-  const browser = await chromium.launch({ channel: 'chrome' });
+  const browser = await chromium.launch({ channel: PW_CHANNEL });
   const page = await makePage(browser);
 
   await page.goto(`${BASE}/#/sims`, { waitUntil: 'networkidle' });
@@ -696,7 +705,7 @@ async function lifecycleChecks(page, id, opts) {
  * suite that simply always-fails cannot pass.
  * ------------------------------------------------------------------ */
 async function runSelfTest() {
-  const browser = await chromium.launch({ channel: 'chrome' });
+  const browser = await chromium.launch({ channel: PW_CHANNEL });
   const page = await makePage(browser);
 
   await page.route('**/__simfixture.html', r => r.fulfill({
