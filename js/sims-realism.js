@@ -14,19 +14,56 @@ Sims.register('cdn-3d-atom','CDN 3D Atom (Lazy)','High-res env map & textures la
     if(loaded) return; loaded=true;
     rS.set('Fetching CDN textures…'); rT.set('threejs.org');
     wrap.innerHTML='';
-    const cv=SU.canvas(wrap,340);
+    /* BUG FIX (found by tools/audit-sims.mjs; broken since it was written):
+       this used SU.canvas(wrap,340), which ends with getContext('2d') - see
+       core.js. A canvas element can only ever have ONE context type, so handing
+       that same element to THREE.WebGLRenderer could only ever fail:
+
+         THREE.WebGLRenderer: A WebGL context could not be created.
+         Reason: Canvas has an existing context of a different type
+
+       WebGLRenderer then threw, the atom was never built, and the canvas stayed
+       permanently black - while the readout cheerfully reported
+       "✅ CDN texture loaded", because the texture HAD loaded and only the
+       renderer had failed. The page rendered, the button worked, the readout said
+       success, and the simulation produced nothing: precisely the failure mode
+       this audit was written to catch.
+
+       A plain canvas element is used instead - no context taken, so THREE can
+       claim WebGL. Sizing mirrors SU.canvas so layout is unchanged. The shared
+       S3D helper in sims3d-a.js does the same job and would be the more idiomatic
+       route; a local canvas keeps the fix contained to this one simulation with
+       no module-graph change. */
+    const c=document.createElement('canvas');
+    const W=Math.max(280, wrap.clientWidth||640), H=340;
+    c.style.width=W+'px'; c.style.height=H+'px'; c.style.display='block';
+    wrap.appendChild(c);
     // Lazy-load Three is already vendored, but textures are CDN
     const loader=new THREE.TextureLoader();
     const texUrl='https://threejs.org/examples/textures/uv_grid_opengl.jpg';
     loader.load(texUrl, tex=>{
       rS.set('✅ CDN texture loaded'); rT.set('uv_grid_opengl.jpg');
       const scene=new THREE.Scene(); scene.background=new THREE.Color(0x05070d);
-      const cam=new THREE.PerspectiveCamera(50,cv.W/cv.H,0.1,100); cam.position.set(0,1.2,4);
-      const ren=new THREE.WebGLRenderer({canvas:cv.c,antialias:true}); ren.setSize(cv.W,cv.H); ren.setPixelRatio(window.devicePixelRatio||1);
+      const cam=new THREE.PerspectiveCamera(50,W/H,0.1,100); cam.position.set(0,1.2,4);
+      const ren=new THREE.WebGLRenderer({canvas:c,antialias:true});
+      ren.setPixelRatio(Math.min(window.devicePixelRatio||1,2)); ren.setSize(W,H);
       const light=new THREE.DirectionalLight(0xffffff,1.2); light.position.set(2,3,2); scene.add(light); scene.add(new THREE.AmbientLight(0x33415c,0.6));
       const geo=new THREE.SphereGeometry(0.9,64,64); const mat=new THREE.MeshStandardMaterial({map:tex, roughness:0.35, metalness:0.1}); const mesh=new THREE.Mesh(geo,mat); scene.add(mesh);
       const elecGeo=new THREE.SphereGeometry(0.12,16,16); const elecMat=new THREE.MeshStandardMaterial({color:0x38bdf8, emissive:0x0ea5e9}); const electrons=[0,1,2].map(i=>{const m=new THREE.Mesh(elecGeo,elecMat); scene.add(m); return m;});
-      let t=0; (function anim(){ requestAnimationFrame(anim); if(!cv.c.isConnected) return; t+=0.015; mesh.rotation.y+=0.006; electrons.forEach((e,i)=>{const a=t* (0.8+i*0.3); const r=1.35; e.position.set(Math.cos(a)*r, Math.sin(a*0.7)*0.4, Math.sin(a)*r);}); ren.render(scene,cam); })();
+      /* BUG FIX 2 (same audit): the loop re-armed requestAnimationFrame BEFORE
+       checking isConnected, so once the simulation started working it could never
+       stop - requestAnimationFrame(anim) was called, then the early return
+       happened after it. Every visit to this page added a permanent rAF chain
+       that ran forever. It had been invisible because the WebGL failure above
+       meant this code was never reached at all; fixing the renderer exposed it.
+
+       The order is now the same as SU.loop in core.js: check first, then re-arm.
+       (The audit made this obvious - the leak is global, so this one simulation
+       made every LATER simulation in the registry fail its unmount check too.) */
+let t=0; (function anim(){
+      if(!c.isConnected) return;          /* stop for good, do not re-arm */
+      requestAnimationFrame(anim);
+      t+=0.015; mesh.rotation.y+=0.006; electrons.forEach((e,i)=>{const a=t* (0.8+i*0.3); const r=1.35; e.position.set(Math.cos(a)*r, Math.sin(a*0.7)*0.4, Math.sin(a)*r);}); ren.render(scene,cam); })();
     }, undefined, ()=>{ rS.set('❌ CDN blocked — fallback'); rT.set('local fallback'); wrap.innerHTML='<div style="padding:1rem;color:var(--txt2)">CDN blocked offline — using local fallback. Online, high-res loads.</div>'; });
   };
   const btn=SU.el('button','btn btn-primary','Load 3D (CDN)'); btn.style.margin='1rem'; btn.onclick=load; frame.appendChild(btn);
