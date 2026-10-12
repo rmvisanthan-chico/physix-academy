@@ -117,15 +117,24 @@ const MANIFEST = {
                    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
   refraction:    { cls: 'interactive', why: "Snell's law evaluated per draw, no clock",
                    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  /* Heat Engine Cycle draws its P-V loop from FIXED constants - the polygon
-     coordinates are literals and never reference the sliders. Only the readouts
-     (Carnot eta, Work) respond. So the picture is a decorative illustration and
-     the honest evidence of a working control here is the readout changing.
-     Declared explicitly rather than loosening the default pixel-only rule for
-     everything, because that rule is what catches dead controls. Worth raising
-     with the authors: the cycle diagram arguably should scale with efficiency. */
-'thermo-engine': { cls: 'interactive', why: 'Carnot efficiency from slider values; P-V loop is a FIXED illustration, only readouts respond',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'readout' } },
+/* Heat Engine Cycle - the P-V loop WAS a fixed illustration. The polygon was
+     four hard-coded literals in js/sims-more.js that referenced neither slider,
+     so the readouts moved while the picture never did, and the work readout was
+     literally labelled "(demo)". Verified rather than assumed: a pixel-signature
+     probe sampling the routed page five times with nothing touched returned one
+     distinct value, which is what a frozen polygon looks like.
+
+     That claim has now been FIXED, so the declaration below is stronger than
+     before: it demands the DIAGRAM change, not merely a readout. The audit
+     passing here is therefore the evidence that the loop responds to Th and Tc.
+
+     Note this is the 2D canvas simulation registered in js/sims-more.js, which
+     is what /#/sims/thermo-engine serves. html5-sims/thermo-engine.html is a
+     separate 3D page in the "3D" gallery with the same cycle and its own
+     (also genuine) defect: its two "isothermal" legs were drawn at constant
+     pressure. Both are covered by tools/test-thermo-engine.mjs. */
+  'thermo-engine': { cls: 'interactive', why: 'Carnot cycle computed from Th and Tc each frame; the drawn loop and the readouts both track the sliders',
+                    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
   'ncert10-mirror': { cls: 'interactive', why: 'mirror equation from sliders, no clock',
                    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
   'ncert10-eye':   { cls: 'interactive', why: 'eye defect from power slider, no clock',
@@ -521,9 +530,21 @@ await page.waitForTimeout(150);
         const settled2 = settled;
         /* Which observable counts as proof the control did something. Pixel-only
            is the default because a readout that merely echoes the slider proves
-           nothing. A simulation may declare 'readout' when its picture is a fixed
-           illustration and the numbers are the real output - thermo-engine is the
-           one such case, and it is declared, not defaulted. */
+           nothing. A simulation may still declare 'readout' when its picture is
+           genuinely a fixed illustration and the numbers are the real output.
+
+           thermo-engine used to be the only simulation taking that path, and the
+           justification written here at the time was correct: its loop really
+           was fixed artwork. It has since been fixed, so it now takes the default
+           pixel proof. (Worth recording that the claim was doubted during this
+           work, on the grounds that html5-sims/thermo-engine.html - a DIFFERENT
+           file implementing the same cycle - does recompute from its sliders.
+           Two implementations, one id, and the wrong one was read first.)
+
+           The 'readout' escape hatch is deliberately retained: it is a
+           declaration a maintainer must justify in writing, and there is no
+           current user. Removing it would only invite the next person to reach
+           for pixelSig unconditionally and miss a genuinely static diagram. */
         const signal = spec.interact.expect === 'readout' ? 'readoutSig' : 'pixelSig';
         /* `signal` and `before` are passed in through the ARGUMENT, not closed
            over. page.waitForFunction serialises the predicate and evaluates it in

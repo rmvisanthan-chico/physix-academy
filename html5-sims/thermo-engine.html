@@ -132,7 +132,10 @@
   </div>
   <p class="hint">
     Drag empty space to orbit, scroll to zoom, right-drag to pan. Heat flowing in is red, heat
-    leaving is green, and the shaded area on the PV diagram is the work delivered.
+    leaving is green. The shaded area is the <b>reversible</b> work the cycle encloses; friction
+    and turbulence take their share before it reaches the shaft, which is why the delivered work
+    and the actual efficiency both read lower than the Carnot ceiling. Cycle rate is temporal
+    only &mdash; it changes how fast you watch, never the curve.
   </p>
 </aside>
 
@@ -145,7 +148,26 @@
   const T = THREE;
   const el = id => document.getElementById(id);
   const cv = el('c');
-  const GAMMA = 1.4, V1 = 2, V2 = 6, EX = 5.5;
+  /* ---- Thermodynamic constants --------------------------------------------
+     The process is a Carnot cycle and the code already said so everywhere: the
+     four legs are named isothermal/adiabatic, the badge shows eta = 1 - Tc/Th,
+     and energy() integrates nR*T*ln(V2/V1). So the model is established by the
+     implementation, not assumed here.
+
+     R is the molar gas constant (J/(mol*K)) and N the amount of gas, so nR has
+     real units of J/K and p(V,T) = nR*T/V genuinely has units of pascals.
+
+     Previously the amount of gas was folded into a single expression
+     `nR = Th * V1`, which left pressure with units of K*K while the readout
+     still printed "kPa". The shape of the curve never depended on that, but no
+     number could honestly be read off the axes. */
+  const R = 8.314;          // J/(mol*K)
+  const N = 40;             // mol
+  const nR = N * R;         // J/K
+  const GAMMA = 1.4;        // diatomic gas
+  const V1 = 0.40;          // m^3 at the start of isothermal expansion
+  const V2 = 1.20;          // m^3 after it (a 3x expansion ratio)
+  const EX = 5.5;
 
   const st = Physix3D.stage(cv, {
       accent: 0xf97316,
@@ -223,10 +245,17 @@
   const axP = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, YH + 2.0, 8),
     new T.MeshBasicMaterial({ color: 0x7f92bb, transparent: true, opacity: 0.7 }));
   axP.position.set(PX, OY + (YH + 2.0) / 2, 0);
-  const lblV = st.label('V', '#9fb0d8', 0.0065);
-  const lblP = st.label('P', '#9fb0d8', 0.0065);
-  lblV.position.set(PX + XW + 1.0, OY, 0);
-  lblP.position.set(PX, OY + YH + 2.2, 0);
+  /* Axis titles carry units. A P-V diagram whose axes say only "P" and "V" cannot
+     be read quantitatively, which is the whole reason the values had nowhere to
+     come from before.
+
+     Both titles sit INSIDE the diagram's own bounding box. Placed outside it,
+     the pressure title falls off the left edge of the frame entirely - it was
+     rendering as a clipped "Pa)" in the corner. */
+  const lblV = st.label('V  (m³)', '#9fb0d8', 0.0058);
+  const lblP = st.label('P  (kPa)', '#9fb0d8', 0.0058);
+  lblV.position.set(PX + XW - 0.55, OY - 1.15, 0);
+  lblP.position.set(PX + 1.5, OY + YH + 0.5, 0);
   const pvPivot = new T.Group();
   pvPivot.position.set(PX + XW / 2, 0, 0);
   const pvGroup = new T.Group();
@@ -234,6 +263,88 @@
   pvPivot.add(pvGroup);
   scene.add(pvPivot);
   pvGroup.add(axV, axP, lblV, lblP);
+
+  /* Axis tick marks, with numeric labels in real units.
+     The pool is built ONCE and only repositioned/retitled afterwards. Creating
+     tick objects per redraw is how a diagram ends up with duplicate sprites and
+     leaked textures after a few hundred frames of slider dragging; a fixed pool
+     makes that impossible by construction. */
+  function tickSprite(color, scale) {
+    const cv = document.createElement('canvas');
+    const ctx = cv.getContext('2d');
+    const tex = new T.CanvasTexture(cv);
+    tex.encoding = T.sRGBEncoding;
+    const sprite = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sprite.renderOrder = 999;
+    const set = text => {
+      const FONT = '600 40px ui-monospace,Menlo,Consolas,monospace';
+      ctx.font = FONT;
+      const w = Math.ceil(ctx.measureText(text).width) + 20;
+      cv.width = w; cv.height = 60;            // resizing clears the canvas
+      ctx.font = FONT;
+      ctx.fillStyle = color;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 10, 32);
+      tex.needsUpdate = true;                  // same texture, no new GPU object
+      sprite.scale.set(w * scale, 60 * scale, 1);
+    };
+    return { sprite, set };
+  }
+
+  const TICK_N = 5;
+  const tickMarkGeo = new T.BoxGeometry(0.16, 0.16, 0.16);
+  const tickMat = new T.MeshBasicMaterial({ color: 0x8fa2cc, transparent: true, opacity: 0.85 });
+  const vTicks = [], pTicks = [];
+  for (let i = 0; i < TICK_N; i++) {
+    const v = tickSprite('#a9bade', 0.0040), p = tickSprite('#a9bade', 0.0040);
+    const vm = new T.Mesh(tickMarkGeo, tickMat), pm = new T.Mesh(tickMarkGeo, tickMat);
+    pvGroup.add(v.sprite, p.sprite, vm, pm);
+    vTicks.push({ ...v, mark: vm }); pTicks.push({ ...p, mark: pm });
+  }
+
+  /* Round tick values (1/2/5 x 10^n) so the labels stay legible and the spacing
+     looks deliberate across a range that spans ~2 m^3 to ~100 m^3. */
+  function niceStep(span, target) {
+    const raw = span / Math.max(1, target);
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const mult = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+    return mult * mag;
+  }
+
+  function updateTicks(C) {
+    const fmt = (x, dp) => x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2);
+    /* Both axes label INSIDE the plot. Textbook diagrams put pressure labels to
+       the left of the axis, but this diagram sits hard against the left edge of
+       the frame on a phone, and anything outside the plot gets clipped off the
+       screen. Inside is the only placement that survives every viewport. */
+    {
+      const lo = V1, hi = C.vmax, step = niceStep(hi - lo, TICK_N - 1);
+      const vals = [];
+      for (let v = lo; v <= hi + step * 1e-6 && vals.length < TICK_N; v += step) vals.push(v);
+      vTicks.forEach((t, i) => {
+        const on = i < vals.length;
+        t.sprite.visible = on; t.mark.visible = on;
+        if (!on) return;
+        t.set(fmt(vals[i], 2));
+        t.sprite.position.set(sx(vals[i], C), OY - 0.62, 0);
+        t.mark.position.set(sx(vals[i], C), OY, 0);
+      });
+    }
+    {
+      const hiKPa = C.ptop / 1000, step = niceStep(hiKPa, TICK_N - 1);
+      const vals = [];
+      for (let v = 0; v <= hiKPa + step * 1e-6 && vals.length < TICK_N; v += step) vals.push(v);
+      pTicks.forEach((t, i) => {
+        const on = i < vals.length;
+        t.sprite.visible = on; t.mark.visible = on;
+        if (!on) return;
+        t.set(fmt(vals[i], 0));
+        t.sprite.position.set(PX + 0.62, OY + (vals[i] / hiKPa) * YH, 0);
+        t.mark.position.set(PX, OY + (vals[i] / hiKPa) * YH, 0);
+      });
+    }
+  }
 
   const legLines = LEGS.map(L => {
     const g = new T.BufferGeometry();
@@ -279,24 +390,42 @@
 
   function cycle() {
     const P = par();
-    const T1 = P.Th, T3 = P.Tc;
-    const r = Math.pow(T1 / T3, 1 / (GAMMA - 1));
-    const nR = T1 * V1;
+    const Th = P.Th, Tc = P.Tc;
+    const r = Math.pow(Th / Tc, 1 / (GAMMA - 1));
     const p = (V, T) => nR * T / V;
-    return {
-      P, r, nR, vmax: V2 * r, ptop: p(V1, T1),
+    const C = {
+      P, r,
+      vmax: V2 * r,
       st: [
-        { n: 1, V: V1, T: T1, p: p(V1, T1) },
-        { n: 2, V: V2, T: T1, p: p(V2, T1) },
-        { n: 3, V: V2 * r, T: T3, p: p(V2 * r, T3) },
-        { n: 4, V: V1 * r, T: T3, p: p(V1 * r, T3) }
+        { n: 1, V: V1,     T: Th, p: p(V1, Th) },
+        { n: 2, V: V2,     T: Th, p: p(V2, Th) },
+        { n: 3, V: V2 * r, T: Tc, p: p(V2 * r, Tc) },
+        { n: 4, V: V1 * r, T: Tc, p: p(V1 * r, Tc) }
       ]
     };
+    C.ptop = C.st[0].p;
+    return C;
   }
 
+  /* Axis ranges map real pascals and cubic metres onto the diagram box. */
   const sx = (V, C) => PX + ((V - V1) / (C.vmax - V1)) * XW;
   const sy = (p, C) => OY + (p / C.ptop) * YH;
 
+  /* The gas follows a clean reversible Carnot path.
+
+     Friction and turbulence are MECHANICAL losses acting on the piston, so they
+     reduce the work delivered from a given gas path without altering that path.
+     They are therefore applied to the work readout, not to the curve - and the
+     curve is the reversible cycle the shaded area measures.
+
+     An earlier attempt scaled each leg's pressure toward the loop's mean by
+     (1-irr), which does shrink the enclosed area by exactly (1-irr). It was
+     wrong: scaling toward the mean RAISES pressure on the cold leg, so the gas
+     came out HOTTER than the cold reservoir while supposedly dumping heat, and
+     the readout showed 1127 K with T_h at 600 K. There is no way around that -
+     for an ideal gas between two reservoirs, any cycle with efficiency below
+     the Carnot limit must leave the [T_c, T_h] band, and getting the sign right
+     needs a full irreversible-cycle model, not a scaling trick. */
   function legPoints(C, i) {
     const S = C.st, out = [];
     const a = S[i], b = S[(i + 1) % 4];
@@ -304,16 +433,26 @@
     for (let j = 0; j < PER; j++) {
       const u = j / (PER - 1);
       const V = a.V + (b.V - a.V) * u;
-      const p = iso ? a.p : a.p * Math.pow(a.V / V, GAMMA);
-      out.push({ V, p, T: p * V / C.nR });
+      /* Isothermal legs follow pV = nRT at the reservoir temperature. They are
+         NOT constant pressure. Holding p = a.p here was the original defect:
+         both "isothermal" legs were drawn as horizontal lines, so temperature
+         ran away along them (600 K -> 1800 K at the defaults), and states 2
+         and 4 sat off the curve entirely. */
+      const p = iso ? nR * a.T / V : a.p * Math.pow(a.V / V, GAMMA);
+      out.push({ V, p, T: p * V / nR });
     }
     return out;
   }
 
+  /* Heat on the two isothermal legs, integrated from the reversible geometry.
+     Qin = nR*Th*ln(V2/V1) and Qout = nR*Tc*ln(V3/V4); since V3/V4 == V2/V1 the
+     ratio of the two is exactly Tc/Th, so Wideal/Qin reduces to the Carnot
+     efficiency. These formulas were already correct - they were simply
+     describing a curve the diagram did not draw. */
   function energy(C) {
     const S = C.st;
-    const Qin = C.nR * S[0].T * Math.log(S[1].V / S[0].V);
-    const Qout = C.nR * S[2].T * Math.log(S[2].V / S[3].V);
+    const Qin = nR * S[0].T * Math.log(S[1].V / S[0].V);
+    const Qout = nR * S[2].T * Math.log(S[2].V / S[3].V);
     return { Qin, Qout, Wideal: Qin - Qout };
   }
 
@@ -383,10 +522,12 @@
     }
     fillGeo.attributes.position.needsUpdate = true;
 
+    /* Markers sit exactly on the drawn curve: both use the same reversible pressure. */
     C.st.forEach((S, i) => marks[i].position.set(sx(S.V, C), sy(S.p, C), 0.05));
     dot.position.set(sx(cur.V, C), sy(cur.p, C), 0.12);
     dotGlow.position.copy(dot.position);
     dot.material.color.set(LEGS[cur.seg].col);
+    updateTicks(C);
 
     pvGroup.visible = show.pv;
     plate.visible = show.piston;
@@ -428,8 +569,9 @@
       v.style.borderColor = 'rgba(255,122,122,.34)';
     } else {
       v.innerHTML = '<b style="color:var(--ok)">' + LEGS[cur.seg].name + '.</b> Gas at ' + cur.T.toFixed(0) +
-        ' K, ' + cur.V.toFixed(1) + ' m³. Each adiabatic leg swells the volume by ' +
-        C.r.toFixed(2) + '&times;, and the shaded loop is worth ' + kJ(W) + ' per cycle.';
+        ' K, ' + cur.V.toFixed(2) + ' m³. Each adiabatic leg swells the volume by ' +
+        C.r.toFixed(2) + '&times;, and the reversible loop encloses ' + kJ(E.Wideal) + ' per cycle, of which ' +
+        kJ(W) + ' reaches the shaft.';
       v.style.borderColor = 'rgba(62,224,164,.34)';
     }
   }
@@ -451,6 +593,22 @@
   el('bRst').addEventListener('click', () => { s = 0; });
 
   syncUI();
+
+  /* Narrow screens stack the panel over the lower half of the canvas, which
+     leaves a short, wide strip to show a scene framed for a 16:10 desktop. At
+     390px the P-V diagram ended up small and pushed against the left edge, so
+     the camera is pulled back toward the diagram itself. Same scene, same
+     physics - only the framing changes. */
+  function frameForViewport() {
+    const narrow = window.innerWidth < 900;
+    st.controls.frame(
+      narrow ? 19 : 20,
+      narrow ? new T.Vector3(-3.2, 3.9, 0) : new T.Vector3(3.65, 4.2, 0)
+    );
+  }
+  frameForViewport();
+  window.addEventListener('resize', frameForViewport);
+
   st.onFrame(dt => { step(dt); outs(draw()); });
   st.start();
 })();
