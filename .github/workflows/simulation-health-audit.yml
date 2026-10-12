@@ -52,9 +52,6 @@ concurrency:
 permissions:
   contents: read
 
-# A hung browser should not consume a runner for six hours.
-timeout-minutes: 30
-
 jobs:
   simulation-health-audit:
     # The job name is what branch protection matches on, so it is deliberately
@@ -62,6 +59,18 @@ jobs:
     # "Simulation Health Audit". If you rename one, rename both.
     name: Simulation Health Audit
     runs-on: ubuntu-latest
+    # JOB level, not workflow level. `timeout-minutes` is only valid inside a
+    # job; at the top level it is a schema violation and GitHub rejects the whole
+    # file with "Unexpected value 'timeout-minutes'" BEFORE any job starts.
+    # That is not a cosmetic mistake: the workflow never ran, so three apparent
+    # "failed runs" told us nothing about the audit, and two speculative fixes
+    # were made against a job that had never executed.
+    #
+    # 45 rather than 30 because the gate runs three browser sweeps (unbundled,
+    # bundled, self-test) at roughly five minutes each, and a loaded or slower
+    # runner can double that. A hung browser must not occupy a runner
+    # indefinitely, but the limit must not kill a legitimate slow run either.
+    timeout-minutes: 45
     env:
       # Provision our own browser instead of relying on whatever Chrome a runner
       # image happens to ship. tools/audit-sims.mjs defaults to 'chrome' for
