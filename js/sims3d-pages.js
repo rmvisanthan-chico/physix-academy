@@ -18,7 +18,7 @@ window.Sims3D = [
   { f: 'lens.html', i: '🔭', t: 'Converging Lens 3D', d: 'A glass lens traced with five rays. Move the object through f and 2f and watch the image change kind.', k: '3d' },
   { f: 'ncert10-mirror.html', i: '🪞', t: 'Spherical Mirror 3D', d: 'Concave and convex with true spherical reflection. Signs follow f < 0 for concave, as in the textbook.', k: '3d' },
   { f: 'ncert10-eye.html', i: '👁️', t: 'Human Eye Defects 3D', d: 'Focus lands on the retina when the eye is right. Too strong is myopia, too weak is hypermetropia — and Auto-correct finds the lens.', k: '3d' },
-  { f: 'thermo-engine.html', i: '🔥', t: 'Heat Engine Cycle 3D', d: 'A real Carnot cycle in a real cylinder. The four legs close properly, and the shaded PV loop is literally the work you get.', k: '3d' },
+  { f: 'thermo-engine.html', i: '🔥', t: 'Heat Engine Cycle 3D', d: 'A real Carnot cycle in a real cylinder. The four legs close properly, and the shaded PV loop is the reversible work the cycle encloses.', k: '3d' },
   { f: 'cooling.html', i: '❄️', t: 'Newton’s Cooling 3D', d: 'Exponential decay with a live marker on the curve. Move the room temperature and watch the half-life and the colour both shift.', k: '3d' },
   { f: 'ncert11-pv.html', i: '📈', t: 'Brayton PV Cycle 3D', d: 'Work is the enclosed area, and the sim proves it: it integrates ∮P dV and checks it against Q(in) − Q(out) live.', k: '3d' },
   { f: 'ktg-gas.html', i: '💨', t: 'Kinetic Gas 3D', d: 'Molecules bounce off real walls and the pressure is nothing but summed impulse. It lands on NkT/V, and all three axes agree.', k: '3d' },

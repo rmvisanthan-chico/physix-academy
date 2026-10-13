@@ -37,6 +37,11 @@
   .ctl{margin-bottom:14px}
   .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt2);margin-bottom:7px}
   .ctl label b{color:var(--txt);font-family:var(--mono);font-weight:500}
+  /* Explanatory text attached to a control and to the readouts. Kept visually
+     subordinate to the numbers: it explains what a control does NOT change. */
+  .note{font-size:11.5px;line-height:1.55;color:var(--txt3);margin:8px 0 0}
+  .note b{color:var(--txt2);font-weight:600}
+  .note em{color:var(--txt2);font-style:italic}
   input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
     background:linear-gradient(90deg,var(--acc) var(--p,50%),rgba(255,255,255,.13) var(--p,50%));outline:none;cursor:pointer}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
@@ -72,13 +77,13 @@
 
 <div class="hud brand">
   <h1>Heat Engine Cycle 3D</h1>
-  <p>A real gas in a real cylinder. Watch it climb the piston, expand, cool and compress &mdash; the loop it traces is the work you get.</p>
+  <p>A real gas in a real cylinder. Watch it climb the piston, expand, cool and compress &mdash; the loop it traces is the work the cycle encloses.</p>
 </div>
 <div class="hud eq">&eta; = 1 &minus; T<sub>c</sub>/T<sub>h</sub></div>
 
 <div class="hud dock">
-  <div class="chip"><span>Efficiency</span><b id="dE">—</b></div>
-  <div class="chip"><span>Work out</span><b id="dW">—</b></div>
+  <div class="chip"><span>Delivered &eta;</span><b id="dE">—</b></div>
+  <div class="chip"><span>Work to shaft</span><b id="dW">—</b></div>
   <div class="chip"><span>Heat in</span><b id="dQin">—</b></div>
   <div class="chip"><span>Stage</span><b id="dS">—</b></div>
 </div>
@@ -98,8 +103,13 @@
     <input type="range" id="sR" min="0.05" max="1" step="0.01" value="0.22">
   </div>
   <div class="ctl">
-    <label>Friction &amp; losses <b><span id="vIr">0.30</span></b></label>
+    <label>Mechanical transmission losses <b><span id="vIr">0.30</span></b></label>
     <input type="range" id="sIr" min="0" max="1" step="0.01" value="0.3">
+    <p class="note">
+      Friction and turbulence in the piston and drive take their share <em>after</em> the gas has
+      completed the cycle. They reduce the useful work reaching the shaft, and leave the idealised
+      Carnot P&ndash;V path &mdash; the drawn loop and the Carnot efficiency &mdash; exactly as it is.
+    </p>
   </div>
 
   <div class="toggles">
@@ -110,13 +120,21 @@
 
   <h2 class="mt">Readouts</h2>
   <div class="ros">
-    <div class="ro"><span>Carnot &eta;</span><b id="rEc">0</b></div>
-    <div class="ro"><span>Actual &eta;</span><b id="rEa">0</b></div>
+    <div class="ro"><span>Ideal Carnot &eta;</span><b id="rEc">0</b></div>
+    <div class="ro"><span>Delivered &eta;</span><b id="rEa">0</b></div>
     <div class="ro"><span>P now</span><b id="rP">0</b></div>
     <div class="ro"><span>V now</span><b id="rV">0</b></div>
     <div class="ro"><span>T now</span><b id="rT">0</b></div>
     <div class="ro"><span>Q out</span><b id="rQo">0</b></div>
   </div>
+
+  <p class="note">
+    <b>Two different efficiencies.</b> The <b>ideal Carnot &eta;</b> belongs to the gas cycle itself
+    and is fixed by the two reservoir temperatures alone: &eta; = 1 &minus; T<sub>c</sub>/T<sub>h</sub>.
+    It never changes when you move the transmission-loss slider. The <b>delivered &eta;</b> is what
+    actually reaches the shaft as a fraction of the heat taken in, so it is the Carnot figure
+    multiplied by the transmission efficiency: &eta;<sub>delivered</sub> = (1 &minus; loss)&nbsp;&times;&nbsp;&eta;<sub>Carnot</sub>.
+  </p>
 
   <div class="btns">
     <button id="bGo">Pause</button>
@@ -132,10 +150,11 @@
   </div>
   <p class="hint">
     Drag empty space to orbit, scroll to zoom, right-drag to pan. Heat flowing in is red, heat
-    leaving is green. The shaded area is the <b>reversible</b> work the cycle encloses; friction
-    and turbulence take their share before it reaches the shaft, which is why the delivered work
-    and the actual efficiency both read lower than the Carnot ceiling. Cycle rate is temporal
-    only &mdash; it changes how fast you watch, never the curve.
+    leaving is green. The shaded area is the <b>reversible</b> work the cycle encloses &mdash; the
+    area is the same whatever the transmission losses are set to, because those losses happen
+    downstream of the gas. The loop encloses <span id="hW">—</span> per cycle and
+    <span id="hWd">—</span> of that reaches the shaft. Cycle rate is temporal only &mdash; it changes
+    how fast you watch, never the curve.
   </p>
 </aside>
 
@@ -381,11 +400,14 @@
   const dotGlow = st.glow(0xffffff, 1.5, 0.85);
   pvGroup.add(dot, dotGlow);
 
+  /* `transLoss` is the fraction of the reversible work lost between the gas and
+     the shaft. It is named for what it is rather than a bare `irr`, because
+     "irreversible" would imply the gas path itself changes - it does not. */
   function par() {
     const Th = Math.max(1, +el('sTh').value);
     let Tc = +el('sTc').value;
     if (Tc > Th - 15) Tc = Math.max(20, Th - 15);
-    return { Th, Tc, rate: +el('sR').value, irr: +el('sIr').value };
+    return { Th, Tc, rate: +el('sR').value, transLoss: +el('sIr').value };
   }
 
   function cycle() {
@@ -411,12 +433,22 @@
   const sx = (V, C) => PX + ((V - V1) / (C.vmax - V1)) * XW;
   const sy = (p, C) => OY + (p / C.ptop) * YH;
 
-  /* The gas follows a clean reversible Carnot path.
+  /* The gas follows a clean reversible Carnot path, and this is the whole
+     physical claim the simulation makes.
 
-     Friction and turbulence are MECHANICAL losses acting on the piston, so they
-     reduce the work delivered from a given gas path without altering that path.
-     They are therefore applied to the work readout, not to the curve - and the
-     curve is the reversible cycle the shaded area measures.
+     Transmission losses sit BETWEEN the gas and the shaft: bearing friction,
+     piston drag, turbulence in the cylinder. They take their share after the
+     cycle is complete, so they reduce the work delivered while leaving the gas
+     path - the drawn curve, the shaded area, and the Carnot efficiency - exactly
+     as the reservoirs set it. That is why they are applied to the work readouts
+     only.
+
+     Two work figures are therefore kept apart and never conflated:
+         Wrev = nR(Th - Tc)ln(V2/V1)   what the cycle encloses = shaded area
+         Wout = Wrev * (1 - transLoss) what arrives at the shaft
+     and two efficiencies likewise:
+         eta_Carnot   = 1 - Tc/Th          a property of the cycle
+         eta_delivered = eta_Carnot * (1 - transLoss)
 
      An earlier attempt scaled each leg's pressure toward the loop's mean by
      (1-irr), which does shrink the enclosed area by exactly (1-irr). It was
@@ -474,9 +506,15 @@
   function draw() {
     const C = cycle();
     const E = energy(C);
-    const W = E.Wideal * (1 - C.P.irr);
+    /* Two work figures, deliberately kept apart:
+         Wrev  - what the gas cycle encloses, equal to the shaded area on the
+                 diagram. A property of the cycle; the transmission slider
+                 cannot touch it.
+         Wout  - what reaches the shaft, after transmission losses. */
+    const Wrev = E.Wideal;
+    const Wout = Wrev * (1 - C.P.transLoss);
     const effCarnot = 1 - C.P.Tc / C.P.Th;
-    const effActual = W / E.Qin;
+    const effDelivered = Wout / E.Qin;
 
     const vSpan = C.vmax - V1;
     const h = 2.0 + (sample(s, C).V - V1) / vSpan * 4.6;
@@ -539,23 +577,31 @@
       pvGroup.rotation.y = Math.atan2(st.camera.position.x - (PX + XW / 2), st.camera.position.z);
     }
 
-    return { C, E, W, effCarnot, effActual, cur };
+    return { C, E, Wrev, Wout, effCarnot, effDelivered, cur };
   }
 
   function outs(R) {
-    const { C, E, W, effCarnot, effActual, cur } = R;
+    const { C, E, Wrev, Wout, effCarnot, effDelivered, cur } = R;
     const kJ = x => (x / 1000).toFixed(0) + ' kJ';
-    const Qout = E.Qin - W;
-    el('dE').textContent = (effActual * 100).toFixed(1) + '%';
-    el('dW').textContent = kJ(W);
+    /* Q out is the heat rejected by the gas, so it is fixed by the cycle and the
+       reservoirs. It is NOT the shaft work, and subtracting transmission losses
+       here would double-count them: the losses leave the gas, they do not change
+       how much heat the gas rejects. */
+    const Qout = nR * C.st[2].T * Math.log(C.st[2].V / C.st[3].V);
+    el('dE').textContent = (effDelivered * 100).toFixed(1) + '%';
+    el('dW').textContent = kJ(Wout);
     el('dQin').textContent = kJ(E.Qin);
     el('dS').textContent = LEGS[cur.seg].name.split(' ')[0];
     el('rEc').textContent = (effCarnot * 100).toFixed(1) + '%';
-    el('rEa').textContent = (effActual * 100).toFixed(1) + '%';
+    el('rEa').textContent = (effDelivered * 100).toFixed(1) + '%';
     el('rP').textContent = (cur.p / 1000).toFixed(1) + ' kPa';
     el('rV').textContent = cur.V.toFixed(2) + ' m³';
     el('rT').textContent = cur.T.toFixed(0) + ' K';
     el('rQo').textContent = kJ(Qout);
+    /* The hint states both work figures so the sentence about the shaded area
+       stays literally true at every loss setting. */
+    el('hW').textContent = kJ(Wrev);
+    el('hWd').textContent = kJ(Wout);
 
     const v = el('v');
     const gap = C.P.Th - C.P.Tc;
@@ -563,15 +609,16 @@
       v.innerHTML = '<b style="color:var(--warn)">Reservoirs nearly equal.</b> The Carnot limit is only ' +
         (effCarnot * 100).toFixed(1) + '% here, so the engine has almost nothing to work with.';
       v.style.borderColor = 'rgba(255,192,67,.34)';
-    } else if (C.P.irr > 0.75) {
-      v.innerHTML = '<b style="color:var(--bad)">Very lossy.</b> Friction and turbulence take most of the work, so you deliver ' +
-        (effActual * 100).toFixed(1) + '% against a Carnot ceiling of ' + (effCarnot * 100).toFixed(1) + '%.';
+    } else if (C.P.transLoss > 0.75) {
+      v.innerHTML = '<b style="color:var(--bad)">Very lossy transmission.</b> The gas still completes the same ' +
+        'Carnot cycle, but only ' + kJ(Wout) + ' of the ' + kJ(Wrev) + ' it encloses reaches the shaft: a delivered ' +
+        (effDelivered * 100).toFixed(1) + '% against an ideal Carnot ' + (effCarnot * 100).toFixed(1) + '%.';
       v.style.borderColor = 'rgba(255,122,122,.34)';
     } else {
       v.innerHTML = '<b style="color:var(--ok)">' + LEGS[cur.seg].name + '.</b> Gas at ' + cur.T.toFixed(0) +
         ' K, ' + cur.V.toFixed(2) + ' m³. Each adiabatic leg swells the volume by ' +
-        C.r.toFixed(2) + '&times;, and the reversible loop encloses ' + kJ(E.Wideal) + ' per cycle, of which ' +
-        kJ(W) + ' reaches the shaft.';
+        C.r.toFixed(2) + '&times;. The loop encloses ' + kJ(Wrev) + ' per cycle; transmission losses leave ' +
+        kJ(Wout) + ' at the shaft.';
       v.style.borderColor = 'rgba(62,224,164,.34)';
     }
   }

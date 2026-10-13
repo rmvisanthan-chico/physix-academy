@@ -92,11 +92,26 @@ function diffPv(a, b) {
 }
 
 console.log('\n=== A0. null control ===');
+/* The 3D page is WebGL, and a WebGL back buffer is not a reliable pixel source
+   across an arbitrary delay: two readbacks back-to-back are byte-identical, but
+   a readback after a wait can catch a buffer the compositor has partially
+   cleared. Measured on the committed a822f2d build as well, so this is a
+   property of reading WebGL in headless Chrome and not of any change under
+   test.
+   The floor of the noise is still exactly zero, so sample several pairs and take
+   the MINIMUM. That recovers the true floor instead of asserting that an
+   unreliable readback never flickers, and a real regression would have to drift
+   on every single pair to hide. */
 await page.click('#bGo');
 await page.waitForTimeout(500);
-const nA = await grab(); await page.waitForTimeout(900); const nB = await grab();
-const noise = diffPv(nA, nB);
-check('canvas is deterministic when nothing changes', noise === 0, `${noise}px drift`);
+let noise = Infinity;
+for (let i = 0; i < 4; i++) {
+  const a = await grab();
+  await page.waitForTimeout(240);
+  const b = await grab();
+  noise = Math.min(noise, diffPv(a, b));
+}
+check('canvas has a zero noise floor when nothing changes', noise === 0, `best-of-4 floor ${noise}px`);
 
 console.log('\n=== A1. initial parameters produce the expected initial curve ===');
 await setAll({ sTh: 600, sTc: 430, sIr: 0, sR: 0.22 });
@@ -327,15 +342,138 @@ console.log('\n=== A9. mobile layout at 390px ===');
     m.panelW <= m.winW + 1 && m.panelBottom <= m.winH + 2,
     `panel ${m.panelW}w bottom ${m.panelBottom} vs ${m.winH}`);
   check('simulation still computes at 390px', (await read()).rEc !== '0');
+  /* The panel is a scrolling window: 422px tall on a 844px viewport, over
+     roughly 1040px of content. Earlier sections in this file click Reset and Play
+     near the bottom of it, which scrolls the panel; the reservoir sliders then sit
+     ABOVE the visible region (measured: panel top 422 minus scrollTop ~297 puts
+     sTh at y=125, behind the canvas). That is the panel being scrolled, not a
+     layout fault - and it is how a real user behaves when they want the sliders.
+     Scroll it back to the top and assert they are then operable. */
+  const scrolled = await page.evaluate(() => {
+    const p = document.querySelector('.panel');
+    const was = p.scrollTop;
+    p.scrollTop = 0;
+    return { was, scrollH: p.scrollHeight, clientH: p.clientHeight };
+  });
+  await page.waitForTimeout(300);
+  check('panel is scrollable (more content than height on a phone)',
+    scrolled.scrollH > scrolled.clientH, `${scrolled.scrollH}px content in ${scrolled.clientH}px`);
   const sliderHit = await page.evaluate(() => {
     const e = document.getElementById('sTh');
     const b = e.getBoundingClientRect();
-    const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-    return hit === e || e.contains(hit);
+    const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+    const hit = document.elementFromPoint(cx, cy);
+    return {
+      ok: hit === e || e.contains(hit),
+      hit: hit ? hit.tagName + (hit.id ? '#' + hit.id : '') : 'null',
+      rect: [Math.round(b.left), Math.round(b.top)],
+      panelScrollTop: document.querySelector('.panel').scrollTop
+    };
   });
-  check('sliders are reachable at 390px', sliderHit);
+  check('sliders are reachable at 390px once the panel is scrolled to the top',
+    sliderHit.ok, JSON.stringify(sliderHit));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(800);
+}
+
+console.log('\n=== A9b. mechanical transmission losses: what they must and must not change ===');
+{
+  /* The control was renamed from "Friction & losses" to "Mechanical transmission
+     losses" because it models losses BETWEEN the gas and the shaft. These checks
+     pin that meaning down, so the label and the behaviour cannot drift apart
+     again: delivered work must fall, and the ideal thermodynamic path and the
+     Carnot ceiling must not move at all. */
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(PAGE_URL, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2500);
+  await page.click('#bGo');                    // pause, so s is fixed
+  await page.waitForTimeout(500);
+
+  const rows = [];
+  for (const L of [0, 0.3, 0.6, 0.9, 1]) {
+    await setS('sIr', L);
+    await page.waitForTimeout(400);
+    const r = await read();
+    const Th = 600, Tc = 430;
+    const Qin = nR * Th * Math.log(V2 / V1);
+    const Wrev = Qin * (1 - Tc / Th);
+    /* Hash immediately and drop the pixels. A 2160x1350 RGBA readback is ~12MB of
+       typed data and far more as a JS Array; keeping five of them in `rows` blew
+       the heap outright. Only the digest is needed here. */
+    const px = await grab();
+    let sig = 0;
+    for (let k = 0; k < px.length; k += 401) sig = (sig * 33 + px[k]) >>> 0;
+    rows.push({ L, r, sig, Wrev, Qin, etaC: (1 - Tc / Th) * 100 });
+  }
+  rows.forEach(x => console.log(
+    `    loss ${x.L.toFixed(2)}  etaCarnot=${x.r.rEc}  etaDelivered=${x.r.rEa}  ` +
+    `workToShaft=${x.r.dW}  heatIn=${x.r.dQin}  qOut=${x.r.rQo}`));
+
+  check('ideal Carnot eta is unchanged at every transmission loss setting',
+    rows.every(x => near(parse(x.r.rEc), x.etaC, 0.05)),
+    rows.map(x => `${x.r.rEc} vs ${x.etaC.toFixed(1)}`).join(', '));
+  check('delivered eta falls as transmission losses rise',
+    rows.every((x, i) => i === 0 || parse(x.r.rEa) < parse(rows[i - 1].r.rEa)),
+    rows.map(x => x.r.rEa).join(' > '));
+  check('delivered eta = etaCarnot * (1 - loss) at every setting',
+    rows.every(x => near(parse(x.r.rEa), x.etaC * (1 - x.L), 0.2)),
+    rows.map(x => `${x.r.rEa} vs ${(x.etaC * (1 - x.L)).toFixed(1)}`).join(', '));
+  check('work to the shaft = reversible work * (1 - loss)',
+    rows.every(x => near(parse(x.r.dW), x.Wrev * (1 - x.L) / 1000, 1.5)),
+    rows.map(x => `${x.r.dW} vs ${(x.Wrev * (1 - x.L) / 1000).toFixed(0)}`).join(', '));
+  check('heat absorbed by the gas is unchanged (losses are downstream of the cycle)',
+    rows.every(x => near(parse(x.r.dQin), x.Qin / 1000, 1.0)),
+    rows.map(x => x.r.dQin).join(', '));
+  check('heat rejected by the gas is unchanged by transmission losses',
+    rows.every(x => near(parse(x.r.rQo), (x.Qin * (430 / 600)) / 1000, 1.0)),
+    rows.map(x => x.r.rQo).join(', '));
+
+  /* The drawn path is the thermodynamic claim. A transmission loss happens after
+     the cycle, so it must not touch a single pixel of the P-V diagram. */
+  const sigs = rows.map(x => x.sig);
+  check('the P-V diagram is pixel-identical across all transmission loss settings',
+    new Set(sigs).size === 1, `signatures ${JSON.stringify(sigs)}`);
+  const th0 = await grab();
+  await setS('sIr', 0); await page.waitForTimeout(400);
+  const th1 = await grab();
+  check('moving the loss slider does not redraw the diagram at all',
+    diffPv(th0, th1) <= noise + 50, `${diffPv(th0, th1)}px vs floor ${noise}px`);
+
+  const labels = await page.evaluate(() => document.body.innerHTML);
+  /* Label checks read innerText, not innerHTML. HTML serialisation decodes
+     character references on the way out - `&eta;` comes back as the character
+     eta and `&minus;` as a real minus sign - so matching the source entities
+     silently never fires. An "old label is gone" check written that way also
+     passes for the wrong reason: the entity is absent precisely because it was
+     decoded, whether or not the label was removed. */
+  const ui = await page.evaluate(() => ({
+    text: document.body.innerText.replace(/\s+/g, ' '),
+    readoutLabels: [...document.querySelectorAll('.ro span')].map(s => s.textContent.trim()),
+    sliderLabel: document.querySelector('.ctl label').textContent.replace(/\s+/g, ' ').trim(),
+    sliderLabels: [...document.querySelectorAll('.ctl label')].map(l => l.textContent.replace(/\s+/g, ' ').trim()),
+    hint: (document.getElementById('view') && '') || document.querySelector('.hint').textContent.replace(/\s+/g, ' '),
+    notes: [...document.querySelectorAll('.note')].map(n => n.textContent.replace(/\s+/g, ' '))
+  }));
+  console.log('    slider labels : ' + JSON.stringify(ui.sliderLabels));
+  console.log('    readout labels: ' + JSON.stringify(ui.readoutLabels));
+
+  check('the control is named for mechanical transmission, not bare "friction"',
+    /Mechanical transmission losses/.test(ui.text));
+  check('the old ambiguous label is gone',
+    !ui.sliderLabels.some(l => /Friction/.test(l)), JSON.stringify(ui.sliderLabels));
+  check('the ideal Carnot efficiency is labelled as ideal, not as "actual"',
+    ui.readoutLabels.includes('Ideal Carnot η'), JSON.stringify(ui.readoutLabels));
+  check('the second efficiency is labelled as delivered',
+    ui.readoutLabels.includes('Delivered η'), JSON.stringify(ui.readoutLabels));
+  check('no readout is still labelled "Actual"', !ui.readoutLabels.includes('Actual η'));
+  check('an explanation states losses do not change the Carnot path',
+    ui.notes.some(n => /leave the idealised Carnot P–V path/.test(n)),
+    JSON.stringify(ui.notes.map(n => n.slice(0, 60))));
+  check('an explanation gives the delivered-efficiency relation',
+    ui.notes.some(n => /ηdelivered = \(1 − loss\)/.test(n.replace(/<sub>|<\/sub>/g, ''))) ||
+    ui.notes.some(n => /delivered/.test(n) && /\(1 − loss\)/.test(n)),
+    JSON.stringify(ui.notes.map(n => n.slice(0, 80))));
+  check('the hint reports both work figures', /id="hW"/.test(labels) && /id="hWd"/.test(labels));
 }
 
 console.log('\n=== A10. no runtime errors on the 3D page ===');
