@@ -288,6 +288,18 @@ window.__hStop = function () { if (window.__h.sampleTimer) clearInterval(window.
 
 async function makePage(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  /* Optional CPU throttling, for reproducing a slow runner on a fast machine.
+     CI_CPU_THROTTLE=4 makes the page behave roughly as it would on a throttled
+     core. Off unless set, and it can only ever make the audit slower and more
+     likely to fail - it cannot turn a failure into a pass - so it is a
+     diagnostic, never a way to relax an assertion. */
+  const RATE = Number(process.env.CI_CPU_THROTTLE || 0);
+  if (RATE > 1) {
+    try {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
+    } catch (e) { /* throttling unsupported: run unthrottled */ }
+  }
   await page.addInitScript(INSTRUMENT);
   page.__errs = [];
   page.on('pageerror', e => page.__errs.push('pageerror: ' + String(e).split('\n')[0].slice(0, 140)));
@@ -645,23 +657,49 @@ if (p1 && p0) {
  * reported as a duplication. And an rAF-rate floor is meaningless for a static
  * or iframe simulation, where zero frames is the CORRECT steady state - so the
  * rate check is applied only to simulations that are supposed to be animating. */
-async function lifecycleChecks(page, id, opts) {
-  /* Navigate far away and confirm the surface and the loop are gone. */
-  await page.evaluate(() => { location.hash = '#/formulas'; });
-  const gone = await until(page, () => {
-    const main = document.getElementById('main');
-    return !main.querySelector('.sim-frame canvas') && !main.querySelector('.sim-frame iframe');
-  }, null, 6000);
-  const leftover = await page.evaluate(() => {
-    const main = document.getElementById('main');
-    return {
-      canvas: main.querySelectorAll('.sim-frame canvas').length,
-      iframe: main.querySelectorAll('.sim-frame iframe').length,
-      bar: main.querySelectorAll('.sim-time').length
-    };
-  });
-  add(id, 'unmount removes the rendering surface', gone,
-    `canvas=${leftover.canvas} iframe=${leftover.iframe} timeBar=${leftover.bar}`);
+  async function lifecycleChecks(page, id, opts) {
+    /* Navigate far away and confirm the surface and the loop are gone.
+
+       This polls for removal with a deadline and then reports the state. Under a
+       4x CPU throttle (tools/_unmount-margin.mjs) `newton` needed 5507ms to
+       unmount against this 6000ms budget - under 6% headroom - while every
+       other simulation was at or below 3819ms. With no headroom the check fails
+       intermittently on a loaded machine even though the teardown is correct,
+       and the failure is actively misleading: the evidence is sampled after the
+       wait, so it prints canvas=0 and looks like a pass.
+
+       The deadline and the contract were conflated. The contract is "the surface
+       is gone", which a leaked surface never satisfies however long you wait;
+       the deadline is only there to avoid hanging. So the deadline still governs
+       the fast path, and a late-but-correct removal is given a bounded grace
+       period and reported with its latency rather than silently accepted. A
+       genuine leak still fails, at the longer deadline. */
+    await page.evaluate(() => { location.hash = '#/formulas'; });
+    const t0 = Date.now();
+    const goneFast = await until(page, () => {
+      const main = document.getElementById('main');
+      return !main.querySelector('.sim-frame canvas') && !main.querySelector('.sim-frame iframe');
+    }, null, 6000);
+    let gone = goneFast, late = 0;
+    if (!goneFast) {
+      gone = await until(page, () => {
+        const main = document.getElementById('main');
+        return !main.querySelector('.sim-frame canvas') && !main.querySelector('.sim-frame iframe');
+      }, null, 9000);
+      late = Date.now() - t0;
+    }
+    const leftover = await page.evaluate(() => {
+      const main = document.getElementById('main');
+      return {
+        canvas: main.querySelectorAll('.sim-frame canvas').length,
+        iframe: main.querySelectorAll('.sim-frame iframe').length,
+        bar: main.querySelectorAll('.sim-time').length
+      };
+    });
+    add(id, 'unmount removes the rendering surface', gone,
+      goneFast ? `canvas=${leftover.canvas} iframe=${leftover.iframe} timeBar=${leftover.bar}`
+        : `canvas=${leftover.canvas} iframe=${leftover.iframe} timeBar=${leftover.bar}` +
+          (gone ? `  (removed late, ${late}ms - correct but slow)` : '  (STILL PRESENT after 15s - a real leak)'));
 
   /* A leaked rAF loop would keep calling rAF forever with nothing mounted.
      Counted AFTER navigation, so nothing legitimate is in flight. */

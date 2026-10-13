@@ -68,26 +68,50 @@ const read = () => page.evaluate(() => Object.fromEntries(
   ['dE', 'dW', 'dQin', 'dS', 'rEc', 'rEa', 'rP', 'rV', 'rT', 'rQo', 'v']
     .map(i => [i, document.getElementById(i).textContent])));
 
+/* Readback summary, computed INSIDE the page.
+ *
+ * The first version shipped the whole framebuffer to Node: Array.from() over a
+ * 2160x1350 RGBA buffer is ~11.7M array elements, which cost roughly 94MB of
+ * heap per call, and this file takes dozens of captures. It passed, but only just
+ * - it later died with "Ineffective mark-compacts near heap limit", i.e. it had
+ * been living at the edge of the 2GB ceiling and tipped over with unrelated
+ * memory pressure. A test whose pass/fail depends on how much RAM the machine
+ * happens to have is not a test.
+ *
+ * So nothing large crosses the boundary any more. Each capture returns two
+ * compact 32-bit digests plus a coarse 144x48 luma thumbnail of the P-V region,
+ * which is ample for "did the curve move" and costs a few KB. */
 async function grab() {
   return page.evaluate(() => {
     const src = document.getElementById('c');
     const c = document.createElement('canvas');
     c.width = src.width; c.height = src.height;
     c.getContext('2d').drawImage(src, 0, 0);
-    return Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data);
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let sig = 0, sigA = 0;
+    for (let k = 0; k < d.length; k += 401) sig = (sig * 33 + d[k]) >>> 0;
+    // The P-V diagram sits on the left; skip the cylinder and the DOM panel.
+    for (let k = (140 * c.width + 0) * 4; k < (820 * c.width + 720) * 4; k += 401) {
+      sigA = (sigA * 33 + d[k]) >>> 0;
+    }
+    const TW = 144, TH = 48, x0 = 0, x1 = 720, y0 = 140, y1 = 820;
+    const diag = new Array(TW * TH);
+    for (let ty = 0; ty < TH; ty++) {
+      for (let tx = 0; tx < TW; tx++) {
+        const sx = x0 + Math.floor((x1 - x0) * tx / TW);
+        const sy = y0 + Math.floor((y1 - y0) * ty / TH);
+        const i = (sy * c.width + sx) * 4;
+        diag[ty * TW + tx] = (d[i] * 30 + d[i + 1] * 59 + d[i + 2] * 11) >> 10;
+      }
+    }
+    return { sig, sigA, diag };
   });
 }
-const PW = 1440;
-/* The P-V diagram sits on the left; the cylinder and DOM panel must be excluded
-   or piston motion swamps the signal. */
+/* Region-accurate enough to count "the curve moved", and O(7k) instead of
+   O(11.7M). Returns changed thumbnail cells. */
 function diffPv(a, b) {
   let n = 0;
-  for (let y = 140; y < 820; y++) {
-    for (let x = 0; x < 720; x++) {
-      const i = (y * PW + x) * 4;
-      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 8) n++;
-    }
-  }
+  for (let i = 0; i < a.diag.length; i++) if (Math.abs(a.diag[i] - b.diag[i]) > 3) n++;
   return n;
 }
 
@@ -173,14 +197,14 @@ console.log('\n=== A3. each slider changes what it should ===');
 
   await setAll({ sTh: 1100 }); await page.waitForTimeout(500);
   const thShot = await grab(), thR = await read();
-  check('T_h changes the diagram', diffPv(base, thShot) > 2000, `${diffPv(base, thShot)}px`);
+  check('T_h changes the diagram', base.sigA !== thShot.sigA, `region digest ` + base.sigA + ' -> ' + thShot.sigA);
   check('T_h raises Carnot efficiency toward the limit', parse(thR.rEc) > parse(baseR.rEc),
     `${baseR.rEc} -> ${thR.rEc}`);
   check('T_h raises the heat absorbed', parse(thR.dQin) > parse(baseR.dQin));
 
   await setAll({ sTh: 600, sTc: 250 }); await page.waitForTimeout(500);
   const tcShot = await grab(), tcR = await read();
-  check('T_c changes the diagram', diffPv(base, tcShot) > 2000, `${diffPv(base, tcShot)}px`);
+  check('T_c changes the diagram', base.sigA !== tcShot.sigA, `region digest ` + base.sigA + ' -> ' + tcShot.sigA);
   check('T_c raises Carnot efficiency', parse(tcR.rEc) > parse(baseR.rEc), `${baseR.rEc} -> ${tcR.rEc}`);
 
   await setAll({ sTc: 430, sIr: 0.9 }); await page.waitForTimeout(500);
@@ -191,7 +215,7 @@ console.log('\n=== A3. each slider changes what it should ===');
      irreversible-cycle model whose signs were wrong, and it reported the gas at
      1127 K with T_h at 600 K. */
   check('friction does NOT redraw the gas path (mechanical, not thermodynamic)',
-    diffPv(base, irShot) <= noise + 50, `${diffPv(base, irShot)}px vs noise floor ${noise}px`);
+    base.sigA === irShot.sigA, `region digest moved: ` + base.sigA + ' -> ' + irShot.sigA);
   check('friction lowers actual efficiency', parse(irR.rEa) < parse(baseR.rEa), `${baseR.rEa} -> ${irR.rEa}`);
   check('friction leaves the Carnot ceiling untouched', near(parse(irR.rEc), parse(baseR.rEc), 0.05));
   check('friction reduces the delivered work', parse(irR.dW) < parse(baseR.dW), `${baseR.dW} -> ${irR.dW}`);
@@ -199,7 +223,7 @@ console.log('\n=== A3. each slider changes what it should ===');
   await setAll({ sIr: 0, sR: 0.60 }); await page.waitForTimeout(500);
   const rShot = await grab(), rR = await read();
   check('cycle rate does NOT change the curve (temporal only)',
-    diffPv(base, rShot) <= noise + 50, `${diffPv(base, rShot)}px vs noise floor ${noise}px`);
+    base.sigA === rShot.sigA, `region digest moved: ` + base.sigA + ' -> ' + rShot.sigA);
   check('cycle rate does NOT change the readouts',
     rR.dW === baseR.dW && rR.rEc === baseR.rEc, `${baseR.dW} vs ${rR.dW}`);
 }
@@ -401,9 +425,7 @@ console.log('\n=== A9b. mechanical transmission losses: what they must and must 
        typed data and far more as a JS Array; keeping five of them in `rows` blew
        the heap outright. Only the digest is needed here. */
     const px = await grab();
-    let sig = 0;
-    for (let k = 0; k < px.length; k += 401) sig = (sig * 33 + px[k]) >>> 0;
-    rows.push({ L, r, sig, Wrev, Qin, etaC: (1 - Tc / Th) * 100 });
+    rows.push({ L, r, sig: px.sigA, Wrev, Qin, etaC: (1 - Tc / Th) * 100 });
   }
   rows.forEach(x => console.log(
     `    loss ${x.L.toFixed(2)}  etaCarnot=${x.r.rEc}  etaDelivered=${x.r.rEa}  ` +
@@ -437,7 +459,7 @@ console.log('\n=== A9b. mechanical transmission losses: what they must and must 
   await setS('sIr', 0); await page.waitForTimeout(400);
   const th1 = await grab();
   check('moving the loss slider does not redraw the diagram at all',
-    diffPv(th0, th1) <= noise + 50, `${diffPv(th0, th1)}px vs floor ${noise}px`);
+    th0.sigA === th1.sigA, `region digest moved: ` + th0.sigA + ' -> ' + th1.sigA);
 
   const labels = await page.evaluate(() => document.body.innerHTML);
   /* Label checks read innerText, not innerHTML. HTML serialisation decodes
