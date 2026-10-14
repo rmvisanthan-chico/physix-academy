@@ -658,48 +658,53 @@ if (p1 && p0) {
  * or iframe simulation, where zero frames is the CORRECT steady state - so the
  * rate check is applied only to simulations that are supposed to be animating. */
   async function lifecycleChecks(page, id, opts) {
-    /* Navigate far away and confirm the surface and the loop are gone.
+    /* Navigate away and confirm the simulation's rendering surface and loop are
+       gone.
 
-       This polls for removal with a deadline and then reports the state. Under a
-       4x CPU throttle (tools/_unmount-margin.mjs) `newton` needed 5507ms to
-       unmount against this 6000ms budget - under 6% headroom - while every
-       other simulation was at or below 3819ms. With no headroom the check fails
-       intermittently on a loaded machine even though the teardown is correct,
-       and the failure is actively misleading: the evidence is sampled after the
-       wait, so it prints canvas=0 and looks like a pass.
+       The earlier version polled for the canvas to disappear and asserted on the
+       poll. That is a router-latency assertion wearing a teardown assertion's
+       clothes: viewSimsPage rebuilds App.el.innerHTML on every navigation, so a
+       canvas inside #main can never survive regardless of what the simulation
+       does. Under a 4x CPU throttle the hash change simply had not been
+       processed within the 6000ms budget, the check failed, and its evidence -
+       sampled after the wait - printed canvas=0, so the failure read as a pass.
 
-       The deadline and the contract were conflated. The contract is "the surface
-       is gone", which a leaked surface never satisfies however long you wait;
-       the deadline is only there to avoid hanging. So the deadline still governs
-       the fast path, and a late-but-correct removal is given a bounded grace
-       period and reported with its latency rather than silently accepted. A
-       genuine leak still fails, at the longer deadline. */
+       Two changes, neither of which is a longer timeout:
+
+       1. Wait for the ROUTER to arrive at the destination view first, using a
+          generous bound. Arrival is observable; teardown correctness is then a
+          synchronous read that cannot lose a race with the router.
+       2. Scan the whole document rather than only #main. A surface appended
+          outside the router's replacement subtree - document.body, a detached
+          overlay - is exactly the leak that survives the innerHTML wipe, and the
+          old #main-scoped query could not see it. This is the defect the check
+          existed to catch and it was not catching it. */
     await page.evaluate(() => { location.hash = '#/formulas'; });
     const t0 = Date.now();
-    const goneFast = await until(page, () => {
+    const arrived = await until(page, () => {
       const main = document.getElementById('main');
-      return !main.querySelector('.sim-frame canvas') && !main.querySelector('.sim-frame iframe');
-    }, null, 6000);
-    let gone = goneFast, late = 0;
-    if (!goneFast) {
-      gone = await until(page, () => {
-        const main = document.getElementById('main');
-        return !main.querySelector('.sim-frame canvas') && !main.querySelector('.sim-frame iframe');
-      }, null, 9000);
-      late = Date.now() - t0;
-    }
-    const leftover = await page.evaluate(() => {
-      const main = document.getElementById('main');
-      return {
-        canvas: main.querySelectorAll('.sim-frame canvas').length,
-        iframe: main.querySelectorAll('.sim-frame iframe').length,
-        bar: main.querySelectorAll('.sim-time').length
-      };
-    });
-    add(id, 'unmount removes the rendering surface', gone,
-      goneFast ? `canvas=${leftover.canvas} iframe=${leftover.iframe} timeBar=${leftover.bar}`
-        : `canvas=${leftover.canvas} iframe=${leftover.iframe} timeBar=${leftover.bar}` +
-          (gone ? `  (removed late, ${late}ms - correct but slow)` : '  (STILL PRESENT after 15s - a real leak)'));
+      if (!main) return false;
+      if (location.hash.indexOf('#/sims/') === 0) return false;
+      return !!main.querySelector('.wrap') && !main.querySelector('.sim-slot-lg, .sim-slot');
+    }, null, 20000);
+    const routerMs = Date.now() - t0;
+    const leftover = await page.evaluate(() => ({
+      /* anywhere in the document, not just inside the router's subtree */
+      strayCanvas: document.querySelectorAll('canvas').length,
+      inMain: (document.getElementById('main') || document).querySelectorAll('.sim-frame canvas, .sim-frame iframe').length,
+      iframe: document.querySelectorAll('iframe').length,
+      bar: document.querySelectorAll('.sim-time').length
+    }));
+    /* The formulas view legitimately contains no canvas, so any canvas still in
+       the document after the router has arrived belongs to the simulation we
+       navigated away from. */
+    const leaked = leftover.strayCanvas > 0 || leftover.iframe > 0;
+    add(id, 'unmount removes the rendering surface', arrived && !leaked,
+      arrived
+        ? (leaked
+          ? `STRAY SURFACE after unmount: ${leftover.strayCanvas} canvas / ${leftover.iframe} iframe in the document (${leftover.inMain} inside the router subtree)`
+          : `no canvas or iframe survives the unmount (router arrived in ${routerMs}ms)`)
+        : `router never reached the destination view within 20000ms - the page did not navigate, so this is not evidence about teardown`);
 
   /* A leaked rAF loop would keep calling rAF forever with nothing mounted.
      Counted AFTER navigation, so nothing legitimate is in flight. */
@@ -740,12 +745,27 @@ if (p1 && p0) {
   /* Frame-rate check only where a loop is expected. For static and iframe
      simulations zero frames is the correct steady state, and demanding frames
      would flag correct behaviour as broken. */
-  if (opts.animates) {
-    await page.evaluate(() => { window.__hReset(); });
-    await page.waitForTimeout(500);
-    const rate = await page.evaluate(() => window.__h.rafCalls);
-    add(id, 'remount runs at a single rate (no duplicated loop)',
-      rate >= 5 && rate <= 200, `${rate} rAF calls in 0.5s after remount`);
+if (opts.animates) {
+      /* Assert liveness and non-duplication, neither measured in a fixed window.
+         The old form sampled 500ms and demanded >= 5 frames. That lower bound is
+         a claim about the machine, not the code: under an 8x CPU throttle
+         `energy` produced 3 frames in that window and was reported as broken
+         while its loop was running perfectly. A slow runner must not be
+         indistinguishable from a dead loop.
+         So: keep counting until enough frames arrive or the deadline passes,
+         then measure frames per SECOND. Alive means "produced at least one
+         frame"; duplicated still means "far more than one loop's worth". The
+         400/s ceiling is the same 200-per-500ms the old upper bound expressed. */
+      await page.evaluate(() => { window.__hReset(); });
+      const t0 = Date.now();
+      const got5 = await until(page, () => window.__h.rafCalls >= 5, null, 8000);
+      const calls = await page.evaluate(() => window.__h.rafCalls);
+      const ms = Date.now() - t0;
+      const perSec = ms > 0 ? (calls / ms) * 1000 : 0;
+      add(id, 'remount runs at a single rate (no duplicated loop)',
+        calls > 0 && perSec <= 400,
+        `${calls} rAF calls in ${ms}ms after remount (${perSec.toFixed(0)}/s` +
+        `${got5 ? '' : ', slow runner: under 5 frames within 8s'})`);
   } else {
     results.push({
       id, name: 'no animation loop expected for this class',
@@ -859,6 +879,25 @@ async function runSelfTest() {
           requestAnimationFrame(stray);          /* never cancelled anywhere */
         });
 
+        /* 7. leaks its RENDERING SURFACE.
+           A canvas inside the frame cannot demonstrate anything here, and that is
+           the point. The router rebuilds main.innerHTML on every navigation, so
+           an in-frame canvas is destroyed by the wipe whether the simulation
+           cleans up or not: it leaks nothing. The only surface that outlives the
+           wipe is one attached outside the router's replacement subtree, which is
+           also the only way a real simulation leaks one. This fixture therefore
+           attaches to document.body and never detaches - the exact defect the
+           surface check is meant to find, and one the previous #main-scoped
+           query was structurally unable to see. */
+        Sims.register('fix-surface-leak', 'Surface leak', 'x', 'x', frame => {
+          const cv = SU.canvas(frame, 120);
+          SU.loop(cv.c, () => { cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); });
+          const stray = document.createElement('canvas');
+          stray.width = 40; stray.height = 40;
+          stray.id = 'fix-stray-surface';
+          document.body.appendChild(stray);   /* outside #main: survives the wipe */
+        });
+
         window.addEventListener('hashchange', mountFixture);
         location.hash = '#/sims/fix-healthy';
         mountFixture();
@@ -886,7 +925,13 @@ async function runSelfTest() {
     ['fix-frozen-loop',   'change over time', true,  'must be flagged: loop runs, state frozen'],
     ['fix-dead-control',  'interaction',     true,  'must be flagged: slider changes nothing'],
     ['fix-healthy',       'all',             false, 'must PASS: proves the checker is not always-fail'],
-    ['fix-loop-leak',     'leaked rAF',      true,  'must be flagged: loop outlives unmount']
+    ['fix-loop-leak',     'leaked rAF',      true,  'must be flagged: loop outlives unmount'],
+    ['fix-surface-leak',  'leaked surface',  true,  'must be flagged: rendering surface outlives unmount'],
+    /* Negative control for the check above. A detector that flags
+       fix-surface-leak proves nothing unless it stays quiet on a fixture with the
+       identical shape and no leak; without this, a surface check that fired on
+       every simulation would score 7/7 while being worthless. */
+    ['fix-healthy',       'leaked surface',  false, 'must be CLEAN: proves the surface check is not always-fail']
   ];
 
   let pass = 0, total = 0;
@@ -894,6 +939,15 @@ async function runSelfTest() {
 
   for (const [id, kind, wantFlagged, why] of expectations) {
     page.__errs = [];
+    /* Clean slate between fixtures. fix-surface-leak deliberately leaves a canvas
+       in document.body forever, so without this it contaminates every case that
+       follows: fix-healthy was reported as leaking because of the PREVIOUS
+       fixture's canvas. The negative control below caught exactly that, which is
+       the whole reason it is worth having. Only body-level canvases are removed,
+       so the fixture's own in-frame surface and the app's chrome are untouched. */
+    await page.evaluate(() => {
+      document.querySelectorAll('body > canvas').forEach(n => n.remove());
+    });
     await page.evaluate(() => { window.__hStop && window.__hStop(); location.hash = '#/formulas'; });
     await page.waitForTimeout(200);
     await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
@@ -946,8 +1000,28 @@ async function runSelfTest() {
       await page.evaluate(() => { window.__hReset(); });
       await page.waitForTimeout(600);
       const stray = await page.evaluate(() => window.__h.rafCalls);
-      detected = stray > 0;
-      detail = `${stray} stray rAF calls after unmount`;
+detected = stray > 0;
+        detail = `${stray} stray rAF calls after unmount`;
+      } else if (kind === 'leaked surface') {
+        /* Must WAIT for the mount before navigating away, or the fixture has not
+           attached its stray canvas yet and the check would pass for the wrong
+           reason - which is exactly the failure the old version would have had. */
+        await until(page, () => !!document.getElementById('fix-stray-surface'), null, 3000);
+        await page.evaluate(() => { location.hash = '#/formulas'; });
+        /* Wait for the router to ARRIVE before judging: the stray canvas is
+           outside the router subtree and is never removed, so once the
+           destination view is rendered its continued presence is a real leak and
+           not a race with the hashchange handler. */
+        const arrivedHere = await until(page, () => {
+          const main = document.getElementById('main');
+          return !!main && location.hash.indexOf('#/sims/') !== 0 &&
+            !!main.querySelector('.wrap') && !main.querySelector('.sim-slot-lg, .sim-slot');
+        }, null, 8000);
+        const stillThere = await page.evaluate(() => document.querySelectorAll('canvas').length);
+        detected = stillThere > 0;
+        detail = detected
+          ? `${stillThere} canvas(s) survived unmount (router arrived=${arrivedHere})`
+          : 'every canvas was cleaned up, so the leak was NOT detected';
     } else if (kind === 'all') {
       /* healthy control must mount, animate and respond */
       const okMount = await until(page, () => {
