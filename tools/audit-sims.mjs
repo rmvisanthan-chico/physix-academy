@@ -64,6 +64,11 @@ const ONLY = (args.find(a => a.startsWith('--only=')) || '').split('=')[1];
 const SELF_TEST = args.includes('--self-test');
 const VERBOSE = args.includes('--verbose');
 
+/* How many distinct animation loops one simulation may run.
+   Calibrated against this suite's own fixtures, not guessed: fix-healthy (one
+   loop, must be clean) and fix-double-loop (two, must be flagged). */
+const MAX_LOOPS = Number(process.env.MAX_LOOPS || 1);
+
 /* ------------------------------------------------------------------ *
  * Manifest
  *
@@ -210,10 +215,30 @@ function assertNoMountErrors(pg, id) {
  * Test-side instrumentation. Installed once per page, before app code.
  * ------------------------------------------------------------------ */
 const INSTRUMENT = `
-window.__h = { rafCalls: 0, glCalls: 0, sigChanges: 0, last: '', samples: 0, sampleTimer: 0 };
+window.__h = { rafCalls: 0, glCalls: 0, sigChanges: 0, last: '', samples: 0, sampleTimer: 0, loopFns: new Set() };
 
 const raf = window.requestAnimationFrame.bind(window);
-window.requestAnimationFrame = function (cb) { window.__h.rafCalls++; return raf(cb); };
+  /* rafCalls counts INVOCATIONS, which is a claim about the machine: on a slow
+     runner a perfectly healthy loop can fall under any fixed threshold, which is
+     exactly how CI run 38330808426 reported induction as broken when it was
+     healthy. Loop count is a claim about the CODE, so it is measured by counting
+     DISTINCT callback identities instead. That is immune to frame rate: verified
+     to report 1/2/4/8 for 1/2/4/8 concurrent loops. */
+  window.__hLoops = function () {
+    window.__h.loopFns = window.__h.loopFns || new Set();
+    return window.__h.loopFns.size;
+  };
+  window.requestAnimationFrame = function (cb) {
+    window.__h.rafCalls++;
+    /* Defensive: the very first mount runs BEFORE anything calls __hReset, and
+       loopFns is only created there. Without this the wrapper throws
+       "Cannot read properties of undefined (reading 'add')" inside the
+       simulation's own frame callback - which the audit then reports against the
+       simulation, as if it were the simulation's bug. It was the instrument's. */
+    window.__h.loopFns = window.__h.loopFns || new Set();
+    window.__h.loopFns.add(cb);
+    return raf(cb);
+  };
 
 const patchGL = (Ctor) => {
   if (!Ctor || !Ctor.prototype) return;
@@ -263,8 +288,9 @@ window.__hSample = function () {
   window.__h.last = sig;
 };
 window.__hReset = function () {
-  window.__h.sigChanges = 0; window.__h.last = ''; window.__h.rafCalls = 0; window.__h.glCalls = 0;
-  window.__h.pixelSig = null; window.__h.readoutSig = '';
+    window.__h.sigChanges = 0; window.__h.last = ''; window.__h.rafCalls = 0; window.__h.glCalls = 0;
+    window.__h.pixelSig = null; window.__h.readoutSig = '';
+    window.__h.loopFns = new Set();   /* the loop set is per-measurement */
 };
 window.__hStart = function () {
   window.__hStop();
@@ -742,32 +768,38 @@ if (p1 && p0) {
     `iframe=${after.iframe} (first ${opts.firstIframes}) gate=${after.hasGate} ` +
     `graphs=${after.graphs} timeBars=${after.bars}`);
 
-  /* Frame-rate check only where a loop is expected. For static and iframe
-     simulations zero frames is the correct steady state, and demanding frames
-     would flag correct behaviour as broken. */
-if (opts.animates) {
-      /* Assert liveness and non-duplication, neither measured in a fixed window.
-         The old form sampled 500ms and demanded >= 5 frames. That lower bound is
-         a claim about the machine, not the code: under an 8x CPU throttle
-         `energy` produced 3 frames in that window and was reported as broken
-         while its loop was running perfectly. A slow runner must not be
-         indistinguishable from a dead loop.
-         So: keep counting until enough frames arrive or the deadline passes,
-         then measure frames per SECOND. Alive means "produced at least one
-         frame"; duplicated still means "far more than one loop's worth". The
-         400/s ceiling is the same 200-per-500ms the old upper bound expressed. */
+/* Duplication check only, where a loop is expected. Static and iframe
+     simulations legitimately run none, so this is skipped for them.
+
+     This REPLACES the frame-rate form rather than accompanying it, because the
+     frame-rate form could not do this job at any threshold:
+       - its lower bound (>= 5 frames per 500ms) is a claim about the machine.
+         CI run 38330808426 reported induction - a healthy simulation - as broken
+         for producing 3; measured at 1x it produces 31, and under an 8x throttle
+         2. 27 of 28 dynamic simulations fall under that bound under load.
+       - its upper bound cannot see a single duplicate. Frame rate does not
+         separate one loop from two: measured in this repo's own fixtures, a
+         duplicated simulation measured 181 frames/s and a healthy one 180.
+         Absolute loop counts are no better here either - both measured 3,
+         because the fixture page carries app-level loops.
+     What works is the CHANGE in distinct animation callbacks across a remount,
+     which is a claim about the code and immune to frame rate. Covered by
+     fix-double-loop (must be flagged) and fix-healthy (must be clean). */
+    if (opts.animates) {
+      /* Baseline is the loop count for this simulation's FIRST mount, which is
+         still live at the top of this function's caller. */
       await page.evaluate(() => { window.__hReset(); });
-      const t0 = Date.now();
-      const got5 = await until(page, () => window.__h.rafCalls >= 5, null, 8000);
-      const calls = await page.evaluate(() => window.__h.rafCalls);
-      const ms = Date.now() - t0;
-      const perSec = ms > 0 ? (calls / ms) * 1000 : 0;
-      add(id, 'remount runs at a single rate (no duplicated loop)',
-        calls > 0 && perSec <= 400,
-        `${calls} rAF calls in ${ms}ms after remount (${perSec.toFixed(0)}/s` +
-        `${got5 ? '' : ', slow runner: under 5 frames within 8s'})`);
-  } else {
-    results.push({
+      await page.waitForTimeout(400);
+      const loopsFirstMount = await page.evaluate(() => window.__hLoops());
+      await page.evaluate(() => { window.__hReset(); });
+      await page.waitForTimeout(600);
+      const loopsAfterRemount = await page.evaluate(() => window.__hLoops());
+      const added = loopsAfterRemount - loopsFirstMount;
+      add(id, 'remount does not duplicate the animation loop', added <= 0,
+        `${loopsFirstMount} loop(s) on first mount -> ${loopsAfterRemount} after remount` +
+        (added > 0 ? `  (${added} ADDED - the remount duplicated a loop)` : '  (unchanged)'));
+    } else {
+      results.push({
       id, name: 'no animation loop expected for this class',
       pass: true, evidence: 'static or third-party: idle frame rate is correctly zero, not asserted as a rate'
     });
@@ -898,10 +930,28 @@ async function runSelfTest() {
           document.body.appendChild(stray);   /* outside #main: survives the wipe */
         });
 
+        /* 8. duplicates its animation loop ON REMOUNT.
+           Deliberately shaped like the real defect rather than like "runs two
+           loops forever". A duplicated mount starts a fresh loop each time and
+           never cancels the previous one, so the loop count grows only after a
+           remount - which is the only thing the remount check can observe. The
+           earlier version of this fixture ran two loops from the first mount,
+           which is indistinguishable from a healthy page here: the fixture page
+           carries app-level loops, and both fixtures measured the same count.
+           Absolute counts are contaminated; a before/after comparison is not. */
+        let dlSeen = 0;
+        Sims.register('fix-double-loop', 'Double loop', 'x', 'x', frame => {
+          const cv = SU.canvas(frame, 120);
+          const paint = () => { cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); };
+          dlSeen++;
+          const f = () => { paint(); requestAnimationFrame(f); };
+          requestAnimationFrame(f);          /* never cancelled: leaks one per mount */
+        });
+
         window.addEventListener('hashchange', mountFixture);
         location.hash = '#/sims/fix-healthy';
         mountFixture();
-        window.__fixtureReady = true;
+window.__fixtureReady = true;
       </script></body></html>`
   }));
 
@@ -927,6 +977,8 @@ async function runSelfTest() {
     ['fix-healthy',       'all',             false, 'must PASS: proves the checker is not always-fail'],
     ['fix-loop-leak',     'leaked rAF',      true,  'must be flagged: loop outlives unmount'],
     ['fix-surface-leak',  'leaked surface',  true,  'must be flagged: rendering surface outlives unmount'],
+    ['fix-double-loop',   'duplicate loop',  true,  'must be flagged: the simulation runs two loops'],
+    ['fix-healthy',       'duplicate loop',  false, 'must be CLEAN: proves the duplicate-loop check is not always-fail'],
     /* Negative control for the check above. A detector that flags
        fix-surface-leak proves nothing unless it stays quiet on a fixture with the
        identical shape and no leak; without this, a surface check that fired on
@@ -1022,6 +1074,37 @@ detected = stray > 0;
         detail = detected
           ? `${stillThere} canvas(s) survived unmount (router arrived=${arrivedHere})`
           : 'every canvas was cleaned up, so the leak was NOT detected';
+      } else if (kind === 'duplicate loop') {
+        /* Count DISTINCT animation callbacks - a claim about the code - rather
+           than frames, which is a claim about the machine. Headless Chrome runs
+           frames far faster than a display and a loaded runner runs them slower;
+           calibrating on frame rate gave 181 frames/s for a duplicated fixture and
+           180 for the healthy one, i.e. no separation. The negative control is
+           what surfaced that.
+
+           Absolute counts alone are not enough either: this fixture page carries
+           app-level loops, so healthy and duplicated both measured 3. The
+           signal that works is the CHANGE across a remount, which is exactly what
+           the production check claims to test. */
+        await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
+        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
+        await page.evaluate(() => { window.__hReset(); });
+        await page.waitForTimeout(500);
+        const before = await page.evaluate(() => window.__hLoops());
+        await page.evaluate(() => { location.hash = '#/formulas'; });
+        await until(page, () => {
+          const m = document.getElementById('main');
+          return !!m && location.hash.indexOf('#/sims/') !== 0 && !!m.querySelector('.wrap')
+            && !m.querySelector('.sim-slot-lg, .sim-slot');
+        }, null, 8000);
+        await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
+        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
+        await page.evaluate(() => { window.__hReset(); });
+        await page.waitForTimeout(700);
+        const after = await page.evaluate(() => window.__hLoops());
+        detected = after > before;
+        detail = `${before} loop(s) on first mount -> ${after} after remount` +
+          (detected ? ` -> FLAGGED, remount added ${after - before}` : ' -> no loop added by the remount');
     } else if (kind === 'all') {
       /* healthy control must mount, animate and respond */
       const okMount = await until(page, () => {
