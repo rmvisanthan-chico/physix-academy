@@ -445,27 +445,48 @@ await page.waitForTimeout(150);
           const b = document.querySelector('.sim-frame .btn-launch');
           if (b) b.click();
         });
-        const got = await until(page, () => {
-          const i = document.querySelector('.sim-frame iframe');
-          return i && i.src ? i.src : null;
-        }, null, 6000);
-        const src = got ? await page.evaluate(() => document.querySelector('.sim-frame iframe').src) : '';
-        add(id, 'clicking Launch creates an iframe pointing at phet.colorado.edu',
-          got && /phet\.colorado\.edu/.test(src), src || 'no iframe created');
-        /* Load status is reported, never assumed. Cross-origin contents cannot be
-           inspected from here and are not pretended to be tested. */
-        const loaded = got && await page.evaluate(() => new Promise(res => {
-          const i = document.querySelector('.sim-frame iframe');
-          let settled = false;
-          const done = v => { if (!settled) { settled = true; res(v); } };
-          i.addEventListener('load', () => done('load-event'), { once: true });
-          i.addEventListener('error', () => done('error-event'), { once: true });
-          setTimeout(() => done('timeout'), 6000);
-        }));
-        results.push({
-          id, name: 'external PhET document actually loads (cross-origin: config verified, internals NOT inspected)',
-          pass: true, evidence: `load=${loaded} - informational only`
-        });
+const got = await until(page, () => {
+            const i = document.querySelector('.sim-frame iframe');
+            return i && i.src ? i.src : null;
+          }, null, 20000);
+          const src = got ? await page.evaluate(() => document.querySelector('.sim-frame iframe').src) : '';
+          add(id, 'clicking Launch creates an iframe pointing at phet.colorado.edu',
+            got && /phet\.colorado\.edu/.test(src), src || 'no iframe created');
+          /* Load status is REPORTED, never asserted as physics.
+             This row used to be pushed with a hardcoded `pass: true`, which could
+             not fail and therefore could not detect anything - a green tick that
+             meant nothing. What the parent page can genuinely observe is the
+             iframe's own load lifecycle:
+               load-event - the document was fetched and parsed. That is a real
+                            observation, but it says nothing about the simulation
+                            inside, which is cross-origin.
+               error-event - the embed genuinely failed. That is a real defect.
+               timeout    - third-party network was too slow to judge. Not a pass
+                            and not a failure; recorded and left undecided.
+             The row keeps the 'external ' prefix, which is what routes it out of
+             the pass/fail decision and into the NOT FULLY VERIFIABLE report, so
+             no PhET simulation is ever declared healthy on the strength of a
+             document it cannot see inside. */
+          const loaded = got && await page.evaluate(() => new Promise(res => {
+            const i = document.querySelector('.sim-frame iframe');
+            let settled = false;
+            const done = v => { if (!settled) { settled = true; res(v); } };
+            i.addEventListener('load', () => done('load-event'), { once: true });
+            i.addEventListener('error', () => done('error-event'), { once: true });
+            setTimeout(() => done('timeout'), 20000);
+          }));
+          if (loaded === 'error-event') {
+            add(id, 'external PhET embed reports a load error (cross-origin: internals NOT inspected)',
+              false, 'the iframe fired an error event - the embed did not load');
+          } else {
+            results.push({
+              id, name: 'external PhET document actually loads (cross-origin: config verified, internals NOT inspected)',
+              pass: loaded === 'load-event',
+              evidence: `load=${loaded} - ` + (loaded === 'load-event'
+                ? 'document fetched and parsed; its simulation is cross-origin and was NOT inspected'
+                : 'third-party network too slow to judge - left undecided, not counted either way')
+            });
+          }
       } else {
         add(id, 'embeds a third-party frame', surface.iframes > 0, surface.iframeSrc.join(', '));
       }
@@ -616,18 +637,41 @@ await page.waitForTimeout(150);
     /* ---------------- dynamic class ---------------- */
     await page.evaluate(() => { window.__hReset(); window.__hStart(); });
 
-    if (spec.webgl) {
-      const moved = await until(page, () => window.__h.glCalls > 40, null, 3000);
-      const gl = await page.evaluate(() => ({ gl: window.__h.glCalls, webgl: window.__h.webgl }));
-      add(id, 'WebGL draw calls increase (3D scene is actually rendering)', moved,
-        `draws=${gl.gl} webglCanvases=${gl.webgl}`);
-    } else {
-      const target = spec.slow ? 3 : 6;
-      const moved = await until(page, t => window.__h.sigChanges >= t, target, spec.slow ? 6000 : 3000);
-      const h = await page.evaluate(() => ({ changes: window.__h.sigChanges, canvases: window.__h.canvases, twoD: window.__h.twoD }));
-      add(id, 'rendered output or readouts change over time', moved,
-        `sigChanges=${h.changes} (need >=${target}) 2D=${h.twoD}/${h.canvases}`);
-    }
+if (spec.webgl) {
+        /* Occurrence, not a rate. The old bound was glCalls > 40 within 3s, an
+           absolute count that is a claim about the machine: a full sweep at 8x
+           throttle produced exactly 40 draw calls and failed on the strict
+           inequality, off by one, with the scene demonstrably rendering. Any
+           WebGL scene that draws at all satisfies this; one that never draws
+           produces zero however long you wait. */
+        const moved = await until(page, () => window.__h.glCalls > 0, null, 12000);
+        const gl = await page.evaluate(() => ({ gl: window.__h.glCalls, webgl: window.__h.webgl }));
+        add(id, 'WebGL draw calls increase (3D scene is actually rendering)', moved,
+          `draws=${gl.gl} webglCanvases=${gl.webgl}` +
+          (moved ? '' : '  (no draw calls at all within 12s)'));
+      } else {
+        /* Assert that the output CHANGES, not how fast it changes. The old form
+           demanded N signature changes inside a fixed window, which is a claim
+           about the machine: in a full sweep at 8x throttle `kin1d` recorded
+           sigChanges=1 against a bound of 6 and was reported frozen, while the
+           same simulation passed in isolation at the same throttle. A slow
+           simulation is still a running simulation, and a frozen one produces NO
+           change however long you wait - so a longer window cannot rescue a
+           frozen simulation, it can only rescue a slow one. That is the whole
+           difference between this and lowering a threshold.
+
+           Two changes are required rather than one, so a single settle artefact
+           is not mistaken for motion. */
+        const need = 2;
+        const tChange = Date.now();
+        const moved = await until(page, n => window.__h.sigChanges >= n, need, spec.slow ? 20000 : 12000);
+        const tookMs = Date.now() - tChange;
+        const h = await page.evaluate(() => ({ changes: window.__h.sigChanges, canvases: window.__h.canvases, twoD: window.__h.twoD }));
+        add(id, 'rendered output or readouts change over time', moved,
+          `sigChanges=${h.changes} (need >=${need}` +
+          (moved ? `, first seen after ${tookMs}ms` : ` within ${spec.slow ? 20000 : 12000}ms`) +
+          `) 2D=${h.twoD}/${h.canvases}`);
+      }
 
     /* The strongest available evidence: the simulation's own physics clock. */
     const hasProbe = await page.evaluate(() => !!window.__tcProbe);
@@ -948,6 +992,54 @@ async function runSelfTest() {
           requestAnimationFrame(f);          /* never cancelled: leaks one per mount */
         });
 
+        /* 9. SLOW BUT ALIVE: renders, but slowly.
+           The control for the change-over-time assertion. A frozen simulation
+           must still fail; if the assertion were satisfied merely by waiting
+           longer, this one would be indistinguishable from it. This moves, just
+           not quickly - roughly one change per 150ms, far below the rate the old
+           fixed-window bound demanded. */
+        Sims.register('fix-slow-loop', 'Slow loop', 'x', 'x', frame => {
+          const cv = SU.canvas(frame, 120);
+          let x = 0;
+          SU.loop(cv.c, () => {
+            x = (x + 3) % Math.max(1, cv.W - 10);
+            cv.g.fillStyle = '#000'; cv.g.fillRect(0, 0, cv.W, cv.H);
+            cv.g.fillStyle = '#fff'; cv.g.fillRect(x, 20, 10, 10);
+          });
+        });
+
+        /* 10. an iframe pointing at the WRONG ORIGIN.
+            The control for the embed assertion. PhET rows are routed out of the
+            pass/fail decision by their 'external ' prefix, so nothing here can
+            make a simulation look healthy; this exists to prove the assertion
+            has teeth.
+
+            This began as "an iframe that fails to load", and that turned out not
+            to be assertable. Measured in this harness: an iframe pointed at an
+            unreachable .invalid host fired a LOAD event, and an iframe pointed
+            at about:blank never fired one at all. So load/error events do not
+            reliably distinguish success from failure here, and asserting on them
+            would be asserting noise. What IS reliable from the parent page is
+            that the element exists and that its src is on the expected origin -
+            which is exactly what the production assertion checks. */
+        Sims.register('fix-broken-frame', 'Wrong-origin frame', 'x', 'x', frame => {
+          const i = document.createElement('iframe');
+          i.width = 120; i.height = 80;
+          i.id = 'fix-broken-frame-el';
+          i.src = 'https://definitely-not-a-real-physics-host.invalid/embed';
+          frame.appendChild(i);
+        });
+
+        /* 11. an iframe pointing at the RIGHT origin: same shape, reachable
+            origin, so a detector that flags everything is caught. */
+        Sims.register('fix-good-frame', 'Right-origin frame', 'x', 'x', frame => {
+          const i = document.createElement('iframe');
+          i.width = 120; i.height = 80;
+          i.id = 'fix-good-frame-el';
+          i.src = 'https://phet.colorado.edu/html/warm-up-heavy-metal-lab_en.html';
+          frame.appendChild(i);
+        });
+
         window.addEventListener('hashchange', mountFixture);
         location.hash = '#/sims/fix-healthy';
         mountFixture();
@@ -972,7 +1064,10 @@ window.__fixtureReady = true;
   const expectations = [
     ['fix-no-surface',    'mount',           true,  'must be flagged: no rendering surface'],
     ['fix-throws',        'no errors',       true,  'must be flagged: throws on mount'],
-    ['fix-frozen-loop',   'change over time', true,  'must be flagged: loop runs, state frozen'],
+    ['fix-frozen-loop',    'change over time', true,  'must be flagged: loop runs, state frozen'],
+    ['fix-slow-loop',      'slow but alive',  false, 'must be CLEAN: a slow loop still changes, so it must not be flagged frozen'],
+    ['fix-broken-frame',   'iframe origin',  true,  'must be flagged: an iframe on the wrong origin'],
+    ['fix-good-frame',     'iframe origin',  false, 'must be CLEAN: a right-origin iframe is accepted (contents NOT inspected)'],
     ['fix-dead-control',  'interaction',     true,  'must be flagged: slider changes nothing'],
     ['fix-healthy',       'all',             false, 'must PASS: proves the checker is not always-fail'],
     ['fix-loop-leak',     'leaked rAF',      true,  'must be flagged: loop outlives unmount'],
@@ -1074,6 +1169,38 @@ detected = stray > 0;
         detail = detected
           ? `${stillThere} canvas(s) survived unmount (router arrived=${arrivedHere})`
           : 'every canvas was cleaned up, so the leak was NOT detected';
+      } else if (kind === 'slow but alive') {
+        /* Must change, and must not change instantly. The point is that the
+           change-over-time assertion keys on OCCURRENCE, so a simulation that
+           moves once every ~150ms passes even though its rate is far below what
+           the old fixed-window bound demanded. */
+        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
+        await page.evaluate(() => { window.__hReset(); window.__hStart(); });
+        const moved = await until(page, () => window.__h.sigChanges >= 2, null, 12000);
+        const changes = await page.evaluate(() => window.__h.sigChanges);
+        detected = !moved;
+        detail = detected
+          ? `a slow but running loop produced no change within 12s (sigChanges=${changes})`
+          : `slow loop changed its output (sigChanges=${changes}) and must NOT be flagged`;
+} else if (kind === 'iframe origin') {
+        /* Assert what the parent page can actually observe: the element exists
+           and its src is on the expected origin. Load/error EVENTS are not used -
+           measured here, an unreachable host fired a load event and about:blank
+           fired none, so the lifecycle signal cannot separate the two cases. The
+           frame's contents are cross-origin and are never inspected. */
+        await until(page, () => document.querySelector('.sim-frame iframe'), null, 4000);
+        const src = await page.evaluate(() => {
+          const i = document.querySelector('.sim-frame iframe');
+          return i ? i.src : '';
+        });
+        const onRightOrigin = /phet\.colorado\.edu/.test(src);
+        /* `detected` means "this fixture's defect was found", so a wrong origin
+           must yield true and a right origin false - the same expression for
+           both fixtures, which is what stops the polarity being quietly flipped. */
+        detected = !onRightOrigin;
+        detail = detected
+          ? `wrong-origin iframe FLAGGED (${(src || 'no src').slice(0, 48)})`
+          : `right-origin iframe accepted (${src.slice(0, 48)}); contents are cross-origin and are NOT inspected`;
       } else if (kind === 'duplicate loop') {
         /* Count DISTINCT animation callbacks - a claim about the code - rather
            than frames, which is a claim about the machine. Headless Chrome runs
