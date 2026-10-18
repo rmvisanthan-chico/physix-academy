@@ -182,8 +182,7 @@ const Hero3D = {
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      const visH = 2 * camera.position.z * Math.tan((camera.fov * Math.PI / 180) / 2);
-      core.position.x = w >= 900 ? visH * camera.aspect * 0.26 : 0;
+      core.position.x = 0;
     };
     fit();
     window.addEventListener('resize', fit);
