@@ -75,7 +75,7 @@ const ctx = () => browser.newContext({ viewport: { width: 1200, height: 800 }, r
   const page = await c.newPage();
   // Same page shell, but point the entry at a module that does not exist, which
   // is what a bad deploy or a dropped chunk actually looks like.
-  await page.route('**/js/main.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: 'import "./does-not-exist.js";' }));
+  await page.route('**/js/main.js*', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: 'import "./does-not-exist.js";' }));
   await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(10500);           // watchdog is 9s
   const txt = await page.textContent('body');

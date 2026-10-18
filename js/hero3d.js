@@ -6,19 +6,27 @@ import { afterRender } from './views.js';
 
 const Hero3D = {
   mountedOn: null,
+  _failures: 0,
+  _threeWarned: false,
 
   mount() {
     const hero = $('.hero');
     if (!hero || hero === this.mountedOn) return;
     if (!window.THREE) {
+      if (this._threeWarned) return;
+      this._threeWarned = true;
       console.warn('[Hero3D] THREE missing — vendor/three.min.js did not load');
       toast('3D engine failed to load (three.min.js)', 'bad');
       return;
     }
-    this.mountedOn = hero;
+    if (this._failures >= 3) return;
     try {
-    this._build(hero);
+      this._build(hero);
+      this.mountedOn = hero;
+      this._failures = 0;
     } catch (e) {
+      this._failures++;
+      hero.querySelector('.hero3d-wrap')?.remove();
       console.error('[Hero3D]', e);
       toast(/webgl/i.test(e.message)
         ? '3D needs WebGL — enable hardware acceleration in browser settings'
@@ -47,7 +55,7 @@ const Hero3D = {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, W0() / H0(), 0.1, 100);
-    camera.position.set(0, 0, 5.8);
+    camera.position.set(0, 0, 6.6);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75));
     const l1 = new THREE.PointLight(0xffffff, 26, 40); l1.position.set(4, 4, 5); scene.add(l1);
@@ -95,14 +103,14 @@ const Hero3D = {
     [0, Math.PI / 3, -Math.PI / 3].forEach((rx, i) => {
       const col = i === 1 ? cAcc2.getHex() : cAcc.getHex();
       const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(1.78, 0.028, 12, 128),
+        new THREE.TorusGeometry(1.30, 0.024, 12, 128),
         new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.22, transparent: true, opacity: 0.98 })
       );
       ring.rotation.set(rx, i * 0.8, rx);
       core.add(ring);
       // glow copy (thicker, additive)
       const glow = new THREE.Mesh(
-        new THREE.TorusGeometry(1.78, 0.075, 10, 96),
+        new THREE.TorusGeometry(1.30, 0.055, 10, 96),
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false })
       );
       glow.rotation.copy(ring.rotation);
@@ -169,7 +177,15 @@ const Hero3D = {
       if (navigator.vibrate) try{ navigator.vibrate(12); }catch(_){}
     }
 
-    const fit = () => { renderer.setSize(W0(), H0()); camera.aspect = W0() / H0(); camera.updateProjectionMatrix(); };
+    const fit = () => {
+      const w = W0(), h = H0();
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      const visH = 2 * camera.position.z * Math.tan((camera.fov * Math.PI / 180) / 2);
+      core.position.x = w >= 900 ? visH * camera.aspect * 0.26 : 0;
+    };
+    fit();
     window.addEventListener('resize', fit);
 
     let visible = true;
