@@ -55,7 +55,7 @@ const Hero3D = {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, W0() / H0(), 0.1, 100);
-    camera.position.set(0, 0, 6.6);
+    camera.position.set(0, 0, 4.8);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.75));
     const l1 = new THREE.PointLight(0xffffff, 26, 40); l1.position.set(4, 4, 5); scene.add(l1);
