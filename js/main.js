@@ -51,7 +51,7 @@ import './dashboard.js';
 import './scientists.js';
 import './cinematic.js';
 import './anime-demo.js';
-import './hero3d.js?v=75';
+import './hero3d.js?v=76';
 import './3d.js';
 import './scroll-cinema.js';
 import './app.js';
