@@ -21,3 +21,14 @@ scroll-reveal-demo.html
 # Secrets / env
 .env
 .env.*
+
+# Desktop build
+node_modules/
+release/
+dist/
+downloads/*
+!downloads/README.md
+
+# Astra AI (local learner profiles + secrets)
+astra/.data/
+astra/.env
