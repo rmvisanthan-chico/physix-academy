@@ -11,7 +11,8 @@ const Hero3D = {
 
   mount() {
     const hero = $('.hero');
-    if (!hero || hero === this.mountedOn) return;
+    if (!hero) return;
+    if (hero === this.mountedOn) return;
     if (!window.THREE) {
       if (this._threeWarned) return;
       this._threeWarned = true;
