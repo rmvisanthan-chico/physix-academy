@@ -1,0 +1,199 @@
+/* PhysiX Academy — Virtual Physics Lab (Phase 2/3)
+ *
+ * Styles for the experiment-selection view and experiment workspace.
+ * Reuses the design tokens from css/style.css (--bg, --card, --card-brd,
+ * --txt, --txt2, --acc, --acc-soft, --r). Does not touch
+ * css/trial-physics-lab.css.
+ */
+
+/* ---------- lab root ---------- */
+.lab-root .wrap {
+  max-width: 1100px;
+}
+
+/* ---------- selection grid ---------- */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.2rem;
+}
+
+/* Experiment card — extends .card from style.css */
+.lab-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+.lab-card:hover {
+  text-decoration: none;
+}
+.lab-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  color: var(--txt);
+}
+.lab-card .muted {
+  color: var(--txt2);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-bottom: auto;
+}
+.lab-card .topic-meta {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ---------- experiment workspace ---------- */
+.lab-stage {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.lab-nav {
+  flex-shrink: 0;
+  width: min(200px, 25vw);
+}
+.lab-mount {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The .sim-slot is filled by Sims.mount(); give it a minimum so the canvas
+   never collapses to zero while the page is still painting. */
+.sim-slot {
+  min-height: 420px;
+}
+
+/* Sidebar panels on the right of the hero */
+.lab-sidebar {
+  flex-shrink: 0;
+  width: min(340px, 30vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.lab-panel {
+  position: sticky;
+  top: 1rem;
+}
+.lab-panel h3.panel-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--txt);
+}
+.lab-panel p.small {
+  margin: 0 0 0.75rem;
+}
+
+/* Measurement table */
+.measure-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+.measure-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.measure-table th,
+.measure-table td {
+  padding: 0.4rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--card-brd);
+}
+.measure-table th {
+  text-align: left;
+  color: var(--txt2);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.measure-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Sweep controls */
+.sweep-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.sweep-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--txt2);
+  margin-bottom: 0.25rem;
+}
+.sweep-val {
+  width: 7ch;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--card-brd);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--txt);
+  font-size: 0.85rem;
+}
+.sweep-val:focus {
+  outline: 2px solid var(--acc);
+  border-color: var(--acc);
+}
+
+/* Lab notes */
+.lab-notes {
+  width: 100%;
+  min-height: 90px;
+  padding: 0.6rem;
+  border: 1px solid var(--card-brd);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--ff-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.lab-notes:focus {
+  outline: 2px solid var(--acc);
+  border-color: var(--acc);
+}
+
+/* Button row */
+.lab-btn-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 768px) {
+  .lab-stage {
+    flex-direction: column;
+  }
+  .lab-sidebar {
+    width: auto;
+    position: static;
+  }
+  .lab-nav {
+    width: auto;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .lab-nav .btn {
+    flex: 1;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .lab-card {
+    transition: none;
+  }
+}

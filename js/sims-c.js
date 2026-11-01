@@ -317,6 +317,7 @@ if (window.MutationObserver) {
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
+  return { controls, graph };
 });
 
 /* ---------------- Spring-mass SHM ---------------- */
@@ -363,6 +364,19 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
      displacement, while opts.xKey ('gt') is time, and overloading one name for
      two roles is how the first version plotted velocity against time's key. */
   let xPix, v, trace = [], gt = 0;
+  /* PhysiX Academy — Virtual Physics Lab display scale.
+   *
+   * PX_PER_M is CHOSEN, not derived: it only scales how the pixel-space state
+   * is PRINTED. The SHM integrator is scale-invariant
+   * (dv_SI/dt = -(k/m)x_SI - dmp*v_SI holds for any value here), so changing
+   * PX_PER_M changes no period, frequency, damping rate or shape.
+   *
+   * Do not confuse it with FIXED_DT (= 1/60 s, sim-controls.js), which is the
+   * physics timestep. Chosen so the amplitude range 30-110 px reads as a
+   * plausible 0.50-1.83 m bench-top demo — plausibility, not derivation: any
+   * other value reads just as well and changes nothing physical.
+   */
+  const PX_PER_M = 60;
   const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 5, 0.25, 1.5, () => reset());
   const K = SU.slider(ctr, 'Spring k', 5, 80, 1, 25, () => reset());
   let AM;
@@ -385,18 +399,18 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
   }
 
   function sample() {
-    /* Graph and readout both report displacement in metres (px / 60), so the
+    /* Graph and readout both report displacement in metres (px / PX_PER_M), so the
        plotted curve and the number beside it agree. Velocity is converted with
        the same factor - the first version pushed raw px/s and the legend read
        "-295 m/s", which is not a velocity anything in this sim produces. */
-    graph.push({ gt, x: xPix / 60, v: v / 60 });
+      graph.push({ gt, x: xPix / PX_PER_M, v: v / PX_PER_M });
   }
 
   function render() {
     const m = M.get(), k = K.get(), dmp = D.get();
     rT.set((2 * Math.PI * Math.sqrt(m / k)).toFixed(2) + ' s');
-    rX.set((xPix / 60).toFixed(2) + ' m');
-    rV.set((v / 60).toFixed(2) + ' m/s');
+    rX.set((xPix / PX_PER_M).toFixed(2) + ' m');
+    rV.set((v / PX_PER_M).toFixed(2) + ' m/s');
     const g = cv.g, midY = cv.H * 0.42;
     g.fillStyle = '#05070d'; g.fillRect(0, 0, cv.W, cv.H);
     const wallX = cv.W * 0.12, eqX = cv.W / 2, bw = 44;
@@ -445,8 +459,8 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
   });
 
   const shmProbe = () => ({
-    t: gt, x: xPix / 60, v: v / 60,
-    y0: (AM ? AM.get() : 80) / 60,
+      t: gt, x: xPix / PX_PER_M, v: v / PX_PER_M,
+      y0: (AM ? AM.get() : 80) / PX_PER_M,
     paused: controls.isPaused(),
     samples: graph.sampleCount('x'),   /* one series only - see the projectile note */
     calls: controls.advanceCalls()
@@ -540,6 +554,7 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
+  return { controls, graph };
 });
 
 /* ---------------- Doppler effect ---------------- */
