@@ -391,4 +391,5 @@ Sims.register('kin1d', '1-D Motion Lab', 'Move a car — watch the graphs being 
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
+  return { controls, graph, getTime: () => t };
 });

@@ -7,6 +7,7 @@ import { Sims } from './sims-a.js';
 import { viewGraph } from './graph.js';
 import { chFirstLesson, SCIENTISTS, viewScientists } from './scientists.js';
 import { viewPractice, viewSimsPage, viewTutorPage } from './pages.js';
+import { viewLab } from './lab.js';
 import { viewFormulas } from './formulas.js';
 import { App, renderHooks } from './core.js';
 import { viewProgress } from './progress.js';
@@ -75,6 +76,7 @@ export function route() {
         case 'progress': viewProgress(); nav = 'progress'; break;
         case 'mistakes': viewMistakes(); nav = 'mistakes'; break;
         case 'support': viewSupport(); nav = ''; break;
+        case 'lab': viewLab(parts[1]); nav = 'lab'; break;
         case 'about': viewAbout(); nav = ''; break;
         default: viewHome();
       }

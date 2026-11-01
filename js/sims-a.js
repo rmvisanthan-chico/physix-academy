@@ -63,8 +63,10 @@ mount(id, host) {
       }
       window.addEventListener('pagehide', report, { once: true });
 
-      try { def.run(frame); }
-      catch (err) { console.error('Sim error:', id, err); frame.insertAdjacentHTML('beforeend', '<div class="empty-state">This simulation failed to start.</div>'); }
+      let result;
+      try { result = def.run(frame); }
+      catch (err) { console.error('Sim error:', id, err); frame.insertAdjacentHTML('beforeend', '<div class="empty-state">This simulation failed to start.</div>'); return null; }
+      return result;
     }
 };
 
