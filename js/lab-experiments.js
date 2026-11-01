@@ -127,21 +127,23 @@ export const LAB_EXPERIMENTS = [
         /* Amplitude is a PIXEL quantity and stays one. The simulation's state
          * variable is xPix, integrated as `v += (-k/m * xPix - damping*v) * h`,
          * i.e. in pixels per second, not metres per second. The readouts then
-         * divide by a hardcoded 60 to print "m", but 60 is an unverified
-         * display convention — nothing in the simulation defines it physically.
-         * Converting this to metres here would manufacture SI that does not
-         * exist, so it is flagged instead of converted. */
+         * apply PX_PER_M = 60 (js/sims-c.js), a chosen display constant: the
+         * integrator is scale-invariant, so it changes no period, frequency or
+         * damping rate. It is not a physical derivation, and the pixel
+         * amplitude must not be presented as an SI amplitude. */
         key: 'A', label: 'Amplitude A', unit: 'px', si: false,
         siStatus: 'unverified',
         min: 30, max: 110, step: 5, default: 80,
         note: 'Pixel amplitude, not metres. The simulation integrates in pixel space and '
-            + 'the /60 used by its readouts is an unverified display convention. Must not be '
-            + 'presented as an SI amplitude.',
+            + 'its readouts apply the chosen display constant PX_PER_M = 60 (js/sims-c.js), '
+            + 'which is scale-invariant and not a physical derivation. Must not be presented '
+            + 'as an SI amplitude.',
       },
     ],
     caveats: [
       'The integrator runs in pixel space: v += (-k/m * xPix - damping*v) * h, with xPix in pixels.',
-      'The /60 applied by the readouts and the graph is a hardcoded display factor, not a derived scale.',
+      'The /60 applied by the readouts and the graph is the chosen display constant PX_PER_M = 60 '
+      + '(js/sims-c.js), not a derived scale.',
       'The period readout uses T = 2*pi*sqrt(m/k) in SI, which is an idealised value rather than a '
       + 'measurement of the pixel-space motion actually being drawn.',
     ],

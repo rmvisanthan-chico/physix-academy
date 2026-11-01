@@ -317,7 +317,7 @@ if (window.MutationObserver) {
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
-  return { controls, graph };
+  return { controls, graph, getTime: () => (st ? st.t : 0) };
 });
 
 /* ---------------- Spring-mass SHM ---------------- */
@@ -554,7 +554,7 @@ Sims.register('shm', 'Spring-Mass SHM', 'x(t) = A cos ωt — the heartbeat of p
     });
     mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
   }
-  return { controls, graph };
+  return { controls, graph, getTime: () => gt };
 });
 
 /* ---------------- Doppler effect ---------------- */

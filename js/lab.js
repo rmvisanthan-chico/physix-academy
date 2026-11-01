@@ -110,13 +110,13 @@ function viewLabExperiment(exp) {
             <h3 class="panel-title">Parameter sweep</h3>
             <p class="small muted">Sweep one parameter, run, record results.</p>
             <div class="sweep-controls">
-              <label class="sweep-label">Parameter</label>
+              <label class="sweep-label" for="sweep-param">Parameter</label>
               <select class="sweep-param" id="sweep-param"></select>
-              <label class="sweep-label">From</label>
+              <label class="sweep-label" for="sweep-min">From</label>
               <input type="number" class="sweep-val" id="sweep-min" step="any">
-              <label class="sweep-label">To</label>
+              <label class="sweep-label" for="sweep-max">To</label>
               <input type="number" class="sweep-val" id="sweep-max" step="any">
-              <label class="sweep-label">Steps</label>
+              <label class="sweep-label" for="sweep-steps">Steps</label>
               <input type="number" class="sweep-val" id="sweep-steps" value="5" min="1" max="20">
               <button class="btn btn-sm btn-primary" id="btn-sweep">Run sweep</button>
             </div>
@@ -145,7 +145,11 @@ function viewLabExperiment(exp) {
   }
   const { controls, graph } = result;
 
-  lab = { exp, simId: exp.simId, controls, graph, slot, measurements: [], observations: '' };
+  lab = {
+    exp, simId: exp.simId, controls, graph, slot,
+    getTime: result.getTime,
+    measurements: [], observations: ''
+  };
 
   /* ---- Measurement capture ---------------------------------------------
      Visibility is deliberately NOT snapshotted here. graph.setVisible() can
@@ -392,14 +396,34 @@ function viewLabExperiment(exp) {
     renderSweepHead();
     sweepBody.innerHTML = '';
 
+    /* A sweep is a temporary experiment: snapshot the student's slider, clock,
+       play/pause state and step size before touching anything, so `finally` can
+       put the workspace back exactly as it was - on success, on a failed trial,
+       or if the batch is interrupted. */
+    const sliderInput = findSlider(paramDef);
+    const originalSliderValue = sliderInput ? sliderInput.value : null;
+    const originalPaused = lab.controls.isPaused();
+    const originalStep = lab.controls.stepSeconds;
+    let originalTime = 0;
+    if (typeof lab.getTime === 'function') {
+      const t = lab.getTime();
+      if (Number.isFinite(t)) originalTime = t;
+    }
+    /* Fallback for any future simulation that does not expose a clock. */
+    if (!originalTime) {
+      for (const s of lab.graph.series) {
+        const range = lab.graph.timeRange(s.id);
+        if (range && range.to > originalTime) originalTime = range.to;
+      }
+    }
+
     /* Pause once, so the rAF loop cannot add samples between trials. Each
        controls.step() already pauses, but being explicit makes the batch
        deterministic from the first trial. */
     lab.controls.pause();
 
-    /* Force the fixed physics timestep for the batch, and restore the student's
-       chosen step size afterwards. 120 x 1/60 s = 2 s of simulated time. */
-    const originalStep = lab.controls.stepSeconds;
+    /* Force the fixed physics timestep for the batch. 120 x 1/60 s = 2 s of
+       simulated time. The student's step size is restored in `finally`. */
     lab.controls.setStepSeconds(lab.controls.FIXED_DT);
 
     try {
@@ -412,7 +436,6 @@ function viewLabExperiment(exp) {
         const missing = [];
 
         try {
-          const sliderInput = findSlider(paramDef);
           if (!sliderInput) {
             status = 'slider missing';
           } else {
@@ -465,7 +488,32 @@ function viewLabExperiment(exp) {
         sweepBody.appendChild(row);
       }
     } finally {
-      if (lab && lab.controls) lab.controls.setStepSeconds(originalStep);
+      if (lab && lab.controls) {
+        /* Restore the swept slider first: its input handler resets the
+           simulation to the restored parameter. */
+        if (sliderInput && originalSliderValue !== null) {
+          sliderInput.value = originalSliderValue;
+          sliderInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        /* Rebuild the pre-sweep state deterministically. Every simulation here
+           integrates fixed 1/60 s sub-steps, so replaying the same number of
+           sub-steps from Reset reaches the same t, x and v - and the same graph
+           samples - without storing internal state. Advance in five-second
+           chunks so a long run does not repaint once per sub-step. */
+        lab.controls.pause();
+        lab.controls.setStepSeconds(lab.controls.FIXED_DT);
+        lab.controls.reset();
+        let remaining = Math.max(0, Math.round(originalTime / lab.controls.FIXED_DT));
+        while (remaining > 0) {
+          const chunk = Math.min(remaining, 300);
+          lab.controls.setStepSeconds(chunk * lab.controls.FIXED_DT);
+          lab.controls.step();
+          remaining -= chunk;
+        }
+        lab.controls.setStepSeconds(originalStep);
+        if (originalPaused) lab.controls.pause();
+        else lab.controls.play();
+      }
       persistLab();
     }
   }
