@@ -8,8 +8,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4244';
@@ -22,13 +27,18 @@ const SIMS = ['newton', 'projectile', 'efield3d', 'phet-pendulum', 'orbit3d', 'c
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
 const results = [];
-const ok = (n, p, d = '') => { results.push(p); console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`); };
+const ok = (n, p, d = '') => {
+  results.push(p);
+  console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`);
+};
 
 for (const width of [390, 820]) {
   const label = width === 390 ? 'phone 390px' : 'tablet 820px';
   const c = await browser.newContext({
     viewport: { width, height: width === 390 ? 844 : 1180 },
-    isMobile: width < 500, hasTouch: width < 500, reducedMotion: 'reduce'
+    isMobile: width < 500,
+    hasTouch: width < 500,
+    reducedMotion: 'reduce'
   });
   const page = await c.newPage();
   console.log(`\n  === ${label} ===`);
@@ -50,7 +60,10 @@ for (const width of [390, 820]) {
       for (const el of [...sliders, ...buttons]) {
         const r = el.getBoundingClientRect();
         if (r.width === 0) continue;
-        if (r.height < 32) smallTargets.push(`${el.tagName}${el.className ? '.' + String(el.className).split(' ')[0] : ''}:${Math.round(r.height)}px`);
+        if (r.height < 32)
+          smallTargets.push(
+            `${el.tagName}${el.className ? '.' + String(el.className).split(' ')[0] : ''}:${Math.round(r.height)}px`
+          );
       }
 
       return {
@@ -73,7 +86,11 @@ for (const width of [390, 820]) {
       ok(`${label} ${sim}: rendered something`, m.text > 20 && !m.emptyState, `${m.text} chars`);
     }
     if (m.sliders > 0) {
-      ok(`${label} ${sim}: tap targets >= 32px`, m.smallTargets.length === 0, m.smallTargets.join(', '));
+      ok(
+        `${label} ${sim}: tap targets >= 32px`,
+        m.smallTargets.length === 0,
+        m.smallTargets.join(', ')
+      );
     }
     if (m.canvasW != null && m.canvasW > 0) {
       ok(`${label} ${sim}: canvas fits viewport`, m.canvasW <= width, `${m.canvasW}px`);
@@ -86,5 +103,5 @@ for (const width of [390, 820]) {
 }
 
 await browser.close();
-const bad = results.filter(r => !r).length;
+const bad = results.filter((r) => !r).length;
 console.log(`\nmobile audit  ${results.length - bad}/${results.length} ok`);

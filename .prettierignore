@@ -1,0 +1,9 @@
+js/vendor/
+node_modules/
+dist/
+electron/
+astra/
+html5-sims/
+tools/.shots/
+graphify-out/
+package-lock.json

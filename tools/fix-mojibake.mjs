@@ -22,16 +22,16 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /* cp1252 code points for bytes 0x80-0x9F. Index 0 is byte 0x80. */
-const CP1252_HIGH =
-  [0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
-   0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
-   0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
-   0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178];
+const CP1252_HIGH = [
+  0x20ac, 0x0081, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039,
+  0x0152, 0x008d, 0x017d, 0x008f, 0x0090, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
+  0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x009d, 0x017e, 0x0178
+];
 
 const REVERSE = new Map();
-for (let b = 0x80; b <= 0x9F; b++) REVERSE.set(CP1252_HIGH[b - 0x80], b);
-for (let b = 0x00; b <= 0x7F; b++) REVERSE.set(b, b);
-for (let b = 0xA0; b <= 0xFF; b++) REVERSE.set(b, b);
+for (let b = 0x80; b <= 0x9f; b++) REVERSE.set(CP1252_HIGH[b - 0x80], b);
+for (let b = 0x00; b <= 0x7f; b++) REVERSE.set(b, b);
+for (let b = 0xa0; b <= 0xff; b++) REVERSE.set(b, b);
 
 function repair(text) {
   const bytes = [];
@@ -47,11 +47,34 @@ function repair(text) {
   return out.includes('\uFFFD') ? null : out;
 }
 
-const MARKERS = ['â€™', 'â€œ', 'â€', 'Ã©', 'Ã¨', 'Ã¼', 'Ã¶', 'Ã¤',
-  'Ã±', 'Ã¢', 'Ã¯', 'Ã³', 'Â°', 'Â·', 'Â«', 'Â»', 'Â±', 'Â½',
-  'Âµ', 'Â§', 'Â£', 'Â©', 'Â®', 'ðŸ'];
+const MARKERS = [
+  'â€™',
+  'â€œ',
+  'â€',
+  'Ã©',
+  'Ã¨',
+  'Ã¼',
+  'Ã¶',
+  'Ã¤',
+  'Ã±',
+  'Ã¢',
+  'Ã¯',
+  'Ã³',
+  'Â°',
+  'Â·',
+  'Â«',
+  'Â»',
+  'Â±',
+  'Â½',
+  'Âµ',
+  'Â§',
+  'Â£',
+  'Â©',
+  'Â®',
+  'ðŸ'
+];
 
-const count = s => MARKERS.reduce((n, m) => n + (s.split(m).length - 1), 0);
+const count = (s) => MARKERS.reduce((n, m) => n + (s.split(m).length - 1), 0);
 
 const targets = process.argv.slice(2);
 if (!targets.length) {
@@ -63,7 +86,10 @@ for (const rel of targets) {
   const p = path.isAbsolute(rel) ? rel : path.join(ROOT, rel);
   const before = fs.readFileSync(p, 'utf8');
   const n0 = count(before);
-  if (n0 === 0) { console.log(`  ${rel}: already clean`); continue; }
+  if (n0 === 0) {
+    console.log(`  ${rel}: already clean`);
+    continue;
+  }
 
   const after = repair(before);
   if (after === null) {

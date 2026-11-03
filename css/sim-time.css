@@ -13,8 +13,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: .35rem .5rem;
-  padding: .5rem .8rem;
+  gap: 0.35rem 0.5rem;
+  padding: 0.5rem 0.8rem;
   border-top: 1px solid var(--card-brd);
   background: var(--panel2);
 }
@@ -25,8 +25,8 @@
 .sim-time .btn {
   min-height: 36px;
   min-width: 44px;
-  padding: .3rem .6rem;
-  font-size: .8rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
 }
 
 /* The play/pause button is the one control a student reaches for mid-run, so it
@@ -35,11 +35,13 @@
    and the state chip spells it out - but the filled style gives the row a
    clear starting point. */
 .sim-time-play {
-  background: rgba(107, 93, 246, .18);
-  border-color: rgba(107, 93, 246, .5);
+  background: rgba(107, 93, 246, 0.18);
+  border-color: rgba(107, 93, 246, 0.5);
   color: #fff;
 }
-.sim-time-play:hover { background: rgba(107, 93, 246, .3); }
+.sim-time-play:hover {
+  background: rgba(107, 93, 246, 0.3);
+}
 
 /* While paused the play button goes solid, so the control the student should
    press next is the one that looks pressed-in. */
@@ -48,15 +50,19 @@
   border-color: var(--accent, #6d5df6);
 }
 
-.sim-time-step { color: #cbd5f5; }
-.sim-time-reset { color: #a9b6d6; }
+.sim-time-step {
+  color: #cbd5f5;
+}
+.sim-time-reset {
+  color: #a9b6d6;
+}
 
 /* ---------- Step size ---------- */
 .sim-time-stepwrap {
   display: inline-flex;
   align-items: center;
-  gap: .3rem;
-  font-size: .72rem;
+  gap: 0.3rem;
+  font-size: 0.72rem;
   color: var(--txt3);
 }
 
@@ -65,8 +71,8 @@
      would need full keyboard/focus handling to not be a regression against the
      native control. */
   min-height: 36px;
-  padding: .2rem .3rem;
-  font-size: .76rem;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.76rem;
   color: var(--txt);
   background: var(--panel);
   border: 1px solid var(--card-brd);
@@ -78,32 +84,34 @@
    a real live region, so a screen reader announces "Paused" / "Running" on
    change without stealing focus. */
 .sim-time-state {
-  font-size: .74rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  padding: .18rem .45rem;
+  padding: 0.18rem 0.45rem;
   border-radius: 999px;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 .sim-time.is-running .sim-time-state {
   color: #34d399;
-  border-color: rgba(52, 211, 153, .35);
-  background: rgba(52, 211, 153, .1);
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.1);
 }
 .sim-time.is-paused .sim-time-state {
   color: #fbbf24;
-  border-color: rgba(251, 191, 36, .4);
-  background: rgba(251, 191, 36, .12);
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
 }
 
 .sim-time-clock {
   margin-left: auto;
-  font-variant-numeric: tabular-nums;   /* digits do not jitter as t advances */
-  font-size: .74rem;
+  font-variant-numeric: tabular-nums; /* digits do not jitter as t advances */
+  font-size: 0.74rem;
   color: var(--txt3);
   white-space: nowrap;
 }
-.sim-time-clock.is-paused { color: #fbbf24; }
+.sim-time-clock.is-paused {
+  color: #fbbf24;
+}
 
 /* ---------- Focus ---------- */
 /* Visible focus on every control. The offsets keep the ring clear of the
@@ -116,8 +124,8 @@
 /* ---------- 390px phone ---------- */
 @media (max-width: 520px) {
   .sim-time {
-    padding: .45rem .6rem;
-    gap: .3rem .35rem;
+    padding: 0.45rem 0.6rem;
+    gap: 0.3rem 0.35rem;
   }
   .sim-time .btn {
     /* 44px: the smallest reliably hittable target. Three of these plus gaps fit
@@ -125,8 +133,8 @@
     min-height: 44px;
     min-width: 44px;
     flex: 1 1 auto;
-    padding: .4rem .5rem;
-    font-size: .78rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
   }
   /* Step size gets its own line rather than squeezing the buttons. */
   .sim-time-stepwrap {
@@ -134,8 +142,14 @@
     width: 100%;
     justify-content: space-between;
   }
-  .sim-time-stepsize { min-height: 44px; flex: 1 1 auto; max-width: 9rem; }
-  .sim-time-state { order: 4; }
+  .sim-time-stepsize {
+    min-height: 44px;
+    flex: 1 1 auto;
+    max-width: 9rem;
+  }
+  .sim-time-state {
+    order: 4;
+  }
   .sim-time-clock {
     order: 6;
     width: 100%;
@@ -150,7 +164,9 @@
    play button, it inherits the project's existing preference rather than
    quietly ignoring it. */
 @media (prefers-reduced-motion: reduce) {
-  .sim-time *, .sim-time *::before, .sim-time *::after {
+  .sim-time *,
+  .sim-time *::before,
+  .sim-time *::after {
     transition: none !important;
     animation: none !important;
   }

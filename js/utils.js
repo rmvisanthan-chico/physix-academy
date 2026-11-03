@@ -5,13 +5,16 @@
 'use strict';
 
 /* ---------- tiny DOM helpers ---------- */
-export const $  = (sel, root = document) => root.querySelector(sel);
+export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 export function esc(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 export function fmtNum(n, d = 2) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
@@ -37,20 +40,31 @@ function physixIdb() {
   let p = null;
   return function open() {
     if (p) return p;
-    p = new Promise(resolve => {
+    p = new Promise((resolve) => {
       let idb;
-      try { idb = window.indexedDB; } catch (e) { return resolve(null); }
+      try {
+        idb = window.indexedDB;
+      } catch (e) {
+        return resolve(null);
+      }
       if (!idb) return resolve(null);
       let req;
-      try { req = idb.open('physix-academy', 1); }
-      catch (e) { return resolve(null); }
+      try {
+        req = idb.open('physix-academy', 1);
+      } catch (e) {
+        return resolve(null);
+      }
       req.onupgradeneeded = () => {
-        try { req.result.createObjectStore('kv'); } catch (e) { /* already there */ }
+        try {
+          req.result.createObjectStore('kv');
+        } catch (e) {
+          /* already there */
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
-      setTimeout(() => resolve(null), 2500);   // never hang the boot on a stuck DB
+      setTimeout(() => resolve(null), 2500); // never hang the boot on a stuck DB
     });
     return p;
   };
@@ -59,12 +73,15 @@ function physixIdb() {
 const IDB = physixIdb();
 
 function idbGet(key) {
-  return IDB().then(db => {
+  return IDB().then((db) => {
     if (!db) return undefined;
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       let r;
-      try { r = db.transaction('kv', 'readonly').objectStore('kv').get(key); }
-      catch (e) { return resolve(undefined); }
+      try {
+        r = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+      } catch (e) {
+        return resolve(undefined);
+      }
       r.onsuccess = () => resolve(r.result);
       r.onerror = () => resolve(undefined);
     });
@@ -72,20 +89,26 @@ function idbGet(key) {
 }
 
 function idbSet(key, value) {
-  return IDB().then(db => {
+  return IDB().then((db) => {
     if (!db) return false;
     try {
       const tx = db.transaction('kv', 'readwrite');
       tx.objectStore('kv').put(value, key);
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
     return true;
   });
 }
 
 function idbDel(key) {
-  return IDB().then(db => {
+  return IDB().then((db) => {
     if (!db) return false;
-    try { db.transaction('kv', 'readwrite').objectStore('kv').delete(key); } catch (e) { return false; }
+    try {
+      db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
+    } catch (e) {
+      return false;
+    }
     return true;
   });
 }
@@ -96,13 +119,23 @@ export const Store = {
   defaults() {
     return {
       settings: { theme: 'dark', fontSize: 100, contrast: false, accent: 'sunset' },
-      completed: {},            // lessonId -> timestamp
+      completed: {}, // lessonId -> timestamp
       quiz: { history: [], perTopic: {} }, // history: {id,qid,topic,difficulty,correct,t}; perTopic: topic -> {correct,total}
       solved: 0,
-      streakDays: [],           // ISO dates with activity
-      timeLog: {},              // date -> seconds
+      streakDays: [], // ISO dates with activity
+      timeLog: {}, // date -> seconds
       lastLesson: null,
-      notes: {}                 // lessonId -> text
+      notes: {}, // lessonId -> text
+      achievements: {
+        // M2: achievements system
+        version: 2,
+        xp: 0,
+        level: 1,
+        unlocked: {},
+        counters: {},
+        processedEvents: [],
+        history: []
+      }
     };
   },
   data: null,
@@ -111,39 +144,79 @@ export const Store = {
        reads Store.data during boot has to wait on IndexedDB. ready() then
        reconciles against IndexedDB, which wins if it holds newer data. */
     try {
-      this.data = Object.assign(this.defaults(), JSON.parse(localStorage.getItem(this.KEY) || '{}'));
+      this.data = Object.assign(
+        this.defaults(),
+        JSON.parse(localStorage.getItem(this.KEY) || '{}')
+      );
       this.data.settings = Object.assign(this.defaults().settings, this.data.settings || {});
-      this.data.quiz     = Object.assign(this.defaults().quiz, this.data.quiz || {});
-    } catch (e) { this.data = this.defaults(); }
+      this.data.quiz = Object.assign(this.defaults().quiz, this.data.quiz || {});
+    } catch (e) {
+      this.data = this.defaults();
+    }
     return this.data;
   },
   /* Resolves once IndexedDB has been consulted. Anything rendering persisted
      state should await this (see ready() in app.js). */
   ready() {
     if (this._ready) return this._ready;
-    this._ready = idbGet(this.KEY).then(rec => {
-      if (rec && rec.data) {
-        const d = Object.assign(this.defaults(), rec.data);
-        d.settings = Object.assign(this.defaults().settings, d.settings || {});
-        d.quiz     = Object.assign(this.defaults().quiz, d.quiz || {});
-        this.data = d;
-      } else if (rec === undefined) {
-        // nothing in IndexedDB yet: seed it from what localStorage had
-        return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data }).then(() => false);
-      }
-      return true;
-    }).catch(() => false);
+    this._ready = idbGet(this.KEY)
+      .then((rec) => {
+        if (rec && rec.data) {
+          const d = Object.assign(this.defaults(), rec.data);
+          d.settings = Object.assign(this.defaults().settings, d.settings || {});
+          d.quiz = Object.assign(this.defaults().quiz, d.quiz || {});
+          this.data = d;
+        } else if (rec === undefined) {
+          // nothing in IndexedDB yet: seed it from what localStorage had
+          return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data }).then(() => false);
+        }
+        return true;
+      })
+      .catch(() => false);
     return this._ready;
   },
   save() {
     // localStorage mirror first (cheap, keeps crash-safety and older versions
     // working), then IndexedDB as the real store
-    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* quota or unavailable */ }
+    try {
+      localStorage.setItem(this.KEY, JSON.stringify(this.data));
+    } catch (e) {
+      /* quota or unavailable */
+    }
     idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data });
   },
+
+  /* ---------- event emitter ---------- */
+  /* Simple synchronous event system for decoupled modules.
+     Listeners are called immediately; no promise handling. */
+  _listeners: {},
+  on(event, fn) {
+    if (!this._listeners[event]) this._listeners[event] = [];
+    this._listeners[event].push(fn);
+  },
+  off(event, fn) {
+    if (!this._listeners[event]) return;
+    this._listeners[event] = this._listeners[event].filter((f) => f !== fn);
+  },
+  emit(event, payload) {
+    if (!this._listeners[event]) return;
+    for (const fn of this._listeners[event]) {
+      try {
+        fn(payload);
+      } catch (e) {
+        console.error('[Store.emit]', event, e);
+      }
+    }
+  },
   /* Wait for any in-flight IndexedDB write. Used before export and unload. */
-  flush() { return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data }); },
-  storageMode() { return (typeof indexedDB !== 'undefined') ? 'IndexedDB + localStorage mirror' : 'localStorage only'; },
+  flush() {
+    return idbSet(this.KEY, { v: 1, savedAt: Date.now(), data: this.data });
+  },
+  storageMode() {
+    return typeof indexedDB !== 'undefined'
+      ? 'IndexedDB + localStorage mirror'
+      : 'localStorage only';
+  },
 
   /* ---------- backup / restore ---------- */
   exportBackup() {
@@ -154,7 +227,7 @@ export const Store = {
       exportedAt: new Date().toISOString(),
       counts: {
         lessons: Object.keys(this.data.completed || {}).length,
-        questions: (this.data.quiz && this.data.quiz.history || []).length,
+        questions: ((this.data.quiz && this.data.quiz.history) || []).length,
         notes: Object.keys(this.data.notes || {}).length,
         streakDays: (this.data.streakDays || []).length
       },
@@ -165,15 +238,18 @@ export const Store = {
      short report so the UI can tell the student what actually changed. */
   importBackup(text) {
     let payload;
-    try { payload = JSON.parse(text); }
-    catch (e) { return { ok: false, error: 'That file is not valid JSON.' }; }
-    const incoming = (payload && payload.kind === 'progress-backup') ? payload.data : payload;
+    try {
+      payload = JSON.parse(text);
+    } catch (e) {
+      return { ok: false, error: 'That file is not valid JSON.' };
+    }
+    const incoming = payload && payload.kind === 'progress-backup' ? payload.data : payload;
     if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
       return { ok: false, error: 'No progress data found in that file.' };
     }
     const d = Object.assign(this.defaults(), incoming);
     d.settings = Object.assign(this.defaults().settings, d.settings || {});
-    d.quiz     = Object.assign(this.defaults().quiz, d.quiz || {});
+    d.quiz = Object.assign(this.defaults().quiz, d.quiz || {});
     if (!d.completed || typeof d.completed !== 'object') d.completed = {};
     if (!d.notes || typeof d.notes !== 'object') d.notes = {};
     if (!Array.isArray(d.streakDays)) d.streakDays = [];
@@ -194,8 +270,12 @@ export const Store = {
   },
   /* --- activity / streaks --- */
   touchToday() {
-    const d = new Date(); const iso = d.toISOString().slice(0, 10);
-    if (!this.data.streakDays.includes(iso)) { this.data.streakDays.push(iso); if (this.data.streakDays.length > 400) this.data.streakDays.shift(); }
+    const d = new Date();
+    const iso = d.toISOString().slice(0, 10);
+    if (!this.data.streakDays.includes(iso)) {
+      this.data.streakDays.push(iso);
+      if (this.data.streakDays.length > 400) this.data.streakDays.shift();
+    }
     this.save();
   },
   addTime(sec) {
@@ -233,28 +313,39 @@ export const Store = {
       count: ids.length,
       totalMs,
       totalMin: Math.round(totalMs / 60000),
-      list: ids.map(id => ({ id, ...all[id] }))
-        .sort((a, b) => b.ms - a.ms)
+      list: ids.map((id) => ({ id, ...all[id] })).sort((a, b) => b.ms - a.ms)
     };
   },
 
   streak() {
-    let count = 0; const day = new Date();
+    let count = 0;
+    const day = new Date();
     // allow "yesterday only" streak to still be alive today
-    if (!this.data.streakDays.includes(day.toISOString().slice(0, 10))) day.setDate(day.getDate() - 1);
+    if (!this.data.streakDays.includes(day.toISOString().slice(0, 10)))
+      day.setDate(day.getDate() - 1);
     for (;;) {
       const iso = day.toISOString().slice(0, 10);
-      if (this.data.streakDays.includes(iso)) { count++; day.setDate(day.getDate() - 1); } else break;
+      if (this.data.streakDays.includes(iso)) {
+        count++;
+        day.setDate(day.getDate() - 1);
+      } else break;
       if (count > 3650) break;
     }
     return count;
   },
   totalTimeMin() {
-    let s = 0; for (const k in this.data.timeLog) s += this.data.timeLog[k];
+    let s = 0;
+    for (const k in this.data.timeLog) s += this.data.timeLog[k];
     return Math.round(s / 60);
   },
-  completeLesson(id) { this.data.completed[id] = Date.now(); this.touchToday(); this.save(); },
-  isComplete(id) { return !!this.data.completed[id]; },
+  completeLesson(id) {
+    this.data.completed[id] = Date.now();
+    this.touchToday();
+    this.save();
+  },
+  isComplete(id) {
+    return !!this.data.completed[id];
+  },
   recordAnswer(q, correct, given) {
     this.touchToday();
     this.data.solved++;
@@ -265,9 +356,11 @@ export const Store = {
        small, and only written when wrong, so history stays lean. */
     if (!correct && given != null) entry.given = given;
     this.data.quiz.history.push(entry);
-    if (!this.data.quiz.perTopic[q.topic]) this.data.quiz.perTopic[q.topic] = { correct: 0, total: 0 };
+    if (!this.data.quiz.perTopic[q.topic])
+      this.data.quiz.perTopic[q.topic] = { correct: 0, total: 0 };
     const pt = this.data.quiz.perTopic[q.topic];
-    pt.total++; if (correct) pt.correct++;
+    pt.total++;
+    if (correct) pt.correct++;
     if (this.data.quiz.history.length > 1000) this.data.quiz.history.shift();
     this.save();
   },
@@ -275,7 +368,7 @@ export const Store = {
   /* ---------- mistake notebook ----------
      A view over quiz.history, not a new data store. Every miss already had
      topic, difficulty and a question id that points at an explanation. */
-mistakes(opts) {
+  mistakes(opts) {
     const only = (opts && opts.topic) || null;
     const out = [];
     /* Walk backwards so "most recent first" is natural, and collapse repeats of
@@ -308,7 +401,7 @@ mistakes(opts) {
      fixed reliably dropped. mistakes() stays unfiltered because the retry
      callback needs to re-check a specific question as the student answers it. */
   openMistakes(opts) {
-    return this.mistakes(opts).filter(m => !this.clearedSinceMiss(m.qid));
+    return this.mistakes(opts).filter((m) => !this.clearedSinceMiss(m.qid));
   },
 
   /* Has this question been answered correctly *since* the most recent miss?
@@ -327,7 +420,10 @@ mistakes(opts) {
     for (let i = hist.length - 1; i >= 0; i--) {
       const h = hist[i];
       if (h.qid !== qid) continue;
-      if (!h.correct) { missedAt = h.t; break; }
+      if (!h.correct) {
+        missedAt = h.t;
+        break;
+      }
       streak++;
     }
     return missedAt > 0 && streak >= this.CLEAN_STREAK;
@@ -335,7 +431,7 @@ mistakes(opts) {
   topicMastery(topic) {
     const pt = this.data.quiz.perTopic[topic];
     if (!pt || pt.total < 2) return null;
-    return Math.round(100 * pt.correct / pt.total);
+    return Math.round((100 * pt.correct) / pt.total);
   }
 };
 
@@ -347,18 +443,20 @@ export const Theme = {
     const s = Store.data.settings;
     document.documentElement.dataset.theme = s.theme;
     document.documentElement.dataset.accent = s.accent || 'sunset';
-    document.documentElement.style.setProperty('--user-font-scale', (s.fontSize / 100));
+    document.documentElement.style.setProperty('--user-font-scale', s.fontSize / 100);
     document.documentElement.classList.toggle('hc', !!s.contrast);
   },
   toggle() {
     Store.data.settings.theme = Store.data.settings.theme === 'dark' ? 'light' : 'dark';
-    Store.save(); this.apply();
+    Store.save();
+    this.apply();
   },
   cycleAccent() {
     const cur = Store.data.settings.accent || 'sunset';
     const nx = this.ACCENTS[(this.ACCENTS.indexOf(cur) + 1) % this.ACCENTS.length];
     Store.data.settings.accent = nx;
-    Store.save(); this.apply();
+    Store.save();
+    this.apply();
     return nx;
   }
 };
@@ -368,7 +466,10 @@ export const Tex = {
   ready: false,
   init() {
     const tryInit = () => {
-      if (window.renderMathInElement) { this.ready = true; return true; }
+      if (window.renderMathInElement) {
+        this.ready = true;
+        return true;
+      }
       return false;
     };
     tryInit();
@@ -387,32 +488,46 @@ export const Tex = {
         throwOnError: false,
         strict: 'ignore'
       });
-    } catch (e) { /* silent */ }
+    } catch (e) {
+      /* silent */
+    }
   }
 };
 Tex.init();
 
 /* ---------- toasts ---------- */
 export function toast(msg, kind = 'ok', ms = 3200) {
-  const box = $('#toasts'); if (!box) return;
+  const box = $('#toasts');
+  if (!box) return;
   const t = document.createElement('div');
   t.className = `toast toast-${kind}`;
   t.innerHTML = msg;
   box.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, ms);
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 400);
+  }, ms);
 }
 
 /* ---------- misc ---------- */
-export function debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; }
-export function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+export function debounce(fn, ms) {
+  let h;
+  return (...a) => {
+    clearTimeout(h);
+    h = setTimeout(() => fn(...a), ms);
+  };
+}
+export function clamp(v, lo, hi) {
+  return Math.min(hi, Math.max(lo, v));
+}
 
 /* difficulty metadata */
 export const DIFFS = {
-  beginner:     { label: 'Beginner',     dot: '🟢', cls: 'd-beginner' },
+  beginner: { label: 'Beginner', dot: '🟢', cls: 'd-beginner' },
   intermediate: { label: 'Intermediate', dot: '🟡', cls: 'd-intermediate' },
-  advanced:     { label: 'Advanced',     dot: '🟠', cls: 'd-advanced' },
-  expert:       { label: 'Expert',       dot: '🔴', cls: 'd-expert' }
+  advanced: { label: 'Advanced', dot: '🟠', cls: 'd-advanced' },
+  expert: { label: 'Expert', dot: '🔴', cls: 'd-expert' }
 };
 
 /* load immediately, then reconcile with IndexedDB in the background.
@@ -422,6 +537,10 @@ export const DIFFS = {
 Store.load();
 Store.ready().then(() => {
   // let anything already on screen pick up hydrated values
-  try { document.dispatchEvent(new CustomEvent('physix:store-ready')); } catch (e) { /* older browsers */ }
+  try {
+    document.dispatchEvent(new CustomEvent('physix:store-ready'));
+  } catch (e) {
+    /* older browsers */
+  }
 });
 Theme.apply();

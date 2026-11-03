@@ -9,7 +9,10 @@ const { chromium } = req('playwright');
 const BASE = process.argv[2] || 'http://localhost:4173';
 const browser = await chromium.launch({ channel: 'chrome' });
 
-for (const [tag, vp] of [['mobile', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 1000 }]]) {
+for (const [tag, vp] of [
+  ['mobile', { width: 390, height: 844 }],
+  ['desktop', { width: 1280, height: 1000 }]
+]) {
   const p = await browser.newPage({ viewport: vp });
   await p.goto(`${BASE}/#/sims/projectile`, { waitUntil: 'domcontentloaded' });
   await p.waitForSelector('.sim-time');

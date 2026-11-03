@@ -8,17 +8,28 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4253';
 
 const results = [];
-const ok = (n, p, d = '') => { results.push(p); console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`); };
+const ok = (n, p, d = '') => {
+  results.push(p);
+  console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`);
+};
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
-const c = await browser.newContext({ viewport: { width: 1360, height: 900 }, reducedMotion: 'reduce' });
+const c = await browser.newContext({
+  viewport: { width: 1360, height: 900 },
+  reducedMotion: 'reduce'
+});
 const page = await c.newPage();
 await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear());
@@ -46,10 +57,13 @@ async function useSim(sim, hold) {
   if (!link) throw new Error(`no link to #/sims/${sim} on the catalogue page`);
   await link.click();
   /* wait for the sim to exist, THEN hold */
-  await page.waitForSelector('.sim-frame canvas, .sim-frame iframe, .sim-frame .empty-state',
-    { timeout: 10000 });
+  await page.waitForSelector('.sim-frame canvas, .sim-frame iframe, .sim-frame .empty-state', {
+    timeout: 10000
+  });
   if (hold > 0) await page.waitForTimeout(hold);
-  await page.evaluate(() => { location.hash = '#/sims'; });
+  await page.evaluate(() => {
+    location.hash = '#/sims';
+  });
   await page.waitForTimeout(500);
 }
 await useSim('newton', 3000);
@@ -59,10 +73,16 @@ const afterOne = await page.evaluate(async () => {
   await Store.ready();
   return Store.simActivity();
 });
-ok('opening and using a simulation is recorded', afterOne.count >= 1,
-  `sims=${afterOne.count} min=${afterOne.totalMin}`);
-ok('time is in a sensible range, not inflated', afterOne.totalMin <= 2 && afterOne.totalMin >= 0,
-  `${afterOne.totalMin} min recorded`);
+ok(
+  'opening and using a simulation is recorded',
+  afterOne.count >= 1,
+  `sims=${afterOne.count} min=${afterOne.totalMin}`
+);
+ok(
+  'time is in a sensible range, not inflated',
+  afterOne.totalMin <= 2 && afterOne.totalMin >= 0,
+  `${afterOne.totalMin} min recorded`
+);
 
 /* ---------- a mis-click is not recorded ---------- */
 /* Clear IndexedDB too: Store.ready() reconciles against it and it wins over
@@ -70,28 +90,37 @@ ok('time is in a sensible range, not inflated', afterOne.totalMin <= 2 && afterO
    run's data in place. That is also why this test failed on a re-run. */
 await page.evaluate(async () => {
   localStorage.clear();
-  await new Promise(res => {
+  await new Promise((res) => {
     const rq = indexedDB.open('physix-academy', 1);
     rq.onsuccess = () => {
       const db = rq.result;
       const tx = db.transaction('kv', 'readwrite');
       tx.objectStore('kv').clear();
-      tx.oncomplete = () => { db.close(); res(); };
-      tx.onerror = () => { db.close(); res(); };
+      tx.oncomplete = () => {
+        db.close();
+        res();
+      };
+      tx.onerror = () => {
+        db.close();
+        res();
+      };
     };
     rq.onerror = () => res();
   });
 });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(700);
-await useSim('shm', 0);   /* a mis-click: barely on screen */
+await useSim('shm', 0); /* a mis-click: barely on screen */
 const afterClick = await page.evaluate(async () => {
   const { Store } = await import('/js/utils.js');
   await Store.ready();
   return Store.simActivity();
 });
-ok('a sub-2s view is not counted as study', afterClick.count === 0,
-  `sims=${afterClick.count} (opened and left immediately)`);
+ok(
+  'a sub-2s view is not counted as study',
+  afterClick.count === 0,
+  `sims=${afterClick.count} (opened and left immediately)`
+);
 
 /* ---------- two sims are distinguished ---------- */
 for (const s of ['newton', 'projectile']) await useSim(s, 2400);
@@ -100,12 +129,14 @@ const two = await page.evaluate(async () => {
   await Store.ready();
   return Store.simActivity();
 });
-ok('each simulation is tracked separately', two.count === 2, two.list.map(x => x.id).join(', '));
+ok('each simulation is tracked separately', two.count === 2, two.list.map((x) => x.id).join(', '));
 
 /* ---------- storage unavailable must not break a simulation ---------- */
 const blocked = await page.evaluate(async () => {
   const real = Storage.prototype.setItem;
-  Storage.prototype.setItem = function () { throw new Error('QuotaExceededError'); };
+  Storage.prototype.setItem = function () {
+    throw new Error('QuotaExceededError');
+  };
   let simOk = true;
   try {
     const { Sims } = await import('/js/sims-a.js');
@@ -113,7 +144,9 @@ const blocked = await page.evaluate(async () => {
     document.body.appendChild(host);
     Sims.mount('newton', host);
     simOk = !!host.querySelector('.sim-frame canvas');
-  } catch (e) { simOk = 'THREW: ' + e.message; }
+  } catch (e) {
+    simOk = 'THREW: ' + e.message;
+  }
   Storage.prototype.setItem = real;
   return simOk;
 });
@@ -129,6 +162,6 @@ const list = await page.evaluate(() => ({
 ok('the simulation catalogue still renders', list.cards > 5 && !list.broken, `${list.cards} cards`);
 
 await browser.close();
-const bad = results.filter(r => !r).length;
+const bad = results.filter((r) => !r).length;
 console.log(`\nsim<->store integration  ${results.length - bad}/${results.length} ok`);
 process.exit(bad ? 1 : 0);

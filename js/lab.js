@@ -28,8 +28,16 @@ let lab = null; /* { exp, simId, controls, graph, slot, measurements, observatio
  * and its graph (kills the graph renderer and observers). */
 export function cleanupLab() {
   if (lab) {
-    try { lab.controls.destroy(); } catch (e) { /* ignore */ }
-    try { lab.graph.destroy(); } catch (e) { /* ignore */ }
+    try {
+      lab.controls.destroy();
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      lab.graph.destroy();
+    } catch (e) {
+      /* ignore */
+    }
     lab = null;
   }
 }
@@ -38,9 +46,15 @@ export function cleanupLab() {
 
 export function viewLab(id) {
   cleanupLab();
-  if (!id) { viewLabSelection(); return; }
+  if (!id) {
+    viewLabSelection();
+    return;
+  }
   const exp = getLabExperiment(id);
-  if (!exp) { viewLabNotFound(id); return; }
+  if (!exp) {
+    viewLabNotFound(id);
+    return;
+  }
   viewLabExperiment(exp);
 }
 
@@ -54,16 +68,18 @@ function viewLabSelection() {
         <p class="sub">Choose a simulation to open in the lab.</p>
       </div>
       <div class="lab-grid">
-        ${LAB_EXPERIMENTS.map(e => `
+        ${LAB_EXPERIMENTS.map(
+          (e) => `
           <a class="card lab-card" href="#/lab/${esc(e.id)}">
             <h3>${esc(e.title)}</h3>
             <p class="muted">${esc(e.summary)}</p>
-            <div class="topic-meta">${e.topics.map(t => `<span class="chip plain">${esc(t)}</span>`).join('')}</div>
+            <div class="topic-meta">${e.topics.map((t) => `<span class="chip plain">${esc(t)}</span>`).join('')}</div>
           </a>
-        `).join('')}
+        `
+        ).join('')}
       </div>
     </div>`;
-  $$('.lab-card', App.el).forEach(card => {
+  $$('.lab-card', App.el).forEach((card) => {
     card.addEventListener('click', (ev) => {
       ev.preventDefault();
       /* card.href is the browser-resolved ABSOLUTE url; setting location.hash to
@@ -82,7 +98,7 @@ function viewLabExperiment(exp) {
       <div class="page-head">
         <h1>${esc(exp.title)}</h1>
         <p class="sub">${esc(exp.summary)}</p>
-        <div class="topic-meta">${exp.topics.map(t => `<span class="chip plain">${esc(t)}</span>`).join('')}</div>
+        <div class="topic-meta">${exp.topics.map((t) => `<span class="chip plain">${esc(t)}</span>`).join('')}</div>
       </div>
       <div class="lab-stage">
         <nav class="lab-nav">
@@ -146,9 +162,14 @@ function viewLabExperiment(exp) {
   const { controls, graph } = result;
 
   lab = {
-    exp, simId: exp.simId, controls, graph, slot,
+    exp,
+    simId: exp.simId,
+    controls,
+    graph,
+    slot,
     getTime: result.getTime,
-    measurements: [], observations: ''
+    measurements: [],
+    observations: ''
   };
 
   /* ---- Measurement capture ---------------------------------------------
@@ -156,7 +177,7 @@ function viewLabExperiment(exp) {
      hide or show a series at any moment, and push() stops recording a hidden
      series, so which series a trial contains is decided when the student
      captures it - never at workspace-creation time. */
-  const currentVisibleSeries = () => graph.series.filter(s => s.visible);
+  const currentVisibleSeries = () => graph.series.filter((s) => s.visible);
 
   const btnCap = $('#btn-cap', App.el);
   const btnClear = $('#btn-clear', App.el);
@@ -189,7 +210,7 @@ function viewLabExperiment(exp) {
        uses a different visible set. */
     const row = {
       t,
-      series: series.map(s => ({ id: s.id, label: s.label, unit: s.unit || '' }))
+      series: series.map((s) => ({ id: s.id, label: s.label, unit: s.unit || '' }))
     };
     for (const s of series) {
       const hit = g.valueAt(s.id, t);
@@ -216,13 +237,13 @@ function viewLabExperiment(exp) {
      keys, so recover their series from those keys. */
   function observationSeries(m) {
     if (Array.isArray(m.series) && m.series.length) {
-      return m.series.map(s => {
+      return m.series.map((s) => {
         const meta = seriesMeta(s.id);
         return { id: s.id, label: s.label || meta.label, unit: s.unit || meta.unit };
       });
     }
     return Object.keys(m)
-      .filter(k => k !== 't' && k !== 'series' && !k.endsWith('_exact'))
+      .filter((k) => k !== 't' && k !== 'series' && !k.endsWith('_exact'))
       .map(seriesMeta);
   }
 
@@ -238,7 +259,10 @@ function viewLabExperiment(exp) {
     const seen = new Set();
     for (const m of lab.measurements) {
       for (const s of observationSeries(m)) {
-        if (!seen.has(s.id)) { seen.add(s.id); cols.push(s); }
+        if (!seen.has(s.id)) {
+          seen.add(s.id);
+          cols.push(s);
+        }
       }
     }
     /* No rows yet: preview the series visible right now. */
@@ -252,29 +276,39 @@ function viewLabExperiment(exp) {
     }
 
     if (thead) {
-      thead.innerHTML = '<th>t (s)</th>' + cols.map(c =>
-        `<th>${esc(c.label)}${c.unit ? ` (${esc(c.unit)})` : ''}</th>`
-      ).join('');
+      thead.innerHTML =
+        '<th>t (s)</th>' +
+        cols.map((c) => `<th>${esc(c.label)}${c.unit ? ` (${esc(c.unit)})` : ''}</th>`).join('');
     }
 
     if (!lab.measurements.length) {
       body.innerHTML = '';
       return;
     }
-    body.innerHTML = lab.measurements.map(m => {
-      const tv = Number(m.t);
-      const cells = cols.map(c => {
-        const v = m[c.id];
-        /* A dash means this observation did not record that series (it was
+    body.innerHTML = lab.measurements
+      .map((m) => {
+        const tv = Number(m.t);
+        const cells = cols
+          .map((c) => {
+            const v = m[c.id];
+            /* A dash means this observation did not record that series (it was
            hidden) or had no valid sample - never "zero". */
-        return '<td>' + (typeof v === 'number' && isFinite(v) ? v.toFixed(3) : '—') + '</td>';
-      }).join('');
-      return `<tr><td>${isFinite(tv) ? tv.toFixed(3) : '—'}</td>${cells}</tr>`;
-    }).join('');
+            return '<td>' + (typeof v === 'number' && isFinite(v) ? v.toFixed(3) : '—') + '</td>';
+          })
+          .join('');
+        return `<tr><td>${isFinite(tv) ? tv.toFixed(3) : '—'}</td>${cells}</tr>`;
+      })
+      .join('');
   }
 
-  btnCap.addEventListener('click', () => { captureTrial(); });
-  btnClear.addEventListener('click', () => { lab.measurements = []; renderMeasureTable(); persistLab(); });
+  btnCap.addEventListener('click', () => {
+    captureTrial();
+  });
+  btnClear.addEventListener('click', () => {
+    lab.measurements = [];
+    renderMeasureTable();
+    persistLab();
+  });
 
   /* ---- Parameter sweep ------------------------------------------------- */
 
@@ -289,7 +323,9 @@ function viewLabExperiment(exp) {
      is the student-facing name, not necessarily the simulation's accessible
      slider label (which often includes units), so matching falls back to the
      parameter key below. */
-  sweepParam.innerHTML = exp.parameters.map(p => `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join('');
+  sweepParam.innerHTML = exp.parameters
+    .map((p) => `<option value="${esc(p.key)}">${esc(p.label)}</option>`)
+    .join('');
 
   /* The simulations' sliders use the registry keys but not the registry labels
      verbatim: "Speed u" is "Speed u (m/s)", "Launch angle" is "Angle θ (°)",
@@ -305,25 +341,19 @@ function viewLabExperiment(exp) {
     m: /mass/i,
     k: /spring/i,
     damping: /damping/i,
-    A: /amplitude/i,
+    A: /amplitude/i
   };
 
   /* Find the range input that actually controls this registry parameter. Scope
      the search to the mounted simulation so the lab's own controls can never be
      mistaken for a simulation slider. */
   function findSlider(paramDef) {
-    const inputs = Array.from(
-      lab.slot.querySelectorAll('.sim-controls input[type="range"]')
-    );
-    const byLabel = inputs.find(
-      inp => inp.getAttribute('aria-label') === paramDef.label
-    );
+    const inputs = Array.from(lab.slot.querySelectorAll('.sim-controls input[type="range"]'));
+    const byLabel = inputs.find((inp) => inp.getAttribute('aria-label') === paramDef.label);
     if (byLabel) return byLabel;
     const re = PARAM_SLIDER_RE[paramDef.key];
     if (re) {
-      const byKey = inputs.find(
-        inp => re.test(inp.getAttribute('aria-label') || '')
-      );
+      const byKey = inputs.find((inp) => re.test(inp.getAttribute('aria-label') || ''));
       if (byKey) return byKey;
     }
     /* Last resort: the registry lists parameters in the same order as the
@@ -343,17 +373,16 @@ function viewLabExperiment(exp) {
     const thead = table ? table.querySelector('thead tr') : null;
     if (!thead) return;
     const series = sweepSeries();
-    thead.innerHTML = '<th>Param</th><th>Value</th>'
-      + series.map(s =>
-        `<th>${esc(s.label)}${s.unit ? ` (${esc(s.unit)})` : ''}</th>`
-      ).join('')
-      + '<th>t (s)</th><th>Status</th>';
+    thead.innerHTML =
+      '<th>Param</th><th>Value</th>' +
+      series.map((s) => `<th>${esc(s.label)}${s.unit ? ` (${esc(s.unit)})` : ''}</th>`).join('') +
+      '<th>t (s)</th><th>Status</th>';
   }
 
   /* Start each parameter selection at its declared range. The number inputs
      otherwise start empty, which makes a first sweep look like it did nothing. */
   function syncSweepBounds() {
-    const p = exp.parameters.find(x => x.key === sweepParam.value);
+    const p = exp.parameters.find((x) => x.key === sweepParam.value);
     if (!p) return;
     for (const el of [sweepMin, sweepMax]) {
       el.min = String(p.min);
@@ -370,7 +399,7 @@ function viewLabExperiment(exp) {
 
   function runSweep() {
     if (!lab || !lab.controls || !lab.graph) return;
-    const paramDef = exp.parameters.find(p => p.key === sweepParam.value);
+    const paramDef = exp.parameters.find((p) => p.key === sweepParam.value);
     if (!paramDef) return;
 
     const rawMin = parseFloat(sweepMin.value);
@@ -385,10 +414,7 @@ function viewLabExperiment(exp) {
     );
     const lo = Math.min(min, max);
     const hi = Math.max(min, max);
-    const runs = Math.max(
-      1,
-      Math.min(20, parseInt(sweepSteps.value, 10) || 1)
-    );
+    const runs = Math.max(1, Math.min(20, parseInt(sweepSteps.value, 10) || 1));
     /* Exactly `runs` trials, including both endpoints when runs > 1. The old
        loop used i <= steps, which produced steps+1 rows. */
     const stepSize = runs > 1 ? (hi - lo) / (runs - 1) : 0;
@@ -474,10 +500,12 @@ function viewLabExperiment(exp) {
           status = 'error';
         }
 
-        const cells = sweepSeries().map(s => {
-          const v = values[s.id];
-          return '<td>' + (typeof v === 'number' && isFinite(v) ? v.toFixed(3) : '—') + '</td>';
-        }).join('');
+        const cells = sweepSeries()
+          .map((s) => {
+            const v = values[s.id];
+            return '<td>' + (typeof v === 'number' && isFinite(v) ? v.toFixed(3) : '—') + '</td>';
+          })
+          .join('');
         const row = document.createElement('tr');
         row.innerHTML = `<td>${esc(paramDef.label)}</td>
           <td>${value.toFixed(3)}</td>
@@ -524,11 +552,14 @@ function viewLabExperiment(exp) {
 
   const notesEl = $('#lab-notes', App.el);
   if (lab.observations) notesEl.value = lab.observations;
-  notesEl.addEventListener('input', debounce(() => {
-    if (!lab) return;
-    lab.observations = notesEl.value;
-    persistLab();
-  }, 400));
+  notesEl.addEventListener(
+    'input',
+    debounce(() => {
+      if (!lab) return;
+      lab.observations = notesEl.value;
+      persistLab();
+    }, 400)
+  );
 
   /* No shared afterRender() in the lab: the sim was already mounted directly
      above via Sims.mount, and afterRender's step('sims') would remount this
@@ -566,7 +597,9 @@ function loadLabPersisted(exp) {
       lab.observations = saved.observations || '';
       lab.measurements = saved.measurements || [];
     }
-  } catch (e) { /* ignore storage errors */ }
+  } catch (e) {
+    /* ignore storage errors */
+  }
 }
 
 function persistLab() {
@@ -580,5 +613,7 @@ function persistLab() {
     };
     Store.data.lab = d;
     Store.save();
-  } catch (e) { /* storage failure — never block the lab */ }
+  } catch (e) {
+    /* storage failure — never block the lab */
+  }
 }

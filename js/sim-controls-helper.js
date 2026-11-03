@@ -58,9 +58,9 @@ export function attachTimeControls(o) {
      re-worded button is still caught. */
   if (o.replaceButtons && o.replaceButtons.length) {
     const acts = o.frame.querySelectorAll('.sim-actions');
-    acts.forEach(act => {
-      [...act.children].forEach(btn => {
-        if (o.replaceButtons.some(label => btn.textContent.includes(label))) btn.remove();
+    acts.forEach((act) => {
+      [...act.children].forEach((btn) => {
+        if (o.replaceButtons.some((label) => btn.textContent.includes(label))) btn.remove();
       });
       /* An emptied .sim-actions still carries `padding:0 1rem 1rem`, so an empty
          one would leave a stray gap under the controls. Removed only when it is
@@ -105,7 +105,10 @@ export function attachTimeControls(o) {
       window.__tcOwner = o.frame;
     }
     ctl.onRelease = () => {
-      if (window.__tcProbe === probe) { window.__tcProbe = null; window.__tcOwner = null; }
+      if (window.__tcProbe === probe) {
+        window.__tcProbe = null;
+        window.__tcOwner = null;
+      }
     };
   }
 
@@ -119,7 +122,10 @@ export function attachTimeControls(o) {
       if (!o.frame.isConnected) {
         ctl.destroy();
         mo.disconnect();
-        if (window.__tcOwner === o.frame) { window.__tcProbe = null; window.__tcOwner = null; }
+        if (window.__tcOwner === o.frame) {
+          window.__tcProbe = null;
+          window.__tcOwner = null;
+        }
       }
     });
     mo.observe(document.getElementById('main') || o.frame, { childList: true, subtree: true });

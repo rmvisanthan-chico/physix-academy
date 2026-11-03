@@ -94,7 +94,8 @@ class Series {
       const idx = (start + i) % this.capacity;
       return { x: this.x[idx], y: this.y[idx] };
     };
-    const first = at(0), lastPt = at(n - 1);
+    const first = at(0),
+      lastPt = at(n - 1);
     /* A single sample has no bracket to interpolate between, but the exact
        instant is still a real measurement. The first version required two
        samples and returned null, which would have made a prediction unanswerable
@@ -102,9 +103,10 @@ class Series {
     if (n === 1) {
       return xq === first.x ? { x: xq, y: first.y, exact: true } : null;
     }
-    if (xq < first.x || xq > lastPt.x) return null;      // outside recorded time
+    if (xq < first.x || xq > lastPt.x) return null; // outside recorded time
     for (let i = 0; i < n - 1; i++) {
-      const a = at(i), b = at(i + 1);
+      const a = at(i),
+        b = at(i + 1);
       if (xq >= a.x && xq <= b.x) {
         if (xq === a.x) return { x: xq, y: a.y, exact: true };
         if (xq === b.x) return { x: xq, y: b.y, exact: true };
@@ -126,10 +128,14 @@ class Series {
   }
   extent() {
     if (!this.len) return null;
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    let x0 = Infinity,
+      x1 = -Infinity,
+      y0 = Infinity,
+      y1 = -Infinity;
     for (let i = 0; i < this.len; i++) {
       const idx = (this.head - this.len + i + this.capacity * 2) % this.capacity;
-      const x = this.x[idx], y = this.y[idx];
+      const x = this.x[idx],
+        y = this.y[idx];
       if (x < x0) x0 = x;
       if (x > x1) x1 = x;
       if (y < y0) y0 = y;
@@ -158,19 +164,30 @@ export class Graph {
        yMin, yMax      pin the y axis, bypassing auto-scaling
        tickCount       target number of gridlines (default 4)                */
   constructor(opts = {}) {
-    this.opts = Object.assign({
-      xLabel: 'x', xUnit: '', xKey: 'x', title: '', height: 180,
-      capacity: 600, yZero: true, yMin: null, yMax: null, tickCount: 4
-    }, opts);
+    this.opts = Object.assign(
+      {
+        xLabel: 'x',
+        xUnit: '',
+        xKey: 'x',
+        title: '',
+        height: 180,
+        capacity: 600,
+        yZero: true,
+        yMin: null,
+        yMax: null,
+        tickCount: 4
+      },
+      opts
+    );
 
-    this.id = 'graph' + (++_uid);
+    this.id = 'graph' + ++_uid;
     this.series = [];
     this.byId = {};
     this.scale = null;
     this._raf = null;
     this._alive = true;
     this._needsDraw = true;
-    this.drawCount = 0;      /* exposed for tests: proves we are not redrawing per push */
+    this.drawCount = 0; /* exposed for tests: proves we are not redrawing per push */
 
     this._build();
     graphs.add(this);
@@ -182,9 +199,12 @@ export class Graph {
   _css(varName, fallback) {
     try {
       const v = getComputedStyle(this.el || document.documentElement)
-        .getPropertyValue(varName).trim();
+        .getPropertyValue(varName)
+        .trim();
       return v || fallback;
-    } catch (e) { return fallback; }
+    } catch (e) {
+      return fallback;
+    }
   }
 
   /* ---------- DOM ---------- */
@@ -209,7 +229,9 @@ export class Graph {
     inner.className = 'pgraph-inner';
     const xCap = document.createElement('span');
     xCap.className = 'pgraph-xcap';
-    axes.appendChild(yCap); axes.appendChild(inner); axes.appendChild(xCap);
+    axes.appendChild(yCap);
+    axes.appendChild(inner);
+    axes.appendChild(xCap);
     root.appendChild(axes);
     this.axesEl = axes;
     this.innerEl = inner;
@@ -245,7 +267,9 @@ export class Graph {
        the subject; these say what the numbers on each axis actually are. */
     const yLabel = this.opts.yLabel || 'Value';
     yCap.textContent = this.opts.yUnit ? `${yLabel} (${this.opts.yUnit})` : yLabel;
-    xCap.textContent = this.opts.xUnit ? `${this.opts.xLabel} (${this.opts.xUnit})` : this.opts.xLabel;
+    xCap.textContent = this.opts.xUnit
+      ? `${this.opts.xLabel} (${this.opts.xUnit})`
+      : this.opts.xLabel;
 
     /* legend + live values, DOM not canvas: selectable, scalable, readable */
     const foot = document.createElement('div');
@@ -259,11 +283,21 @@ export class Graph {
     /* canvas backing store follows devicePixelRatio, capped at 2: a 3x phone
        would otherwise allocate 9x the pixels for no visible gain */
     const ro = window.ResizeObserver
-      ? new ResizeObserver(() => { this._resize(); this._needsDraw = true; this._kick(); })
+      ? new ResizeObserver(() => {
+          this._resize();
+          this._needsDraw = true;
+          this._kick();
+        })
       : null;
-    if (ro) { ro.observe(plot); this._ro = ro; }
-    else {
-      this._onResize = () => { this._resize(); this._needsDraw = true; this._kick(); };
+    if (ro) {
+      ro.observe(plot);
+      this._ro = ro;
+    } else {
+      this._onResize = () => {
+        this._resize();
+        this._needsDraw = true;
+        this._kick();
+      };
       window.addEventListener('resize', this._onResize);
     }
 
@@ -320,14 +354,15 @@ export class Graph {
     /* +3px of slack for antialiasing, and a hard cap. The cap is why the top
        tick is not clipped on a 350px phone: at 10px, a 5-character label is
        ~28px, and a 28% share of a narrow plot leaves nothing for the curve. */
-    return Math.min(Math.ceil(widest) + 10, Math.floor(W * 0.30));
+    return Math.min(Math.ceil(widest) + 10, Math.floor(W * 0.3));
   }
 
   _resize() {
     const w = this.innerEl.clientWidth || 320;
     const h = this.opts.height;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.cssW = w; this.cssH = h;
+    this.cssW = w;
+    this.cssH = h;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     this.canvas.style.width = w + 'px';
@@ -364,7 +399,10 @@ export class Graph {
       if (y === undefined) continue;
       if (s.push(xv, y)) touched = true;
     }
-    if (touched) { this._needsDraw = true; this._kick(); }
+    if (touched) {
+      this._needsDraw = true;
+      this._kick();
+    }
   }
 
   /* ---------- read-only query ----------
@@ -406,7 +444,9 @@ export class Graph {
     return n;
   }
 
-  reset() { this.clear(); }
+  reset() {
+    this.clear();
+  }
 
   setVisible(id, on) {
     const s = this.byId[id];
@@ -421,10 +461,16 @@ export class Graph {
      ResizeObserver outlive the page and redraw into a detached canvas. */
   destroy() {
     this._alive = false;
-    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    if (this._raf) {
+      cancelAnimationFrame(this._raf);
+      this._raf = null;
+    }
     if (this._ro) this._ro.disconnect();
     else if (this._onResize) window.removeEventListener('resize', this._onResize);
-    if (this._onVis) { document.removeEventListener('visibilitychange', this._onVis); this._onVis = null; }
+    if (this._onVis) {
+      document.removeEventListener('visibilitychange', this._onVis);
+      this._onVis = null;
+    }
     this.series.length = 0;
     this.byId = {};
     this.el.remove();
@@ -436,10 +482,13 @@ export class Graph {
      the frame, and with a floor on the span so a flat signal does not get
      magnified into visual noise by dividing by ~0. */
   computeScale() {
-    const vis = this.series.filter(s => s.visible && s.len);
+    const vis = this.series.filter((s) => s.visible && s.len);
     if (!vis.length) return null;
 
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    let x0 = Infinity,
+      x1 = -Infinity,
+      y0 = Infinity,
+      y1 = -Infinity;
     for (const s of vis) {
       const e = s.extent();
       if (!e) continue;
@@ -454,11 +503,15 @@ export class Graph {
     if (this.opts.yMin != null) y0 = this.opts.yMin;
     if (this.opts.yMax != null) y1 = this.opts.yMax;
 
-    let sx = x1 - x0, sy = y1 - y0;
+    let sx = x1 - x0,
+      sy = y1 - y0;
     /* pad: 8% of span, or a small absolute floor when the span is tiny */
     const px = sx > 0 ? sx * 0.04 : Math.max(0.5, Math.abs(x1) * 0.1 || 0.5);
     const py = sy > 0 ? sy * 0.12 : Math.max(0.5, Math.abs(y1) * 0.1 || 0.5);
-    x0 -= px; x1 += px; y0 -= py; y1 += py;
+    x0 -= px;
+    x1 += px;
+    y0 -= py;
+    y1 += py;
     /* never invert */
     if (x1 - x0 < 1e-6) x1 = x0 + 1;
     if (y1 - y0 < 1e-6) y1 = y0 + 1;
@@ -499,7 +552,7 @@ export class Graph {
          schedules the next one. No lost update, no double-schedule. */
   _kick() {
     if (!this._needsDraw || !this._alive) return;
-    if (this._raf) return;                 /* already scheduled */
+    if (this._raf) return; /* already scheduled */
     this._raf = requestAnimationFrame(this._frame);
   }
 
@@ -521,7 +574,8 @@ export class Graph {
     this.drawCount++;
     const g = this.ctx;
     if (!g) return;
-    const W = this.cssW, H = this.cssH;
+    const W = this.cssW,
+      H = this.cssH;
     const line = this._css('--card-brd', '#2a3550');
     const txt = this._css('--txt3', '#7c8aa5');
     const panel = this._css('--panel2', '#131c31');
@@ -536,13 +590,13 @@ export class Graph {
     const BAND = 14;
     this.scale = this.computeScale();
     if (!this.scale) {
-this._gut = 0;
-    g.fillStyle = txt;
-    g.font = '12px "DM Mono", monospace';
-    g.textAlign = 'center';
-    g.fillText('no data yet', W / 2, H / 2);
-    this._renderFoot();
-    return;
+      this._gut = 0;
+      g.fillStyle = txt;
+      g.font = '12px "DM Mono", monospace';
+      g.textAlign = 'center';
+      g.fillText('no data yet', W / 2, H / 2);
+      this._renderFoot();
+      return;
     }
     const { x0, x1, y0, y1 } = this.scale;
 
@@ -553,8 +607,8 @@ this._gut = 0;
        Measuring after deriving PW (as this did until Phase 3C.2) meant the plot
        was laid out with the previous frame's gutter. */
     this._gut = this._measureTicks(W);
-    const PW = W - this._gut;               /* plot width, excluding y gutter  */
-    const PH = H - BAND;                   /* plot height, excluding x band  */
+    const PW = W - this._gut; /* plot width, excluding y gutter  */
+    const PH = H - BAND; /* plot height, excluding x band  */
     this._PH = PH;
     /* Exposed for tests, like drawCount. PW + _gut must equal the canvas width
        for the frame just drawn - if it does not, the plot was laid out against a
@@ -587,7 +641,10 @@ this._gut = 0;
       const x = (PW / n) * i;
       const xv = x0 + ((x1 - x0) / n) * i;
       g.globalAlpha = 0.5;
-      g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, PH); g.stroke();
+      g.beginPath();
+      g.moveTo(x + 0.5, 0);
+      g.lineTo(x + 0.5, PH);
+      g.stroke();
       g.globalAlpha = 1;
       /* in the reserved strip below the plot, and clamped inward so the first
          and last labels cannot run off either edge */
@@ -600,7 +657,10 @@ this._gut = 0;
       const y = (PH / n) * i;
       const yv = y1 - ((y1 - y0) / n) * i;
       g.globalAlpha = 0.5;
-      g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(PW, y + 0.5); g.stroke();
+      g.beginPath();
+      g.moveTo(0, y + 0.5);
+      g.lineTo(PW, y + 0.5);
+      g.stroke();
       g.globalAlpha = 1;
       /* the top and bottom ticks sit exactly ON the frame edges, so nudge them
          inward by half a line or they read as clipped */
@@ -613,7 +673,10 @@ this._gut = 0;
       g.strokeStyle = 'rgba(148,163,184,.55)';
       g.setLineDash([3, 3]);
       g.lineWidth = 1;
-      g.beginPath(); g.moveTo(0, fy(0) + 0.5); g.lineTo(plotW, fy(0) + 0.5); g.stroke();
+      g.beginPath();
+      g.moveTo(0, fy(0) + 0.5);
+      g.lineTo(plotW, fy(0) + 0.5);
+      g.stroke();
       g.setLineDash([]);
     }
 
@@ -626,9 +689,12 @@ this._gut = 0;
       g.beginPath();
       let first = true;
       s.each((xv, yv) => {
-        const px = fx(xv), py = fy(yv);
-        if (first) { g.moveTo(px, py); first = false; }
-        else g.lineTo(px, py);
+        const px = fx(xv),
+          py = fy(yv);
+        if (first) {
+          g.moveTo(px, py);
+          first = false;
+        } else g.lineTo(px, py);
       });
       g.stroke();
       /* a dot at the live end, so "where is it now" is unambiguous */
@@ -649,13 +715,15 @@ this._gut = 0;
   _renderFoot() {
     if (!this.footEl) return;
     const xu = this.opts.xUnit;
-    const rows = this.series.map(s => {
+    const rows = this.series.map((s) => {
       const dash = `<span class="pgraph-swatch" style="--c:${s.color}" aria-hidden="true"></span>`;
       const val = s.last ? `${fmtNum(s.last.y)}${s.unit ? ' ' + s.unit : ''}` : '—';
       const xt = s.last ? `${fmtNum(s.last.x)}${xu ? ' ' + xu : ''}` : '—';
-      return `<span class="pgraph-entry${s.visible ? '' : ' off'}">${dash}` +
+      return (
+        `<span class="pgraph-entry${s.visible ? '' : ' off'}">${dash}` +
         `<span class="pgraph-name">${s.label}</span>` +
-        `<b>${val}</b><span class="pgraph-at">at ${xt}</span></span>`;
+        `<b>${val}</b><span class="pgraph-at">at ${xt}</span></span>`
+      );
     });
     this.footEl.innerHTML = rows.join('') || '<span class="muted small">no series</span>';
   }
@@ -687,12 +755,17 @@ export function createGraph(host, opts, series = []) {
    the student is currently running instead of duplicating the physics. */
 export const graphs = {
   all: [],
-  add(g) { this.all.push(g); return g; },
+  add(g) {
+    this.all.push(g);
+    return g;
+  },
   remove(g) {
     const i = this.all.indexOf(g);
     if (i >= 0) this.all.splice(i, 1);
   },
-  latest() { return this.all[this.all.length - 1] || null; }
+  latest() {
+    return this.all[this.all.length - 1] || null;
+  }
 };
 
 /* Exposed deliberately, not for debugging convenience: the bundler rewrites
@@ -719,11 +792,11 @@ function exposeEngine() {
    dash glyph and its current value, so the plot remains readable with any
    form of colour blindness and to a screen reader. */
 export const GRAPH_COLORS = {
-  a: '#22d3ee',   /* --acc2  cyan    */
-  b: '#fbbf24',   /* --warn  amber   */
-  c: '#34d399',   /* --ok    green   */
-  d: '#6d5df6',   /* --acc   violet  */
-  e: '#f87171'    /* --bad   red     */
+  a: '#22d3ee' /* --acc2  cyan    */,
+  b: '#fbbf24' /* --warn  amber   */,
+  c: '#34d399' /* --ok    green   */,
+  d: '#6d5df6' /* --acc   violet  */,
+  e: '#f87171' /* --bad   red     */
 };
 
 /* Last statement in the module, deliberately. See exposeEngine(): touching

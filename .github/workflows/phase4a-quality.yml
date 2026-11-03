@@ -1,0 +1,100 @@
+# Phase 4A Quality Check (CI gate)
+#
+# Runs the Phase 4A quality harness on every push/PR to the phase4a branch.
+# Includes lint, format check, typecheck, unit tests, and verification suites.
+
+name: Phase 4A Quality Check
+
+on:
+  push:
+    branches: [phase4a]
+  pull_request:
+    branches: [phase4a]
+  workflow_dispatch:
+
+concurrency:
+  group: phase4a-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  phase4a-quality:
+    name: Phase 4A Quality Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PW_CHANNEL: chromium
+      CI: true
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock --ignore-scripts
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run lint
+        run: npx eslint .
+
+      - name: Run format check
+        run: npx prettier --check .
+
+      - name: Run typecheck
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run verify:4a
+
+      - name: Start test server
+        run: |
+          python -m http.server 4311 --bind 127.0.0.1 &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+          sleep 3
+
+      - name: Run simulation health audit
+        run: node tools/audit-sims.mjs http://localhost:4311
+
+      - name: Run graph verification
+        run: node tools/verify-graph.mjs http://localhost:4311
+
+      - name: Run time controls verification
+        run: node tools/verify-timecontrols.mjs http://localhost:4311
+
+      - name: Run graph scheduling verification
+        run: node tools/verify-graph-scheduling.mjs http://localhost:4311
+
+      - name: Run simstore verification
+        run: node tools/verify-simstore.mjs http://localhost:4311
+
+      - name: Run prediction verification
+        run: node tools/verify-prediction.mjs http://localhost:4311
+
+      - name: Run dashboard verification
+        run: node tools/verify-dashboard.mjs http://localhost:4311
+
+      - name: Run mistakes verification
+        run: node tools/verify-mistakes.mjs http://localhost:4311
+
+      - name: Run accessibility audit
+        run: node tools/audit-a11y.mjs http://localhost:4311
+
+      - name: Run performance audit
+        run: node tools/audit-perf.mjs http://localhost:4311
+
+      - name: Cleanup test server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID}" ]; then kill ${SERVER_PID} || true; fi

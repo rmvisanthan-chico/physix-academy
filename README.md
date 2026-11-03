@@ -8,12 +8,12 @@ An interactive physics learning platform built entirely by **R.M.VISANTHAN** —
 
 ## Author
 
-| | |
-|---|---|
-| **Name** | R.M.VISANTHAN |
-| **Email** | r.m.visanthan@gmail.com |
+|            |                                                |
+| ---------- | ---------------------------------------------- |
+| **Name**   | R.M.VISANTHAN                                  |
+| **Email**  | r.m.visanthan@gmail.com                        |
 | **GitHub** | [@rmvisanthan](https://github.com/rmvisanthan) |
-| **Role** | Sole developer, designer, and content creator |
+| **Role**   | Sole developer, designer, and content creator  |
 
 ---
 
@@ -23,23 +23,23 @@ This project has been developed over **72+ versions**, with each commit represen
 
 ### Version History (Key Milestones)
 
-| Version | Date | Milestone |
-|---------|------|-----------|
-| v1.0–v57 | Pre-git era | Initial development, core architecture, simulation engine |
-| v58 | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims |
-| v59 | Aug 27, 2026 | NCERT Class 10 Physics track — Light, Eye, Electricity, Magnetism |
-| v60 | Aug 27, 2026 | NCERT Class 9 Physics track — Motion, Force, Gravitation, Work/Energy, Sound |
-| v61 | Aug 27, 2026 | NCERT Class 11 Physics track — 14 chapters across 10 units |
-| v62 | Aug 27, 2026 | NCERT sims pack — echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle |
-| v63 | Aug 27, 2026 | NS PHYSIX LAB + physics-lab-inspired topics |
-| v65 | Aug 28, 2026 | NCERT Class 12 track — Electrostatics to Electronic Devices |
-| v66 | Aug 28, 2026 | Realism pack — CDN lazy 3D atom + WASM fluid |
-| v67 | Aug 28, 2026 | Games — Projectile Sniper + Torque Balance |
-| v68 | Aug 28, 2026 | JEE/NEET + Polish — PYQs + OG image + Vercel Analytics |
-| v69 | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds |
-| v70 | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN) |
-| v71 | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML |
-| v72 | Aug 28, 2026 | AI Tutor problem solver — offline numerics (Ohm, mirror, lens, kinematics, KE, echo) |
+| Version  | Date         | Milestone                                                                                       |
+| -------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| v1.0–v57 | Pre-git era  | Initial development, core architecture, simulation engine                                       |
+| v58      | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims                        |
+| v59      | Aug 27, 2026 | NCERT Class 10 Physics track — Light, Eye, Electricity, Magnetism                               |
+| v60      | Aug 27, 2026 | NCERT Class 9 Physics track — Motion, Force, Gravitation, Work/Energy, Sound                    |
+| v61      | Aug 27, 2026 | NCERT Class 11 Physics track — 14 chapters across 10 units                                      |
+| v62      | Aug 27, 2026 | NCERT sims pack — echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle |
+| v63      | Aug 27, 2026 | NS PHYSIX LAB + physics-lab-inspired topics                                                     |
+| v65      | Aug 28, 2026 | NCERT Class 12 track — Electrostatics to Electronic Devices                                     |
+| v66      | Aug 28, 2026 | Realism pack — CDN lazy 3D atom + WASM fluid                                                    |
+| v67      | Aug 28, 2026 | Games — Projectile Sniper + Torque Balance                                                      |
+| v68      | Aug 28, 2026 | JEE/NEET + Polish — PYQs + OG image + Vercel Analytics                                          |
+| v69      | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds                                   |
+| v70      | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN)                                              |
+| v71      | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML                                           |
+| v72      | Aug 28, 2026 | AI Tutor problem solver — offline numerics (Ohm, mirror, lens, kinematics, KE, echo)            |
 
 ### Git Commit Proof
 
@@ -76,22 +76,23 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 
 ## Technical Statistics
 
-| Metric | Value |
-|--------|-------|
-| **Total JS files** | 49 |
-| **Total JS lines** | 7,593 |
-| **Total CSS files** | 7 |
-| **Total CSS lines** | 1,204 |
-| **HTML files** | 2 (+ scroll-reveal-demo) |
-| **Project size** | ~2.4 MB (excl. .git) |
-| **Framework** | None (vanilla JS) |
-| **External libs** | Three.js, KaTeX, Anime.js (vendor/bundled) |
+| Metric              | Value                                      |
+| ------------------- | ------------------------------------------ |
+| **Total JS files**  | 49                                         |
+| **Total JS lines**  | 7,593                                      |
+| **Total CSS files** | 7                                          |
+| **Total CSS lines** | 1,204                                      |
+| **HTML files**      | 2 (+ scroll-reveal-demo)                   |
+| **Project size**    | ~2.4 MB (excl. .git)                       |
+| **Framework**       | None (vanilla JS)                          |
+| **External libs**   | Three.js, KaTeX, Anime.js (vendor/bundled) |
 
 ---
 
 ## Features Built
 
 ### Core Platform
+
 - **SPA Router** — Hash-based routing with view transitions
 - **Dark/Light Theme** — CSS custom properties, system preference detection
 - **Responsive Design** — Mobile-first, works on all screen sizes
@@ -99,29 +100,34 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 - **Cinematic Brand Studio** — Interactive logo exploration, rainbow hero animations
 
 ### Learning Content
+
 - **54 Lessons** across NCERT Class 9, 10, 11, 12 Physics
 - **SL Arora Guide** — 14 chapters with original explanations, derivations, solved examples
 - **JEE/NEET PYQs** — 8 previous year questions with solutions
 - **Formula Library** — Searchable, explained physics formulas
 
 ### Simulations (26+ Live)
+
 - **3D Physics** — Three.js-powered atom, crystal lattice, fluid dynamics
 - **NCERT Sims** — Echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle
 - **Realism Pack** — CDN lazy 3D atom + WASM fluid simulation
 - **Physics Lab** — NS PHYSIX LAB integration
 
 ### AI Tutor
+
 - **Offline Problem Solver** — Ohm's law, mirror formula, lens power, kinematics, kinetic energy, echo
 - **Step-by-Step Solutions** — Detailed explanations with formulas
 - **No API Required** — Runs entirely in the browser
 
 ### Interactive Elements
+
 - **Games** — Projectile Sniper + Torque Balance
 - **Scroll Reveal Animations** — Custom intersection observer, prefers-reduced-motion support
 - **View Transitions API** — Smooth page transitions
 - **Web Speech API** — Read-aloud with en-IN voice
 
 ### Analytics & Deployment
+
 - **Vercel Analytics** — Performance insights
 - **Custom Domain** — Ready for deployment
 - **OG Image** — Social media preview (1200x630)
@@ -175,4 +181,4 @@ This project is the intellectual property of R.M.VISANTHAN. All rights reserved.
 
 ---
 
-*Built with ❤️ by R.M.VISANTHAN — PhysiX Academy, 2026*
+_Built with ❤️ by R.M.VISANTHAN — PhysiX Academy, 2026_
