@@ -1362,8 +1362,8 @@ function viewAssessmentResults(sessionId) {
 function viewAbout() {
   App.el.innerHTML = `
   <div class="wrap wrap-narrow">
-    <div class="page-head"><h1>About PhysiX Academy</h1>
-      <p class="sub">Built start to finish by one student — no template, no framework, no shortcuts.</p></div>
+    <div class="page-head"><h1>About PhysiX Academy &amp; R.M. Visanthan</h1>
+      <p class="sub">PhysiX Academy is created by R.M. Visanthan — educator, author and the person behind every lesson, simulation and page.</p></div>
 
     <div class="card" style="line-height:1.8">
       <h3>The story</h3>
@@ -1384,7 +1384,7 @@ function viewAbout() {
 
     <div class="card" style="line-height:1.8">
       <h3>Author</h3>
-      <p><b>R.M. VISANTHAN</b> — the sole developer, designer and content writer behind every page of this site.</p>
+      <p><b>R.M. Visanthan</b> is an educator, author, and the creator of PhysiX Academy. He is known for developing educational physics content, including practical study guides, exam preparation resources, and easy-to-understand explanations of physics concepts. Through PhysiX Academy, he aims to make learning physics more visual, interactive, and accessible to students.</p>
       <p>Questions, corrections, or just to say the site helped? Email <a href="mailto:r.m.visanthan@gmail.com">r.m.visanthan@gmail.com</a>.</p>
     </div>
 
