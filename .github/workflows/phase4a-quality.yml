@@ -43,6 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-package-lock --ignore-scripts
+          npm install --no-save --no-package-lock playwright
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
