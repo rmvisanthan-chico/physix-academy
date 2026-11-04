@@ -2,6 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/blog/jee-neet-preparation-physics.html",
+      "destination": "/blog/",
+      "statusCode": 301
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

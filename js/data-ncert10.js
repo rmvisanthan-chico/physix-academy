@@ -12,7 +12,7 @@ CURRICULUM.push({
   tag: 'NCERT 10',
   icon: '📘',
   color: '#0ea5e9',
-  desc: 'Complete Class 10 Physics from the NCERT Science textbook — exam-ready intuition, derivations, ray diagrams, numericals and PYQ-style practice. Straight from the textbook, explained like a teacher.',
+  desc: 'Complete Class 10 Physics from the NCERT Science textbook — exam-ready intuition, derivations, ray diagrams, numericals and exam-style practice. Straight from the textbook, explained like a teacher.',
   chapters: [
     /* ---------------- Chapter 1: Light — Reflection and Refraction ---------------- */
     {

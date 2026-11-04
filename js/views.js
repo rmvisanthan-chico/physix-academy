@@ -1369,7 +1369,7 @@ function viewAbout() {
       <h3>The story</h3>
       <p>Most physics websites give you a wall of notes and call it teaching. I wanted something that actually works the way physics works — with things you can move, formulas you can see respond, and questions that explain themselves.</p>
       <p>So I built it. Every lesson, every simulation, every equation on this site was hand-written. The simulations run live in your browser. The AI tutor solves problems offline. Nothing here is a template or a copied block of notes.</p>
-      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams, JEE, or NEET.</p>
+      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams.</p>
     </div>
 
     <div class="card" style="line-height:1.8">

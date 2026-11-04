@@ -12,7 +12,7 @@ CURRICULUM.push({
   tag: 'NCERT 11',
   icon: '📘',
   color: '#8b5cf6',
-  desc: 'Complete Class 11 Physics — 14 chapters, 10 units. NCERT-exact sequence from Units & Measurement to Waves, with derivations, graphs and JEE/NEET foundation numericals.',
+  desc: 'Complete Class 11 Physics — 14 chapters, 10 units. NCERT-exact sequence from Units & Measurement to Waves, with derivations, graphs and foundation numericals.',
   chapters: [
     {
       id: 'ncert11.units',
