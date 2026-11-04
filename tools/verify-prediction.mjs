@@ -382,3 +382,4 @@ await browser.close();
 const bad = results.filter((r) => !r).length;
 console.log(`\nprediction system  ${results.length - bad}/${results.length} ok`);
 process.exit(bad ? 1 : 0);
+

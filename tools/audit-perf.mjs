@@ -263,3 +263,4 @@ console.log(`  [info] reset button on newton: ${hasReset || 'none'}`);
 await browser.close();
 const bad = results.filter((r) => !r).length;
 console.log(`\nperf/lifecycle  ${results.length - bad}/${results.length} ok`);
+

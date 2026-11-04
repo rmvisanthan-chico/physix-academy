@@ -43,14 +43,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/* Playwright is installed by the CI workflow. For local runs, it may be in
+   the project node_modules or globally. We require it directly. */
 function loadPlaywright() {
-  try {
-    return createRequire(import.meta.url)('playwright');
-  } catch {
-    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
-      'playwright'
-    );
-  }
+  return createRequire(import.meta.url)('playwright');
 }
 const { chromium } = loadPlaywright();
 
@@ -1744,3 +1741,4 @@ if (SELF_TEST) {
   const hardFail = summary.fail.length > 0 || !selfOk;
   process.exit(hardFail ? 1 : 0);
 }
+

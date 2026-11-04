@@ -145,3 +145,4 @@ for (const sim of SIMS) {
 await browser.close();
 const bad = results.filter((r) => !r).length;
 console.log(`\nsim accessibility  ${results.length - bad}/${results.length} ok`);
+
