@@ -1220,11 +1220,11 @@ async function runSelfTest() {
   }
 
   console.log('\n  self-test complete');
-  console.log('  pass:', results.filter(r => r.pass).length);
-  console.log('  fail:', results.filter(r => !r.pass).length);
+  console.log('  pass:', results.filter((r) => r.pass).length);
+  console.log('  fail:', results.filter((r) => !r.pass).length);
   await browser.close();
 
-  if (results.some(r => !r.pass)) {
+  if (results.some((r) => !r.pass)) {
     console.error('SELF-TEST FAILED');
     process.exit(1);
   }
@@ -1235,27 +1235,33 @@ async function runSelfTest() {
  * Entry
  * ------------------------------------------------------------------ */
 if (SELF_TEST) {
-  runSelfTest().catch(e => { console.error(e); process.exit(1); });
+  runSelfTest().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 } else {
   runAudit()
     .then(() => {
       console.log('\n===== SUMMARY =====');
-      const passed = results.filter(r => r.pass).length;
-      const failed = results.filter(r => !r.pass).length;
+      const passed = results.filter((r) => r.pass).length;
+      const failed = results.filter((r) => !r.pass).length;
       console.log(`passed: ${passed}`);
       console.log(`failed: ${failed}`);
       console.log(`total:  ${results.length}`);
       if (failed > 0) {
         console.log('\nFAILURES:');
-        results.filter(r => !r.pass).forEach(r =>
-          console.log(`  ${r.id}: ${r.name} — ${r.evidence}`)
-        );
+        results
+          .filter((r) => !r.pass)
+          .forEach((r) => console.log(`  ${r.id}: ${r.name} — ${r.evidence}`));
       }
       console.log('\nNOT FULLY VERIFIABLE (cross-origin):');
-      results.filter(r => r.name.startsWith('external') || r.name.startsWith('embeds')).forEach(r =>
-        console.log(`  ${r.id}: ${r.name} — ${r.evidence}`)
-      );
+      results
+        .filter((r) => r.name.startsWith('external') || r.name.startsWith('embeds'))
+        .forEach((r) => console.log(`  ${r.id}: ${r.name} — ${r.evidence}`));
       if (failed > 0) process.exit(1);
     })
-    .catch(e => { console.error(e); process.exit(1); });
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
 }
