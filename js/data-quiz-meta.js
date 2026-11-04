@@ -454,8 +454,31 @@ export const QUESTION_METADATA = {
   }
 };
 
+/* Attach each metadata entry to its question's topic. The engine and the
+   #/assessment view filter by metadata.topic, but the topic itself is owned
+   by the question bank, so it is derived from QUIZ_BANK (single source of
+   truth) instead of being duplicated here. Wiring is deferred to first
+   access, not module-evaluation time: the later bank parts
+   (data-quiz-b.js / data-quiz-c.js) may not have pushed their questions when
+   this module is evaluated. Entries whose qid is absent from the bank
+   (planned questions) stay untagged and are naturally excluded from
+   selection by the engine's null filter. */
+let _topicsWired = false;
+function wireTopics() {
+  if (_topicsWired) return;
+  _topicsWired = true;
+  for (const qid of Object.keys(QUESTION_METADATA)) {
+    const m = QUESTION_METADATA[qid];
+    if (!m.topic) {
+      const q = QUIZ_BANK.find((x) => x.id === qid);
+      if (q) m.topic = q.topic;
+    }
+  }
+}
+
 /* Get metadata for a question ID */
 export function getQuestionMeta(qid) {
+  wireTopics();
   return (
     QUESTION_METADATA[qid] || {
       skill: 'conceptual',
@@ -468,5 +491,6 @@ export function getQuestionMeta(qid) {
 
 /* Get all metadata entries */
 export function getAllMetadata() {
+  wireTopics();
   return QUESTION_METADATA;
 }
