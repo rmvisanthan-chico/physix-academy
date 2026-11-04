@@ -56,9 +56,17 @@ import {
   submitAnswer,
   finishAssessment,
   getAssessmentState,
+  getAssessmentHistory,
+  getSessionReport,
   getTopicDiagnosis,
   getRecommendations
 } from './assessment-engine.js';
+import {
+  getQuestionMeta,
+  getAllMetadata,
+  ASSESSMENT_SKILLS,
+  DIFFICULTY_CALIBRATION
+} from './data-quiz-meta.js';
 /* PhysiX Academy — Router + Home/Learn/Lesson/Topics views */
 ('use strict');
 
@@ -210,7 +218,7 @@ export async function route() {
           nav = 'achievements';
           break;
         case 'assessment':
-          viewAssessment(parts[1]);
+          viewAssessment(parts[1], parts[2]);
           nav = 'assessment';
           break;
         case 'progress':
@@ -998,7 +1006,14 @@ function viewAchievements() {
 }
 
 /* ---------------- Assessment ---------------- */
-function viewAssessment(topicId) {
+function viewAssessment(topicId, sessionId) {
+  /* #/assessment/results/<id> — the router passes the session id as the
+     second path part. Dispatch to the dedicated results view. */
+  if (topicId === 'results' && sessionId) {
+    viewAssessmentResults(sessionId);
+    return;
+  }
+
   const state = getAssessmentState();
   const session = state.currentSession;
   const allTopics = Object.keys(getAllMetadata())
@@ -1038,7 +1053,7 @@ function viewAssessment(topicId) {
           </section>
 
           <div class="assess-nav">
-            <button class="btn btn-primary" id="assess-submit" ${!item.answered ? '' : 'disabled'}>Submit Answer</button>
+            <button class="btn btn-primary" id="assess-submit" ${item.given == null ? 'disabled' : ''}>Submit Answer</button>
             <button class="btn" id="assess-end">End Assessment</button>
           </div>
         </div>`;
@@ -1093,8 +1108,12 @@ function viewAssessment(topicId) {
               mdInline(q.why) +
               '</div>';
             $('#assess-submit').disabled = false;
-            item.answered = true;
-            item.correct = correct;
+            /* Record only the SELECTION (item.given). item.answered and
+               item.correct belong to the engine: submitAnswer() sets them and
+               guards on item.answered, so if the view pre-marked the item as
+               answered here, the engine would reject the submit with
+               "Already answered" and the session would stall on the same
+               question forever. */
             item.given = i;
           });
           optsBox.appendChild(b);
@@ -1105,7 +1124,7 @@ function viewAssessment(topicId) {
 
         /* Submit handler */
         $('#assess-submit').addEventListener('click', async () => {
-          if (!item.answered) return;
+          if (item.given == null) return; /* no option selected yet */
           const qid = item.qid;
           const given = item.given;
           await submitAnswer(qid, given, 0); // timeMs not tracked in UI yet
@@ -1141,15 +1160,16 @@ function viewAssessment(topicId) {
         return;
       }
     }
+  }
 
-    /* No active session - show topic selection or results */
-    if (topicId) {
-      /* Show assessment setup for specific topic */
-      const metadata = getAllMetadata();
-      const topicMeta = metadata[Object.keys(metadata).find((k) => metadata[k].topic === topicId)];
-      const recentSessions = getAssessmentHistory(topicId).slice(-5);
+  /* No active session - show topic selection or results */
+  if (topicId) {
+    /* Show assessment setup for specific topic */
+    const metadata = getAllMetadata();
+    const topicMeta = metadata[Object.keys(metadata).find((k) => metadata[k].topic === topicId)];
+    const recentSessions = getAssessmentHistory(topicId).slice(-5);
 
-      App.el.innerHTML = `
+    App.el.innerHTML = `
       <div class="wrap">
         <div class="page-head"><h1>📊 Assessment: ${topicId}</h1>
           <p class="sub">Take an adaptive assessment to measure your understanding and identify gaps.</p></div>
@@ -1202,24 +1222,24 @@ function viewAssessment(topicId) {
         </section>
       </div>`;
 
-      $('#start-assess-5')?.addEventListener('click', () => {
-        startAssessment(topicId, 5);
-        viewAssessment();
-      });
-      $('#start-assess-10')?.addEventListener('click', () => {
-        startAssessment(topicId, 10);
-        viewAssessment();
-      });
-      $('#start-assess-20')?.addEventListener('click', () => {
-        startAssessment(topicId, 20);
-        viewAssessment();
-      });
+    $('#start-assess-5')?.addEventListener('click', () => {
+      startAssessment(topicId, 5);
+      viewAssessment();
+    });
+    $('#start-assess-10')?.addEventListener('click', () => {
+      startAssessment(topicId, 10);
+      viewAssessment();
+    });
+    $('#start-assess-20')?.addEventListener('click', () => {
+      startAssessment(topicId, 20);
+      viewAssessment();
+    });
 
-      return;
-    }
+    return;
+  }
 
-    /* Topic selection view */
-    App.el.innerHTML = `
+  /* Topic selection view */
+  App.el.innerHTML = `
     <div class="wrap">
       <div class="page-head"><h1>📊 Adaptive Assessment</h1>
         <p class="sub">Choose a topic to start an adaptive assessment. Questions adapt to your ability in real time.</p></div>
@@ -1255,23 +1275,23 @@ function viewAssessment(topicId) {
         </div>
       </section>
     </div>`;
-    afterRender();
+  afterRender();
+}
+
+/* Separate results view */
+function viewAssessmentResults(sessionId) {
+  const session = getSessionReport(sessionId);
+  if (!session) {
+    App.el.innerHTML =
+      '<div class="wrap"><div class="empty-state"><h2>Assessment not found</h2></div></div>';
+    return;
   }
 
-  /* Separate results view */
-  function viewAssessmentResults(sessionId) {
-    const session = getSessionReport(sessionId);
-    if (!session) {
-      App.el.innerHTML =
-        '<div class="wrap"><div class="empty-state"><h2>Assessment not found</h2></div></div>';
-      return;
-    }
+  const correct = session.responses.filter((r) => r.correct).length;
+  const total = session.responses.length;
+  const pct = total ? Math.round((100 * correct) / total) : 0;
 
-    const correct = session.responses.filter((r) => r.correct).length;
-    const total = session.responses.length;
-    const pct = total ? Math.round((100 * correct) / total) : 0;
-
-    App.el.innerHTML = `
+  App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>📊 Assessment Results</h1>
       <p class="sub">${session.targetTopic} · ${new Date(session.endedAt).toLocaleDateString()}</p></div>
@@ -1335,12 +1355,12 @@ function viewAssessment(topicId) {
     </div>
   </div>`;
 
-    afterRender();
-  }
+  afterRender();
+}
 
-  /* ---------------- About ---------------- */
-  function viewAbout() {
-    App.el.innerHTML = `
+/* ---------------- About ---------------- */
+function viewAbout() {
+  App.el.innerHTML = `
   <div class="wrap wrap-narrow">
     <div class="page-head"><h1>About PhysiX Academy</h1>
       <p class="sub">Built start to finish by one student — no template, no framework, no shortcuts.</p></div>
@@ -1373,5 +1393,4 @@ function viewAssessment(topicId) {
       <p>PhysiX Academy has no ads, no subscriptions, and no hidden paywalls. It runs as a static site, so running costs are near zero — which means it can stay free forever. If it helped you, you can <a href="#/support">support the project</a> with a small donation.</p>
     </div>
   </div>`;
-  }
 }
