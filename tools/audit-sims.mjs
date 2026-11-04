@@ -997,7 +997,7 @@ async function lifecycleChecks(page, id, opts) {
     inMain: (document.getElementById('main') || document).querySelectorAll(
       '.sim-frame canvas, .sim-frame iframe'
     ).length,
-    iframe: document.queryitorAll('iframe').length,
+    iframe: document.querySelectorAll('iframe').length,
     bar: document.querySelectorAll('.sim-time').length
   }));
   /* The formulas view legitimately contains no canvas, so any canvas still in
