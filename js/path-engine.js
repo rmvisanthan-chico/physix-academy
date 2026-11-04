@@ -214,9 +214,7 @@ const LEVEL_TOPICS = {
     'electricity',
     'magnetism'
   ],
-  ncert12: ['electricity', 'magnetism', 'waveoptics'],
-  jee: ['kinematics', 'newton', 'energy', 'momentum', 'electricity', 'waves', 'optics'],
-  slarora11: ['kinematics', 'newton', 'energy', 'momentum', 'waves'],
+  ncert12: ['electricity', 'magnetism', 'waveoptics'],  slarora11: ['kinematics', 'newton', 'energy', 'momentum', 'waves'],
   l3: ['rotation', 'waves', 'optics'],
   l4: ['optics', 'waveoptics']
 };

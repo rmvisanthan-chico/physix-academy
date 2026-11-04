@@ -7,7 +7,7 @@ CURRICULUM.push({
   tag: 'NCERT 12',
   icon: '🎓',
   color: '#ec4899',
-  desc: 'Complete Class 12 Physics — 14 chapters from Electrostatics to Electronic Devices. Board + JEE/NEET bridge with derivations, graphs and previous-year focus.',
+  desc: 'Complete Class 12 Physics — 14 chapters from Electrostatics to Electronic Devices. Board-focused with derivations, graphs and previous-year question practice.',
   chapters: [
     {
       id: 'ncert12.electro',

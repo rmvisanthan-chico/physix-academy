@@ -35,7 +35,7 @@ This project has been developed over **72+ versions**, with each commit represen
 | v65      | Aug 28, 2026 | NCERT Class 12 track — Electrostatics to Electronic Devices                                     |
 | v66      | Aug 28, 2026 | Realism pack — CDN lazy 3D atom + WASM fluid                                                    |
 | v67      | Aug 28, 2026 | Games — Projectile Sniper + Torque Balance                                                      |
-| v68      | Aug 28, 2026 | JEE/NEET + Polish — PYQs + OG image + Vercel Analytics                                          |
+| v68      | Aug 28, 2026 | Polish — OG image + Vercel Analytics                                          |
 | v69      | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds                                   |
 | v70      | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN)                                              |
 | v71      | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML                                           |
@@ -56,7 +56,7 @@ afab927 2026-08-28 Downloadable SL Arora 11 guide v71
 a031737 2026-08-28 SL Arora Class 11 guide v71 (14 ch)
 c646c1f 2026-08-28 Speaker button v70: Listen — Web Speech API
 6a769ca 2026-08-28 More sims + Video lessons v69
-10a83f0 2026-08-28 JEE/NEET + Polish v68
+10a83f0 2026-08-28 Polish v68
 b354a1b 2026-08-28 Bump to v67
 a0a006d 2026-08-28 Games v67 (2 games)
 609b4eb 2026-08-28 Realism pack v66: CDN lazy 3D atom + WASM fluid
@@ -103,7 +103,6 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 
 - **54 Lessons** across NCERT Class 9, 10, 11, 12 Physics
 - **SL Arora Guide** — 14 chapters with original explanations, derivations, solved examples
-- **JEE/NEET PYQs** — 8 previous year questions with solutions
 - **Formula Library** — Searchable, explained physics formulas
 
 ### Simulations (26+ Live)
@@ -155,7 +154,7 @@ PhysiX Academy/
 │   ├── games.js            # Physics games
 │   ├── formulas.js         # Formula library
 │   ├── calculators.js      # Physics calculators
-│   ├── data-*.js           # Content data (NCERT, quiz, JEE, SL Arora)
+│   ├── data-*.js           # Content data (NCERT, quiz, SL Arora)
 │   └── vendor/             # Third-party libraries
 ├── assets/
 │   ├── logo.png/svg/jpg    # Brand assets
