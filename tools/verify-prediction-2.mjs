@@ -5,14 +5,22 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4320';
 
 const results = [];
-const ok = (n, p, d = '') => { results.push(p); console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`); };
+const ok = (n, p, d = '') => {
+  results.push(p);
+  console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`);
+};
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
 
@@ -24,12 +32,13 @@ const CASES = [
     series: 'x',
     theory(t, ctx) {
       /* x = A cos(ωt) in metres; A comes from the amplitude slider (px) / 60 */
-      const w = 2 * Math.PI / ctx.T;
+      const w = (2 * Math.PI) / ctx.T;
       return ctx.ampM * Math.cos(w * t);
     },
     readCtx: () => {
       const inputs = [...document.querySelectorAll('.sim-frame input[type=range]')];
-      const m = parseFloat(inputs[0].value), k = parseFloat(inputs[1].value);
+      const m = parseFloat(inputs[0].value),
+        k = parseFloat(inputs[1].value);
       const amp = parseFloat(inputs[3].value);
       return { m, k, T: 2 * Math.PI * Math.sqrt(m / k), ampM: amp / 60 };
     }
@@ -37,7 +46,9 @@ const CASES = [
   {
     id: 'kin1d',
     series: 'x',
-    theory(t, ctx) { return ctx.u * t + 0.5 * ctx.a * t * t; },
+    theory(t, ctx) {
+      return ctx.u * t + 0.5 * ctx.a * t * t;
+    },
     readCtx: () => {
       const inputs = [...document.querySelectorAll('.sim-frame input[type=range]')];
       return { u: parseFloat(inputs[0].value), a: parseFloat(inputs[1].value) };
@@ -46,11 +57,14 @@ const CASES = [
 ];
 
 for (const c of CASES) {
-  const ctx = await browser.newContext({ viewport: { width: 1360, height: 1000 }, reducedMotion: 'reduce' });
+  const ctx = await browser.newContext({
+    viewport: { width: 1360, height: 1000 },
+    reducedMotion: 'reduce'
+  });
   const page = await ctx.newPage();
   const errs = [];
-  page.on('pageerror', e => errs.push(String(e)));
-  page.on('console', m => {
+  page.on('pageerror', (e) => errs.push(String(e)));
+  page.on('console', (m) => {
     if (m.type() !== 'error') return;
     const loc = m.location() || {};
     if (/\/_vercel\//.test(loc.url || '')) return;
@@ -81,23 +95,29 @@ for (const c of CASES) {
 
   const res = await page.evaluate(() => ({
     shown: !document.querySelector('.predict-out')?.hidden,
-    rows: [...document.querySelectorAll('.predict-rows div')].map(d => d.textContent.replace(/\s+/g, ' ').trim()),
+    rows: [...document.querySelectorAll('.predict-rows div')].map((d) =>
+      d.textContent.replace(/\s+/g, ' ').trim()
+    ),
     why: (document.querySelector('.predict-why')?.textContent || '').replace(/\s+/g, ' ').trim(),
     verdict: (document.querySelector('.predict-verdict-title')?.textContent || '').trim()
   }));
   ok(`${c.id}: a result appears`, res.shown);
   ok(`${c.id}: an explanation is given`, res.why.length > 40, `${res.why.slice(0, 60)}...`);
 
-  const measured = parseFloat((res.rows.join(' ').match(/Measured from the simulation([\d.-]+)/) || [])[1]);
+  const measured = parseFloat(
+    (res.rows.join(' ').match(/Measured from the simulation([\d.-]+)/) || [])[1]
+  );
   const pctx = await page.evaluate(c.readCtx);
   const expected = c.theory(t, pctx);
   /* tolerance: the sim integrates on fixed steps, so exact agreement is not
      expected — this proves the number came from the simulation and not from a
      second formula evaluated by the UI */
   const tol = Math.max(Math.abs(expected) * 0.12, 0.35);
-  ok(`${c.id}: measured value is real simulated physics`,
+  ok(
+    `${c.id}: measured value is real simulated physics`,
     measured != null && Math.abs(measured - expected) <= tol,
-    `reported ${measured}, theory ${expected.toFixed(2)} (ctx ${JSON.stringify(pctx)})`);
+    `reported ${measured}, theory ${expected.toFixed(2)} (ctx ${JSON.stringify(pctx)})`
+  );
 
   /* retry */
   await page.click('.predict-out .btn');
@@ -109,7 +129,9 @@ for (const c of CASES) {
   ok(`${c.id}: retry reopens the input`, again.enabled && again.hidden);
 
   /* unmount leaves nothing behind */
-  await page.evaluate(() => { location.hash = '#/formulas'; });
+  await page.evaluate(() => {
+    location.hash = '#/formulas';
+  });
   await page.waitForTimeout(700);
   const left = await page.evaluate(() => document.querySelectorAll('.predict').length);
   ok(`${c.id}: unmount removes the prediction UI`, left === 0, `${left} left`);
@@ -119,6 +141,6 @@ for (const c of CASES) {
 }
 
 await browser.close();
-const bad = results.filter(r => !r).length;
+const bad = results.filter((r) => !r).length;
 console.log(`\nprediction: shm + kin1d  ${results.length - bad}/${results.length} ok`);
 process.exit(bad ? 1 : 0);

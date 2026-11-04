@@ -24,9 +24,16 @@ npm run dist       # builds release/PhysiX-Academy-Setup-0.1.0.exe
 Then re-add the button to `index.html` inside `.top-actions`:
 
 ```html
-<a class="icon-btn" id="btn-download" href="downloads/PhysiX-Academy-Setup.exe" download
-   title="Download PhysiX Academy for Windows"
-   aria-label="Download PhysiX Academy for Windows"> ... </a>
+<a
+  class="icon-btn"
+  id="btn-download"
+  href="downloads/PhysiX-Academy-Setup.exe"
+  download
+  title="Download PhysiX Academy for Windows"
+  aria-label="Download PhysiX Academy for Windows"
+>
+  ...
+</a>
 ```
 
 The binary is intentionally git-ignored, so it has to be uploaded somewhere

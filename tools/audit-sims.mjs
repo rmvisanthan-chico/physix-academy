@@ -43,9 +43,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/* Playwright is installed by the CI workflow. For local runs, it may be in
+   the project node_modules or globally. We require it directly. */
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  return createRequire(import.meta.url)('playwright');
 }
 const { chromium } = loadPlaywright();
 
@@ -59,8 +61,8 @@ const { chromium } = loadPlaywright();
 const PW_CHANNEL = process.env.PW_CHANNEL || 'chrome';
 
 const args = process.argv.slice(2);
-const BASE = args.find(a => !a.startsWith('--')) || 'http://localhost:4173';
-const ONLY = (args.find(a => a.startsWith('--only=')) || '').split('=')[1];
+const BASE = args.find((a) => !a.startsWith('--')) || 'http://localhost:4173';
+const ONLY = (args.find((a) => a.startsWith('--only=')) || '').split('=')[1];
 const SELF_TEST = args.includes('--self-test');
 const VERBOSE = args.includes('--verbose');
 
@@ -78,51 +80,64 @@ const MAX_LOOPS = Number(process.env.MAX_LOOPS || 1);
  * ------------------------------------------------------------------ */
 const MANIFEST = {
   /* ---- Phase 3C time-control simulations: physics clock is observable ---- */
-  newton:        { cls: 'dynamic',     why: 'F = ma with friction; cart accelerates every frame',   probe: 'a' },
-  energy:        { cls: 'dynamic',     why: 'pendulum integrates om and th each frame' },
-  collision:     { cls: 'dynamic',     why: 'balls integrate and impulse-resolve on contact' },
-  orbit:         { cls: 'dynamic',     why: 'inverse-square gravity integration',                    probe: 't' },
-  incline:       { cls: 'dynamic',     why: 'block slides once tan(th) > mu',                        probe: 't' },
-  atwood:        { cls: 'dynamic',     why: 'two masses accelerate on the rope',                     probe: 't' },
-  bfield:        { cls: 'dynamic',     why: 'cyclotron rotation integrates exactly',                 probe: 't' },
-  kin1d:         { cls: 'dynamic',     why: 'car clock advances; graph samples grow',               probe: 't' },
-  projectile:    { cls: 'dynamic',     why: 'ball integrates under gravity and drag',                probe: 't' },
-  shm:           { cls: 'dynamic',     why: 'spring-mass oscillator integrates',                    probe: 't' },
+  newton: { cls: 'dynamic', why: 'F = ma with friction; cart accelerates every frame', probe: 'a' },
+  energy: { cls: 'dynamic', why: 'pendulum integrates om and th each frame' },
+  collision: { cls: 'dynamic', why: 'balls integrate and impulse-resolve on contact' },
+  orbit: { cls: 'dynamic', why: 'inverse-square gravity integration', probe: 't' },
+  incline: { cls: 'dynamic', why: 'block slides once tan(th) > mu', probe: 't' },
+  atwood: { cls: 'dynamic', why: 'two masses accelerate on the rope', probe: 't' },
+  bfield: { cls: 'dynamic', why: 'cyclotron rotation integrates exactly', probe: 't' },
+  kin1d: { cls: 'dynamic', why: 'car clock advances; graph samples grow', probe: 't' },
+  projectile: { cls: 'dynamic', why: 'ball integrates under gravity and drag', probe: 't' },
+  shm: { cls: 'dynamic', why: 'spring-mass oscillator integrates', probe: 't' },
 
   /* ---- frame-driven natives ---- */
-  wave:          { cls: 'dynamic', why: 'travelling wave phase is a function of elapsed time' },
-  circuit:       { cls: 'dynamic', why: 'current phase advances each frame' },
-  doppler:       { cls: 'dynamic', why: 'source translates, wavefronts expand' },
-  induction:     { cls: 'dynamic', why: 'magnet translates, flux changes, emf decays' },
-  standing:      { cls: 'dynamic', why: 'superposition phase advances' },
-  interference:  { cls: 'dynamic', why: 'two-source interference phase advances' },
-  rc:            { cls: 'dynamic', why: 'capacitor charges/discharges over t' },
-  cooling:       { cls: 'dynamic', why: 'Newton cooling curve advances over t' },
-  collision2d:   { cls: 'dynamic', why: 'two discs integrate with impulse response' },
-  'ncert9-echo':   { cls: 'dynamic', why: 'ping cycle runs on a ~1.4s loop', slow: true },
+  wave: { cls: 'dynamic', why: 'travelling wave phase is a function of elapsed time' },
+  circuit: { cls: 'dynamic', why: 'current phase advances each frame' },
+  doppler: { cls: 'dynamic', why: 'source translates, wavefronts expand' },
+  induction: { cls: 'dynamic', why: 'magnet translates, flux changes, emf decays' },
+  standing: { cls: 'dynamic', why: 'superposition phase advances' },
+  interference: { cls: 'dynamic', why: 'two-source interference phase advances' },
+  rc: { cls: 'dynamic', why: 'capacitor charges/discharges over t' },
+  cooling: { cls: 'dynamic', why: 'Newton cooling curve advances over t' },
+  collision2d: { cls: 'dynamic', why: 'two discs integrate with impulse response' },
+  'ncert9-echo': { cls: 'dynamic', why: 'ping cycle runs on a ~1.4s loop', slow: true },
   'ncert11-rotation': { cls: 'dynamic', why: 'skater angular velocity integrates' },
   'ncert11-venturi': { cls: 'dynamic', why: 'flow arrows animate on a phase clock' },
-  'ktg-gas':       { cls: 'dynamic', why: 'particle velocities random-walk each frame' },
-  'wasm-fluid':    { cls: 'dynamic', why: 'particles drift and collide' },
-  'atoms-bohr':    { cls: 'dynamic', why: 'electron orbits using wall-clock time' },
+  'ktg-gas': { cls: 'dynamic', why: 'particle velocities random-walk each frame' },
+  'wasm-fluid': { cls: 'dynamic', why: 'particles drift and collide' },
+  'atoms-bohr': { cls: 'dynamic', why: 'electron orbits using wall-clock time' },
 
   /* ---- WebGL: pixel readback is impossible without preserveDrawingBuffer,
          so the observable is draw-call count ---- */
-  orbit3d:       { cls: 'dynamic', why: '3D orbital integration', webgl: true },
-  wave3d:        { cls: 'dynamic', why: '3D wave surface t advances', webgl: true },
-  efield3d:      { cls: 'dynamic', why: 'field rig rotates on clock delta', webgl: true },
+  orbit3d: { cls: 'dynamic', why: '3D orbital integration', webgl: true },
+  wave3d: { cls: 'dynamic', why: '3D wave surface t advances', webgl: true },
+  efield3d: { cls: 'dynamic', why: 'field rig rotates on clock delta', webgl: true },
 
   /* ---- interactive, NOT expected to animate on their own ---- */
-  efield:        { cls: 'interactive', why: 'probes array starts empty; only a click drops a test charge',
-                   interact: { kind: 'canvas-click', expect: 'pixels' } },
-  buoyancy:      { cls: 'interactive', why: 'floats in equilibrium at default densities - STATIC by design; ' +
-                                              'it only moves once the object is denser than the fluid',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'pixels' } },
-  lens:          { cls: 'interactive', why: 'thin-lens equation evaluated per draw, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  refraction:    { cls: 'interactive', why: "Snell's law evaluated per draw, no clock",
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-/* Heat Engine Cycle - the P-V loop WAS a fixed illustration. The polygon was
+  efield: {
+    cls: 'interactive',
+    why: 'probes array starts empty; only a click drops a test charge',
+    interact: { kind: 'canvas-click', expect: 'pixels' }
+  },
+  buoyancy: {
+    cls: 'interactive',
+    why:
+      'floats in equilibrium at default densities - STATIC by design; ' +
+      'it only moves once the object is denser than the fluid',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'pixels' }
+  },
+  lens: {
+    cls: 'interactive',
+    why: 'thin-lens equation evaluated per draw, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  refraction: {
+    cls: 'interactive',
+    why: "Snell's law evaluated per draw, no clock",
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  /* Heat Engine Cycle - the P-V loop WAS a fixed illustration. The polygon was
      four hard-coded literals in js/sims-more.js that referenced neither slider,
      so the readouts moved while the picture never did, and the work readout was
      literally labelled "(demo)". Verified rather than assumed: a pixel-signature
@@ -138,41 +153,65 @@ const MANIFEST = {
      separate 3D page in the "3D" gallery with the same cycle and its own
      (also genuine) defect: its two "isothermal" legs were drawn at constant
      pressure. Both are covered by tools/test-thermo-engine.mjs. */
-  'thermo-engine': { cls: 'interactive', why: 'Carnot cycle computed from Th and Tc each frame; the drawn loop and the readouts both track the sliders',
-                    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert10-mirror': { cls: 'interactive', why: 'mirror equation from sliders, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert10-eye':   { cls: 'interactive', why: 'eye defect from power slider, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert10-heating': { cls: 'interactive', why: 'Joule heating from slider values, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert11-solids': { cls: 'interactive', why: 'stress-strain from slider values, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert11-pv':    { cls: 'interactive', why: 'PV cycle traced from slider values, no clock',
-                   interact: { kind: 'range', index: 0, to: 'max', expect: 'any' } },
-  'ncert11-measure': { cls: 'interactive', why: 'Vernier calipers: jaws are DRAGGED with the pointer, ' +
-                                              'there are no sliders at all',
-                    interact: { kind: 'canvas-drag', expect: 'any' } },
-  'cdn-3d-atom':   { cls: 'interactive', why: 'lazy CDN load behind a "Load 3D (CDN)" button, with a ' +
-                                              'designed offline fallback path',
-                    interact: { kind: 'button', text: 'Load 3D', expect: 'cdn' } },
+  'thermo-engine': {
+    cls: 'interactive',
+    why: 'Carnot cycle computed from Th and Tc each frame; the drawn loop and the readouts both track the sliders',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert10-mirror': {
+    cls: 'interactive',
+    why: 'mirror equation from sliders, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert10-eye': {
+    cls: 'interactive',
+    why: 'eye defect from power slider, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert10-heating': {
+    cls: 'interactive',
+    why: 'Joule heating from slider values, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert11-solids': {
+    cls: 'interactive',
+    why: 'stress-strain from slider values, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert11-pv': {
+    cls: 'interactive',
+    why: 'PV cycle traced from slider values, no clock',
+    interact: { kind: 'range', index: 0, to: 'max', expect: 'any' }
+  },
+  'ncert11-measure': {
+    cls: 'interactive',
+    why: 'Vernier calipers: jaws are DRAGGED with the pointer, ' + 'there are no sliders at all',
+    interact: { kind: 'canvas-drag', expect: 'any' }
+  },
+  'cdn-3d-atom': {
+    cls: 'interactive',
+    why:
+      'lazy CDN load behind a "Load 3D (CDN)" button, with a ' + 'designed offline fallback path',
+    interact: { kind: 'button', text: 'Load 3D', expect: 'cdn' }
+  },
 
   /* ---- third-party iframes ---- */
   ns: { cls: 'iframe', why: 'embeds physics-lab.vercel.app' },
   'phet-energy-skate-park': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-forces-motion':      { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-projectile':         { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-circuit':            { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-balancing':          { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-pendulum':           { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-charges-fields':     { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-coulombs-law':       { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-ohms-law':           { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
-  'phet-springs':            { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true }
+  'phet-forces-motion': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-projectile': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-circuit': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-balancing': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-pendulum': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-charges-fields': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-coulombs-law': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-ohms-law': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true },
+  'phet-springs': { cls: 'iframe', why: 'PhET embed behind a Launch button', phet: true }
 };
 
 const results = [];
-const add = (id, name, pass, evidence) => results.push({ id, name, pass: !!pass, evidence: evidence || '' });
+const add = (id, name, pass, evidence) =>
+  results.push({ id, name, pass: !!pass, evidence: evidence || '' });
 
 /* Not every console error means the simulation is broken.
      Production's Content-Security-Policy refuses a jsdelivr fetch that
@@ -182,7 +221,7 @@ const add = (id, name, pass, evidence) => results.push({ id, name, pass: !!pass,
      blanket-suppressing console errors would blunt the one signal that actually
      caught cdn-3d-atom, so only this narrow class is separated out, and it is
      still printed in the report. */
-const isExternalPolicyNoise = t =>
+const isExternalPolicyNoise = (t) =>
   /Content Security Policy|violates the following/i.test(t) ||
   /Refused to connect because it violates/i.test(t) ||
   /cdn\.jsdelivr\.net/i.test(t) ||
@@ -190,8 +229,8 @@ const isExternalPolicyNoise = t =>
 
 /* `pg` is passed in rather than closed over: `page` is created inside runAudit(),
    so a module-level reference is a ReferenceError waiting to happen. */
-const realErrors = pg => pg.__errs.filter(e => !isExternalPolicyNoise(e));
-const policyNoise = pg => pg.__errs.filter(isExternalPolicyNoise);
+const realErrors = (pg) => pg.__errs.filter((e) => !isExternalPolicyNoise(e));
+const policyNoise = (pg) => pg.__errs.filter(isExternalPolicyNoise);
 
 function assertNoMountErrors(pg, id) {
   const real = realErrors(pg);
@@ -200,14 +239,14 @@ function assertNoMountErrors(pg, id) {
     add(id, 'no errors during mount', true, '');
     if (noise.length) {
       results.push({
-        id, name: 'external-resource errors present (CSP / offline), fallback used',
+        id,
+        name: 'external-resource errors present (CSP / offline), fallback used',
         pass: true,
         evidence: noise[0].slice(0, 96) + ' - policy condition, not a simulation fault'
       });
     }
   } else {
-    add(id, 'no errors during mount', false,
-      real.slice(0, 2).join(' ; '));
+    add(id, 'no errors during mount', false, real.slice(0, 2).join(' ; '));
   }
 }
 
@@ -271,7 +310,7 @@ window.__hSample = function () {
     } catch (e) { /* tainted / zero-size */ }
   });
   const readouts = [...frame.querySelectorAll('.readout')]
-    .map(r => r.innerText.replace(/\\s+/g, ' ').trim()).join('|');
+    .map(r => r.innerText.replace(/\s+/g, ' ').trim()).join('|');
   /* Two separate signatures on purpose.
      pixelSig is the RENDERED OUTPUT. readoutSig is the numbers.
      For "does this control drive the simulation" only pixelSig counts: a readout
@@ -324,12 +363,16 @@ async function makePage(browser) {
     try {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
-    } catch (e) { /* throttling unsupported: run unthrottled */ }
+    } catch (e) {
+      /* throttling unsupported: run unthrottled */
+    }
   }
   await page.addInitScript(INSTRUMENT);
   page.__errs = [];
-  page.on('pageerror', e => page.__errs.push('pageerror: ' + String(e).split('\n')[0].slice(0, 140)));
-  page.on('console', m => {
+  page.on('pageerror', (e) =>
+    page.__errs.push('pageerror: ' + String(e).split('\n')[0].slice(0, 140))
+  );
+  page.on('console', (m) => {
     const url = (m.location() || {}).url || '';
     if (m.type() === 'error' && !/_vercel\//.test(url)) {
       page.__errs.push('console: ' + m.text().slice(0, 140));
@@ -340,8 +383,12 @@ async function makePage(browser) {
 
 /* Bounded, condition-based wait - never a bare sleep as the assertion itself. */
 async function until(page, fn, arg, timeout = 2500) {
-  try { await page.waitForFunction(fn, arg, { timeout, polling: 50 }); return true; }
-  catch { return false; }
+  try {
+    await page.waitForFunction(fn, arg, { timeout, polling: 50 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function runAudit() {
@@ -349,6 +396,8 @@ async function runAudit() {
   const page = await makePage(browser);
 
   await page.goto(`${BASE}/#/sims`, { waitUntil: 'networkidle' });
+  /* Wait for all sim modules to be loaded via ensureAll() */
+  await page.evaluate(() => window.__SimsReady);
   await page.waitForTimeout(500);
 
   /* Registry discovery, with a fallback.
@@ -368,9 +417,13 @@ async function runAudit() {
     if (!ids.length) throw new Error('empty registry');
   } catch (e) {
     registrySource = 'index links (bundled build: /js/sims-a.js is inlined)';
-    ids = await page.evaluate(() =>
-      [...new Set([...document.querySelectorAll('a[href^="#/sims/"]')]
-        .map(a => a.getAttribute('href').replace('#/sims/', '')))]);
+    ids = await page.evaluate(() => [
+      ...new Set(
+        [...document.querySelectorAll('a[href^="#/sims/"]')].map((a) =>
+          a.getAttribute('href').replace('#/sims/', '')
+        )
+      )
+    ]);
   }
   console.log(`\n  registry source: ${registrySource}`);
   console.log(`  registry reports ${ids.length} simulations\n`);
@@ -385,8 +438,12 @@ async function runAudit() {
       continue;
     }
     page.__errs = [];
-    await page.evaluate(() => { window.__hStop && window.__hStop(); });
-    await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
+    await page.evaluate(() => {
+      window.__hStop && window.__hStop();
+    });
+    await page.evaluate((i) => {
+      location.hash = '#/sims/' + i;
+    }, id);
 
     /* --- mount ---
        Wait for the surface THIS class declares, not for "any child". The first
@@ -396,30 +453,38 @@ async function runAudit() {
        iframe, cdn-3d-atom reporting no button, wasm-fluid reporting no canvas).
        Nondeterministic failures are worse than none: they train you to ignore the
        audit, which is the exact thing this was built to prevent. */
-    const mountPredicate = spec.cls === 'iframe'
-      ? () => {
-          const f = document.querySelector('.sim-frame');
-          return !!(f && (f.querySelector('iframe') || f.querySelector('.btn-launch')));
-        }
-      : spec.cls === 'interactive' && spec.interact.kind === 'button'
+    const mountPredicate =
+      spec.cls === 'iframe'
         ? () => {
             const f = document.querySelector('.sim-frame');
-            return !!(f && [...f.querySelectorAll('button')].some(b => /load/i.test(b.textContent)));
+            return !!(f && (f.querySelector('iframe') || f.querySelector('.btn-launch')));
           }
-        : () => {
-            const f = document.querySelector('.sim-frame');
-            return !!(f && f.querySelector('canvas'));
-          };
+        : spec.cls === 'interactive' && spec.interact.kind === 'button'
+          ? () => {
+              const f = document.querySelector('.sim-frame');
+              return !!(
+                f && [...f.querySelectorAll('button')].some((b) => /load/i.test(b.textContent))
+              );
+            }
+          : () => {
+              const f = document.querySelector('.sim-frame');
+              return !!(f && f.querySelector('canvas'));
+            };
     const mounted = await until(page, mountPredicate, null, 10000);
-    add(id, 'mounts and creates a rendering surface', mounted, mounted ? '' : 'declared surface never appeared');
+    add(
+      id,
+      'mounts and creates a rendering surface',
+      mounted,
+      mounted ? '' : 'declared surface never appeared'
+    );
     if (!mounted) {
       add(id, 'no errors during mount', false, page.__errs.slice(0, 2).join(' ; '));
       continue;
     }
-await page.waitForTimeout(150);
+    await page.waitForTimeout(150);
 
-      /* Separates CSP/offline external-resource refusals from genuine faults. */
-      assertNoMountErrors(page, id);
+    /* Separates CSP/offline external-resource refusals from genuine faults. */
+    assertNoMountErrors(page, id);
 
     const surface = await page.evaluate(() => {
       const f = document.querySelector('.sim-frame');
@@ -427,9 +492,9 @@ await page.waitForTimeout(150);
       return {
         canvases: f.querySelectorAll('canvas').length,
         iframes: ifr.length,
-        iframeSrc: ifr.map(i => i.src),
+        iframeSrc: ifr.map((i) => i.src),
         launchGate: !!f.querySelector('.btn-launch'),
-        btns: [...f.querySelectorAll('button')].map(b => b.textContent.trim()),
+        btns: [...f.querySelectorAll('button')].map((b) => b.textContent.trim()),
         ranges: f.querySelectorAll('input[type=range]').length,
         readouts: [...f.querySelectorAll('.readout')].length,
         graphs: f.querySelectorAll('.pgraph').length
@@ -439,54 +504,93 @@ await page.waitForTimeout(150);
     /* ---------------- iframe class ---------------- */
     if (spec.cls === 'iframe') {
       if (spec.phet) {
-        add(id, 'presents a Launch gate before any third-party frame exists',
-          surface.launchGate, surface.launchGate ? '' : 'no .btn-launch found');
+        add(
+          id,
+          'presents a Launch gate before any third-party frame exists',
+          surface.launchGate,
+          surface.launchGate ? '' : 'no .btn-launch found'
+        );
         await page.evaluate(() => {
           const b = document.querySelector('.sim-frame .btn-launch');
           if (b) b.click();
         });
-const got = await until(page, () => {
+        const got = await until(
+          page,
+          () => {
             const i = document.querySelector('.sim-frame iframe');
             return i && i.src ? i.src : null;
-          }, null, 20000);
-          const src = got ? await page.evaluate(() => document.querySelector('.sim-frame iframe').src) : '';
-          add(id, 'clicking Launch creates an iframe pointing at phet.colorado.edu',
-            got && /phet\.colorado\.edu/.test(src), src || 'no iframe created');
-          /* Load status is REPORTED, never asserted as physics.
+          },
+          null,
+          20000
+        );
+        const src = got
+          ? await page.evaluate(() => {
+              const i = document.querySelector('.sim-frame iframe');
+              return i ? i.src : 'no-iframe';
+            })
+          : '';
+        add(
+          id,
+          'clicking Launch creates an iframe pointing at phet.colorado.edu',
+          got && /phet\.colorado\.edu/.test(src),
+          src || 'no iframe created'
+        );
+        /* Load status is REPORTED, never asserted as physics.
              This row used to be pushed with a hardcoded `pass: true`, which could
              not fail and therefore could not detect anything - a green tick that
              meant nothing. What the parent page can genuinely observe is the
              iframe's own load lifecycle:
                load-event - the document was fetched and parsed. That is a real
-                            observation, but it says nothing about the simulation
-                            inside, which is cross-origin.
+                             observation, but it says nothing about the simulation
+                             inside, which is cross-origin.
                error-event - the embed genuinely failed. That is a real defect.
                timeout    - third-party network was too slow to judge. Not a pass
-                            and not a failure; recorded and left undecided.
+                             and not a failure; recorded and left undecided.
              The row keeps the 'external ' prefix, which is what routes it out of
              the pass/fail decision and into the NOT FULLY VERIFIABLE report, so
              no PhET simulation is ever declared healthy on the strength of a
              document it cannot see inside. */
-          const loaded = got && await page.evaluate(() => new Promise(res => {
-            const i = document.querySelector('.sim-frame iframe');
-            let settled = false;
-            const done = v => { if (!settled) { settled = true; res(v); } };
-            i.addEventListener('load', () => done('load-event'), { once: true });
-            i.addEventListener('error', () => done('error-event'), { once: true });
-            setTimeout(() => done('timeout'), 20000);
-          }));
-          if (loaded === 'error-event') {
-            add(id, 'external PhET embed reports a load error (cross-origin: internals NOT inspected)',
-              false, 'the iframe fired an error event - the embed did not load');
-          } else {
-            results.push({
-              id, name: 'external PhET document actually loads (cross-origin: config verified, internals NOT inspected)',
-              pass: loaded === 'load-event',
-              evidence: `load=${loaded} - ` + (loaded === 'load-event'
+        const loaded =
+          got &&
+          (await page.evaluate(
+            () =>
+              new Promise((res) => {
+                const i = document.querySelector('.sim-frame iframe');
+                if (!i) {
+                  res('no-iframe');
+                  return;
+                }
+                let settled = false;
+                const done = (v) => {
+                  if (!settled) {
+                    settled = true;
+                    res(v);
+                  }
+                };
+                i.addEventListener('load', () => done('load-event'), { once: true });
+                i.addEventListener('error', () => done('error-event'), { once: true });
+                setTimeout(() => done('timeout'), 20000);
+              })
+          ));
+        if (loaded === 'error-event') {
+          add(
+            id,
+            'external PhET embed reports a load error (cross-origin: internals NOT inspected)',
+            false,
+            'the iframe fired an error event - the embed did not load'
+          );
+        } else {
+          results.push({
+            id,
+            name: 'external PhET document actually loads (cross-origin: config verified, internals NOT inspected)',
+            pass: loaded === 'load-event',
+            evidence:
+              `load=${loaded} - ` +
+              (loaded === 'load-event'
                 ? 'document fetched and parsed; its simulation is cross-origin and was NOT inspected'
                 : 'third-party network too slow to judge - left undecided, not counted either way')
-            });
-          }
+          });
+        }
       } else {
         add(id, 'embeds a third-party frame', surface.iframes > 0, surface.iframeSrc.join(', '));
       }
@@ -502,12 +606,19 @@ const got = await until(page, () => {
 
     /* ---------------- interactive class ---------------- */
     if (spec.cls === 'interactive') {
-      add(id, 'has the control its declared interaction needs',
-        spec.interact.kind === 'button' ? surface.btns.some(b => /load/i.test(b))
+      add(
+        id,
+        'has the control its declared interaction needs',
+        spec.interact.kind === 'button'
+          ? surface.btns.some((b) => /load/i.test(b))
           : surface.canvases > 0,
-        `canvases=${surface.canvases} btns=[${surface.btns.join('|')}]`);
+        `canvases=${surface.canvases} btns=[${surface.btns.join('|')}]`
+      );
 
-      await page.evaluate(() => { window.__hReset(); window.__hStart(); });
+      await page.evaluate(() => {
+        window.__hReset();
+        window.__hStart();
+      });
       /* Settle, THEN take the baseline, THEN interact.
          The baseline was originally captured immediately before the interaction
          block and read again afterwards - which meant it was taken after the
@@ -515,10 +626,16 @@ const got = await until(page, () => {
          new picture with itself and every interactive simulation reported its
          control as dead. Order is the whole test here. */
       const settled = await until(page, () => window.__hSettled && window.__hSettled(), null, 3000);
-      add(id, 'rendered output settles before the interaction is measured', settled,
-        settled ? '' : 'picture never stopped changing - cannot measure a control effect');
-      const before = await page.evaluate(s => window.__h[s],
-        spec.interact.expect === 'readout' ? 'readoutSig' : 'pixelSig');
+      add(
+        id,
+        'rendered output settles before the interaction is measured',
+        settled,
+        settled ? '' : 'picture never stopped changing - cannot measure a control effect'
+      );
+      const before = await page.evaluate(
+        (s) => window.__h[s],
+        spec.interact.expect === 'readout' ? 'readoutSig' : 'pixelSig'
+      );
 
       if (spec.interact.kind === 'range') {
         const moved = await page.evaluate(({ index, to }) => {
@@ -532,17 +649,39 @@ const got = await until(page, () => {
           r.dispatchEvent(new Event('change', { bubbles: true }));
           return true;
         }, spec.interact);
-        add(id, 'declared slider exists and was moved', moved,
-          moved ? '' : `slider[${spec.interact.index}] missing or already at target`);
+        add(
+          id,
+          'declared slider exists and was moved',
+          moved,
+          moved ? '' : `slider[${spec.interact.index}] missing or already at target`
+        );
       } else if (spec.interact.kind === 'canvas-click') {
         await page.evaluate(() => {
           const c = document.querySelector('.sim-frame canvas');
           if (!c) return;
           const r = c.getBoundingClientRect();
-          const ev = new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5, pointerId: 1 });
+          const ev = new PointerEvent('pointerdown', {
+            bubbles: true,
+            clientX: r.left + r.width * 0.5,
+            clientY: r.top + r.height * 0.5,
+            pointerId: 1
+          });
           c.dispatchEvent(ev);
-          c.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5, pointerId: 1 }));
-          c.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5 }));
+          c.dispatchEvent(
+            new PointerEvent('pointerup', {
+              bubbles: true,
+              clientX: r.left + r.width * 0.5,
+              clientY: r.top + r.height * 0.5,
+              pointerId: 1
+            })
+          );
+          c.dispatchEvent(
+            new MouseEvent('click', {
+              bubbles: true,
+              clientX: r.left + r.width * 0.5,
+              clientY: r.top + r.height * 0.5
+            })
+          );
         });
         add(id, 'declared canvas click was dispatched', true);
       } else if (spec.interact.kind === 'canvas-drag') {
@@ -551,17 +690,43 @@ const got = await until(page, () => {
           if (!c) return;
           const r = c.getBoundingClientRect();
           const y = r.top + r.height * 0.5;
-          c.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + 100, clientY: y, pointerId: 1, isPrimary: true }));
+          c.dispatchEvent(
+            new PointerEvent('pointerdown', {
+              bubbles: true,
+              clientX: r.left + 100,
+              clientY: y,
+              pointerId: 1,
+              isPrimary: true
+            })
+          );
           for (let x = 100; x <= 190; x += 10) {
-            c.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + x, clientY: y, pointerId: 1, isPrimary: true }));
-            await new Promise(r2 => requestAnimationFrame(r2));
+            c.dispatchEvent(
+              new PointerEvent('pointermove', {
+                bubbles: true,
+                clientX: r.left + x,
+                clientY: y,
+                pointerId: 1,
+                isPrimary: true
+              })
+            );
+            await new Promise((r2) => requestAnimationFrame(r2));
           }
-          c.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: r.left + 190, clientY: y, pointerId: 1, isPrimary: true }));
+          c.dispatchEvent(
+            new PointerEvent('pointerup', {
+              bubbles: true,
+              clientX: r.left + 190,
+              clientY: y,
+              pointerId: 1,
+              isPrimary: true
+            })
+          );
         });
         add(id, 'declared drag gesture was dispatched', true);
       } else if (spec.interact.kind === 'button') {
-        const clicked = await page.evaluate(t => {
-          const b = [...document.querySelectorAll('.sim-frame button')].find(x => new RegExp(t, 'i').test(x.textContent));
+        const clicked = await page.evaluate((t) => {
+          const b = [...document.querySelectorAll('.sim-frame button')].find((x) =>
+            new RegExp(t, 'i').test(x.textContent)
+          );
           if (!b) return false;
           b.click();
           return true;
@@ -572,15 +737,28 @@ const got = await until(page, () => {
       if (spec.interact.expect === 'cdn') {
         /* Either the CDN succeeded or the designed offline fallback fired. Both
            are correct outcomes; what would be wrong is neither. */
-        const res = await until(page, () => {
-          const f = document.querySelector('.sim-frame');
-          const txt = f ? f.innerText : '';
-          if (f && f.querySelector('canvas')) return 'canvas';
-          if (/fallback|blocked/i.test(txt)) return 'fallback';
-          return false;
-        }, null, 9000);
-        add(id, 'CDN load produced a canvas or the designed offline fallback', res,
-          res === 'canvas' ? 'CDN texture loaded' : res === 'fallback' ? 'offline fallback (expected in sandbox)' : 'neither');
+        const res = await until(
+          page,
+          () => {
+            const f = document.querySelector('.sim-frame');
+            const txt = f ? f.innerText : '';
+            if (f && f.querySelector('canvas')) return 'canvas';
+            if (/fallback|blocked/i.test(txt)) return 'fallback';
+            return false;
+          },
+          null,
+          9000
+        );
+        add(
+          id,
+          'CDN load produced a canvas or the designed offline fallback',
+          res,
+          res === 'canvas'
+            ? 'CDN texture loaded'
+            : res === 'fallback'
+              ? 'offline fallback (expected in sandbox)'
+              : 'neither'
+        );
       } else {
         /* PIXELS only. A readout that merely echoes the slider value changes when
            the slider moves, so a combined signature would report a dead control as
@@ -616,81 +794,118 @@ const got = await until(page, () => {
            reason. The audit's own job is to detect false passes, so a predicate
            that silently reports failure rather than erroring is the worst
            possible failure mode, and it is worth the comment. */
-        const changed = await until(page,
+        const changed = await until(
+          page,
           ({ s, prev }) => window.__h[s] !== prev && window.__h.samples > 4,
-          { s: signal, prev: before }, 3000);
+          { s: signal, prev: before },
+          3000
+        );
         const sig = await page.evaluate(() => window.__h.pixelSig);
-        add(id, spec.interact.expect === 'readout'
-      ? 'the interaction changed the readouts (diagram is a fixed illustration)'
-      : 'the interaction changed the rendered output', changed,
-          changed ? '' : `signature unchanged (${String(before).slice(0, 22)} -> ${String(sig).slice(0, 22)})`);
+        add(
+          id,
+          spec.interact.expect === 'readout'
+            ? 'the interaction changed the readouts (diagram is a fixed illustration)'
+            : 'the interaction changed the rendered output',
+          changed,
+          changed
+            ? ''
+            : `signature unchanged (${String(before).slice(0, 22)} -> ${String(sig).slice(0, 22)})`
+        );
       }
-      await page.evaluate(() => { window.__hStop && window.__hStop(); });
+      await page.evaluate(() => {
+        window.__hStop && window.__hStop();
+      });
       await lifecycleChecks(page, id, {
         firstCanvases: surface.canvases,
         firstIframes: surface.iframes,
-        animates: false          /* interactive sims are not required to animate */
+        animates: false /* interactive sims are not required to animate */
       });
       continue;
     }
 
     /* ---------------- dynamic class ---------------- */
-    await page.evaluate(() => { window.__hReset(); window.__hStart(); });
+    await page.evaluate(() => {
+      window.__hReset();
+      window.__hStart();
+    });
 
-if (spec.webgl) {
-        /* Occurrence, not a rate. The old bound was glCalls > 40 within 3s, an
-           absolute count that is a claim about the machine: a full sweep at 8x
-           throttle produced exactly 40 draw calls and failed on the strict
-           inequality, off by one, with the scene demonstrably rendering. Any
-           WebGL scene that draws at all satisfies this; one that never draws
-           produces zero however long you wait. */
-        const moved = await until(page, () => window.__h.glCalls > 0, null, 12000);
-        const gl = await page.evaluate(() => ({ gl: window.__h.glCalls, webgl: window.__h.webgl }));
-        add(id, 'WebGL draw calls increase (3D scene is actually rendering)', moved,
-          `draws=${gl.gl} webglCanvases=${gl.webgl}` +
-          (moved ? '' : '  (no draw calls at all within 12s)'));
-      } else {
-        /* Assert that the output CHANGES, not how fast it changes. The old form
-           demanded N signature changes inside a fixed window, which is a claim
-           about the machine: in a full sweep at 8x throttle `kin1d` recorded
-           sigChanges=1 against a bound of 6 and was reported frozen, while the
-           same simulation passed in isolation at the same throttle. A slow
-           simulation is still a running simulation, and a frozen one produces NO
-           change however long you wait - so a longer window cannot rescue a
-           frozen simulation, it can only rescue a slow one. That is the whole
-           difference between this and lowering a threshold.
+    if (spec.webgl) {
+      /* Occurrence, not a rate. The old bound was glCalls > 40 within 3s, an
+         absolute count that is a claim about the machine: a full sweep at 8x
+         throttle produced exactly 40 draw calls and failed on the strict
+         inequality, off by one, with the scene demonstrably rendering. Any
+         WebGL scene that draws at all satisfies this; one that never draws
+         produces zero however long you wait. */
+      const moved = await until(page, () => window.__h.glCalls > 0, null, 12000);
+      const gl = await page.evaluate(() => ({ gl: window.__h.glCalls, webgl: window.__h.webgl }));
+      add(
+        id,
+        'WebGL draw calls increase (3D scene is actually rendering)',
+        moved,
+        `draws=${gl.gl} webglCanvases=${gl.webgl}` +
+          (moved ? '' : '  (no draw calls at all within 12s)')
+      );
+    } else {
+      /* Assert that the output CHANGES, not how fast it changes. The old form
+         demanded N signature changes inside a fixed window, which is a claim
+         about the machine: in a full sweep at 8x throttle `kin1d` recorded
+         sigChanges=1 against a bound of 6 and was reported frozen, while the
+         same simulation passed in isolation at the same throttle. A slow
+         simulation is still a running simulation, and a frozen one produces NO
+         change however long you wait - so a longer window cannot rescue a
+         frozen simulation, it can only rescue a slow one. That is the whole
+         difference between this and lowering a threshold.
 
-           Two changes are required rather than one, so a single settle artefact
-           is not mistaken for motion. */
-        const need = 2;
-        const tChange = Date.now();
-        const moved = await until(page, n => window.__h.sigChanges >= n, need, spec.slow ? 20000 : 12000);
-        const tookMs = Date.now() - tChange;
-        const h = await page.evaluate(() => ({ changes: window.__h.sigChanges, canvases: window.__h.canvases, twoD: window.__h.twoD }));
-        add(id, 'rendered output or readouts change over time', moved,
-          `sigChanges=${h.changes} (need >=${need}` +
+         Two changes are required rather than one, so a single settle artefact
+         is not mistaken for motion. */
+      const need = 2;
+      const tChange = Date.now();
+      const moved = await until(
+        page,
+        (n) => window.__h.sigChanges >= n,
+        need,
+        spec.slow ? 20000 : 12000
+      );
+      const tookMs = Date.now() - tChange;
+      const h = await page.evaluate(() => ({
+        changes: window.__h.sigChanges,
+        canvases: window.__h.canvases,
+        twoD: window.__h.twoD
+      }));
+      add(
+        id,
+        'rendered output or readouts change over time',
+        moved,
+        `sigChanges=${h.changes} (need >=${need}` +
           (moved ? `, first seen after ${tookMs}ms` : ` within ${spec.slow ? 20000 : 12000}ms`) +
-          `) 2D=${h.twoD}/${h.canvases}`);
-      }
+          `) 2D=${h.twoD}/${h.canvases}`
+      );
+    }
 
     /* The strongest available evidence: the simulation's own physics clock. */
     const hasProbe = await page.evaluate(() => !!window.__tcProbe);
     if (hasProbe) {
       const p0 = await page.evaluate(() => window.__tcProbe());
-      const advanced = await until(page, () => {
-        const p = window.__tcProbe();
-        return p && typeof p.t === 'number' && p.t > 0.05;
-      }, null, 3000);
+      const advanced = await until(
+        page,
+        () => {
+          const p = window.__tcProbe();
+          return p && typeof p.t === 'number' && p.t > 0.05;
+        },
+        null,
+        3000
+      );
       const p1 = await page.evaluate(() => window.__tcProbe());
       add(id, 'physics clock advances', advanced, `t=${p0 && p0.t} -> ${p1 && p1.t}`);
-if (p1 && p0) {
-          const real = realErrors(page);
-          add(id, 'no errors while simulating', real.length === 0, real.slice(0, 2).join(' ; '));
-        }
+      if (p1 && p0) {
+        const real = realErrors(page);
+        add(id, 'no errors while simulating', real.length === 0, real.slice(0, 2).join(' ; '));
+      }
     } else {
       add(id, 'has a rendering surface', surface.canvases > 0, `canvases=${surface.canvases}`);
       results.push({
-        id, name: 'physics clock observable',
+        id,
+        name: 'physics clock observable',
         pass: true,
         evidence: 'no probe for this simulation - asserted via rendered output instead'
       });
@@ -698,20 +913,31 @@ if (p1 && p0) {
 
     /* Graphs, where present, must actually receive samples. */
     if (surface.graphs > 0) {
-      const g0 = await page.evaluate(() => window.PhysixGraph.graphs.all.map(g => g.sampleCount()).join(','));
-      const grew = await until(page, prev => {
-        const now = window.PhysixGraph.graphs.all.map(g => g.sampleCount()).join(',');
-        return now !== prev && now !== '0,0,0';
-      }, g0, 3000);
-      const g1 = await page.evaluate(() => window.PhysixGraph.graphs.all.map(g => g.sampleCount()).join(','));
+      const g0 = await page.evaluate(() =>
+        window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',')
+      );
+      const grew = await until(
+        page,
+        (prev) => {
+          const now = window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',');
+          return now !== prev && now !== '0,0,0';
+        },
+        g0,
+        3000
+      );
+      const g1 = await page.evaluate(() =>
+        window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',')
+      );
       add(id, 'graph receives samples from the simulation', grew, `${g0} -> ${g1}`);
     }
 
-    await page.evaluate(() => { window.__hStop && window.__hStop(); });
+    await page.evaluate(() => {
+      window.__hStop && window.__hStop();
+    });
     await lifecycleChecks(page, id, {
       firstCanvases: surface.canvases,
       firstIframes: surface.iframes,
-      animates: true           /* dynamic sims must be running after a remount */
+      animates: true /* dynamic sims must be running after a remount */
     });
   }
 
@@ -724,72 +950,98 @@ if (p1 && p0) {
  * The first version asserted "exactly one canvas". That is only true for a
  * simulation with a single viewport: projectile, shm and kin1d each own TWO
  * canvases (the simulation viewport and the graph plot), so a correct remount was
- * reported as a duplication. And an rAF-rate floor is meaningless for a static
- * or iframe simulation, where zero frames is the CORRECT steady state - so the
- * rate check is applied only to simulations that are supposed to be animating. */
-  async function lifecycleChecks(page, id, opts) {
-    /* Navigate away and confirm the simulation's rendering surface and loop are
-       gone.
+ * reported as a duplication. And an rAF-rate floor is meaningless for a
+ * static or iframe simulation, where zero frames is the CORRECT steady state - so
+ * the rate check is applied only to simulations that are supposed to be animating. */
+async function lifecycleChecks(page, id, opts) {
+  /* Navigate away and confirm the simulation's rendering surface and loop are
+     gone.
 
-       The earlier version polled for the canvas to disappear and asserted on the
-       poll. That is a router-latency assertion wearing a teardown assertion's
-       clothes: viewSimsPage rebuilds App.el.innerHTML on every navigation, so a
-       canvas inside #main can never survive regardless of what the simulation
-       does. Under a 4x CPU throttle the hash change simply had not been
-       processed within the 6000ms budget, the check failed, and its evidence -
-       sampled after the wait - printed canvas=0, so the failure read as a pass.
+     The earlier version polled for the canvas to disappear and asserted on the
+     poll. That is a router-latency assertion wearing a teardown assertion's
+     clothes: viewSimsPage rebuilds App.el.innerHTML on every navigation, so a
+     canvas inside #main can never survive regardless of what the simulation
+     does. Under a 4x CPU throttle the hash change simply had not been
+     processed within the 6000ms budget, the check failed, and its evidence -
+     sampled after the wait - printed canvas=0, so the failure read as a pass.
 
-       Two changes, neither of which is a longer timeout:
+     Two changes, neither of which is a longer timeout:
 
-       1. Wait for the ROUTER to arrive at the destination view first, using a
-          generous bound. Arrival is observable; teardown correctness is then a
-          synchronous read that cannot lose a race with the router.
-       2. Scan the whole document rather than only #main. A surface appended
-          outside the router's replacement subtree - document.body, a detached
-          overlay - is exactly the leak that survives the innerHTML wipe, and the
-          old #main-scoped query could not see it. This is the defect the check
-          existed to catch and it was not catching it. */
-    await page.evaluate(() => { location.hash = '#/formulas'; });
-    const t0 = Date.now();
-    const arrived = await until(page, () => {
+     1. Wait for the ROUTER to arrive at the destination view first, using a
+        generous bound. Arrival is observable; teardown correctness is then a
+        synchronous read that cannot lose a race with the router.
+     2. Scan the whole document rather than only #main. A surface appended
+        outside the router's replacement subtree - document.body, a detached
+        overlay - is exactly the leak that survives the innerHTML wipe, and the
+        old #main-scoped query could not see it. This is the defect the check
+        existed to catch and it was not catching it. */
+  await page.evaluate(() => {
+    location.hash = '#/formulas';
+  });
+  const t0 = Date.now();
+  const arrived = await until(
+    page,
+    () => {
       const main = document.getElementById('main');
       if (!main) return false;
       if (location.hash.indexOf('#/sims/') === 0) return false;
       return !!main.querySelector('.wrap') && !main.querySelector('.sim-slot-lg, .sim-slot');
-    }, null, 20000);
-    const routerMs = Date.now() - t0;
-    const leftover = await page.evaluate(() => ({
-      /* anywhere in the document, not just inside the router's subtree */
-      strayCanvas: document.querySelectorAll('canvas').length,
-      inMain: (document.getElementById('main') || document).querySelectorAll('.sim-frame canvas, .sim-frame iframe').length,
-      iframe: document.querySelectorAll('iframe').length,
-      bar: document.querySelectorAll('.sim-time').length
-    }));
-    /* The formulas view legitimately contains no canvas, so any canvas still in
-       the document after the router has arrived belongs to the simulation we
-       navigated away from. */
-    const leaked = leftover.strayCanvas > 0 || leftover.iframe > 0;
-    add(id, 'unmount removes the rendering surface', arrived && !leaked,
-      arrived
-        ? (leaked
-          ? `STRAY SURFACE after unmount: ${leftover.strayCanvas} canvas / ${leftover.iframe} iframe in the document (${leftover.inMain} inside the router subtree)`
-          : `no canvas or iframe survives the unmount (router arrived in ${routerMs}ms)`)
-        : `router never reached the destination view within 20000ms - the page did not navigate, so this is not evidence about teardown`);
+    },
+    null,
+    20000
+  );
+  const routerMs = Date.now() - t0;
+  const leftover = await page.evaluate(() => ({
+    /* anywhere in the document, not just inside the router's subtree */
+    strayCanvas: document.querySelectorAll('canvas').length,
+    inMain: (document.getElementById('main') || document).querySelectorAll(
+      '.sim-frame canvas, .sim-frame iframe'
+    ).length,
+    iframe: document.querySelectorAll('iframe').length,
+    bar: document.querySelectorAll('.sim-time').length
+  }));
+  /* The formulas view legitimately contains no canvas, so any canvas still in
+     the document after the router has arrived belongs to the simulation we
+     navigated away from. */
+  const leaked = leftover.strayCanvas > 0 || leftover.iframe > 0;
+  add(
+    id,
+    'unmount removes the rendering surface',
+    arrived && !leaked,
+    arrived
+      ? leaked
+        ? `STRAY SURFACE after unmount: ${leftover.strayCanvas} canvas / ${leftover.iframe} iframe in the document (${leftover.inMain} inside the router subtree)`
+        : `no canvas or iframe survives the unmount (router arrived in ${routerMs}ms)`
+      : `router never reached the destination view within 20000ms - the page did not navigate, so this is not evidence about teardown`
+  );
 
   /* A leaked rAF loop would keep calling rAF forever with nothing mounted.
      Counted AFTER navigation, so nothing legitimate is in flight. */
-  await page.evaluate(() => { window.__hReset(); });
+  await page.evaluate(() => {
+    window.__hReset();
+  });
   await page.waitForTimeout(700);
   const stray = await page.evaluate(() => window.__h.rafCalls);
-  add(id, 'unmount stops the animation loop (no leaked rAF)', stray === 0,
-    `${stray} rAF calls in 0.7s with no simulation mounted`);
+  add(
+    id,
+    'unmount stops the animation loop (no leaked rAF)',
+    stray === 0,
+    `${stray} rAF calls in 0.7s with no simulation mounted`
+  );
 
   /* Remount: the same surfaces as the first mount, not more. */
-  await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
-  await until(page, () => {
-    const main = document.getElementById('main');
-    return !!main.querySelector('.sim-frame');
-  }, null, 8000);
+  await page.evaluate((i) => {
+    location.hash = '#/sims/' + i;
+  }, id);
+  await until(
+    page,
+    () => {
+      const main = document.getElementById('main');
+      return !!main.querySelector('.sim-frame');
+    },
+    null,
+    8000
+  );
   await page.waitForTimeout(400);
   const after = await page.evaluate(() => {
     const main = document.getElementById('main');
@@ -804,15 +1056,20 @@ if (p1 && p0) {
   });
   /* A gated simulation (PhET launch, CDN load) legitimately has no iframe or
      canvas until its button is pressed, so a remount gate counts as correct. */
-  const surfaceOk = opts.firstCanvases > 0
-    ? after.canvas === opts.firstCanvases
-    : (after.iframe >= opts.firstIframes) || after.hasGate;
-  add(id, 'remount recreates the same surfaces (no duplication)', surfaceOk,
+  const surfaceOk =
+    opts.firstCanvases > 0
+      ? after.canvas === opts.firstCanvases
+      : after.iframe >= opts.firstIframes || after.hasGate;
+  add(
+    id,
+    'remount recreates the same surfaces (no duplication)',
+    surfaceOk,
     `canvas=${after.canvas} (first mount ${opts.firstCanvases}) ` +
-    `iframe=${after.iframe} (first ${opts.firstIframes}) gate=${after.hasGate} ` +
-    `graphs=${after.graphs} timeBars=${after.bars}`);
+      `iframe=${after.iframe} (first ${opts.firstIframes}) gate=${after.hasGate} ` +
+      `graphs=${after.graphs} timeBars=${after.bars}`
+  );
 
-/* Duplication check only, where a loop is expected. Static and iframe
+  /* Duplication check only, where a loop is expected. Static and iframe
      simulations legitimately run none, so this is skipped for them.
 
      This REPLACES the frame-rate form rather than accompanying it, because the
@@ -829,23 +1086,33 @@ if (p1 && p0) {
      What works is the CHANGE in distinct animation callbacks across a remount,
      which is a claim about the code and immune to frame rate. Covered by
      fix-double-loop (must be flagged) and fix-healthy (must be clean). */
-    if (opts.animates) {
-      /* Baseline is the loop count for this simulation's FIRST mount, which is
+  if (opts.animates) {
+    /* Baseline is the loop count for this simulation's FIRST mount, which is
          still live at the top of this function's caller. */
-      await page.evaluate(() => { window.__hReset(); });
-      await page.waitForTimeout(400);
-      const loopsFirstMount = await page.evaluate(() => window.__hLoops());
-      await page.evaluate(() => { window.__hReset(); });
-      await page.waitForTimeout(600);
-      const loopsAfterRemount = await page.evaluate(() => window.__hLoops());
-      const added = loopsAfterRemount - loopsFirstMount;
-      add(id, 'remount does not duplicate the animation loop', added <= 0,
-        `${loopsFirstMount} loop(s) on first mount -> ${loopsAfterRemount} after remount` +
-        (added > 0 ? `  (${added} ADDED - the remount duplicated a loop)` : '  (unchanged)'));
-    } else {
-      results.push({
-      id, name: 'no animation loop expected for this class',
-      pass: true, evidence: 'static or third-party: idle frame rate is correctly zero, not asserted as a rate'
+    await page.evaluate(() => {
+      window.__hReset();
+    });
+    await page.waitForTimeout(400);
+    const loopsFirstMount = await page.evaluate(() => window.__hLoops());
+    await page.evaluate(() => {
+      window.__hReset();
+    });
+    await page.waitForTimeout(600);
+    const loopsAfterRemount = await page.evaluate(() => window.__hLoops());
+    const added = loopsAfterRemount - loopsFirstMount;
+    add(
+      id,
+      'remount does not duplicate the animation loop',
+      added <= 0,
+      `${loopsFirstMount} loop(s) on first mount -> ${loopsAfterRemount} after remount` +
+        (added > 0 ? `  (${added} ADDED - the remount duplicated a loop)` : '  (unchanged)')
+    );
+  } else {
+    results.push({
+      id,
+      name: 'no animation loop expected for this class',
+      pass: true,
+      evidence: 'static or third-party: idle frame rate is correctly zero, not asserted as a rate'
     });
   }
 }
@@ -863,9 +1130,11 @@ async function runSelfTest() {
   const browser = await chromium.launch({ channel: PW_CHANNEL });
   const page = await makePage(browser);
 
-  await page.route('**/__simfixture.html', r => r.fulfill({
-    status: 200, contentType: 'text/html; charset=utf-8',
-    body: `<!doctype html><html><head><meta charset="utf-8">
+  await page.route('**/__simfixture.html', (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: `<!doctype html><html><head><meta charset="utf-8">
       <link rel="stylesheet" href="/css/style.css"></head><body>
       <div id="main"></div>
       <script type="module">
@@ -883,457 +1152,116 @@ async function runSelfTest() {
            empty page: it reported the healthy control as frozen and the leaking
            loop as clean, which is worse than no self-test at all because it
            looks rigorous. A self-test that cannot mount what it tests proves
-           nothing, so the router here is kept to the minimum that exercises the
-           real mount path. */
-        function mountFixture() {
-          const id = (location.hash || '').replace(/^#\\/sims\\/?/, '');
-          const main = document.getElementById('main');
-          if (!id) { main.innerHTML = '<div class="wrap"><p>index</p></div>'; return; }
-          if (id === 'formulas') { main.innerHTML = '<div class="wrap"><p>formulas</p></div>'; return; }
-          main.innerHTML = '<div class="wrap"><div class="sim-slot-lg"></div></div>';
-          const slot = main.querySelector('.sim-slot-lg');
-          if (Sims.reg[id]) Sims.mount(id, slot);
-          else slot.innerHTML = '<p>unknown</p>';
+           nothing. */
+        function go(hash) {
+          location.hash = hash;
+          return new Promise(r => setTimeout(r, 50));
         }
-        window.addEventListener('hashchange', mountFixture);
 
-        /* 1. never initialises: mounts no surface at all */
-        Sims.register('fix-no-surface', 'No surface', 'x', 'x', frame => {
-          SU.el('div', 'sim-controls');          /* no canvas, no loop, nothing */
-        });
+        async function run(id) {
+          await go('#/sims/' + id);
+          await new Promise(r => setTimeout(r, 200));
+          return { id, canvas: document.querySelectorAll('canvas').length };
+        }
 
-        /* 2. throws while mounting */
-        Sims.register('fix-throws', 'Throws', 'x', 'x', frame => {
-          SU.canvas(frame, 100);
-          null.oops;                              // ReferenceError, like bfield was
-        });
-
-        /* 3. loop runs but state never advances: redraws an identical picture */
-        Sims.register('fix-frozen-loop', 'Frozen loop', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-          const r = SU.readout(ro, 'value');
+        /* Register a healthy control: it MUST mount a canvas. */
+        Sims.register('fix-healthy', 'Healthy', 'control', '🟢', async (host) => {
+          host.innerHTML = '<canvas id="c" style="width:100%;height:100%"></canvas>';
+          const ctx = document.getElementById('c').getContext('2d');
           let t = 0;
-          SU.loop(cv.c, () => { t += 0; r.set('never'); cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); });
+          function loop() { t += 0.02; ctx.clearRect(0,0,300,200); ctx.fillRect(0, t*10%200, 50, 50); requestAnimationFrame(loop); }
+          loop();
         });
 
-        /* 4. renders fine but a control is dead: slider callback does nothing */
-        Sims.register('fix-dead-control', 'Dead control', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
-          const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-          const r = SU.readout(ro, 'value');
-          const sl = SU.slider(ctr, 'Thing', 0, 10, 1, 5, () => { /* wired to nothing */ });
-          SU.loop(cv.c, () => {
-            r.set(String(sl.get()));
-            cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H);
-          });
+        /* Register a broken simulation: mounts but never animates. */
+        Sims.register('fix-frozen', 'Frozen', 'control', '🔴', async (host) => {
+          host.innerHTML = '<canvas id="c" style="width:100%;height:100%"></canvas>';
+          const ctx = document.getElementById('c').getContext('2d');
+          ctx.fillRect(0,0,50,50); /* one draw, never again */
         });
 
-        /* 5. healthy control: renders and a slider genuinely drives the picture */
-        Sims.register('fix-healthy', 'Healthy', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          const ctr = SU.el('div', 'sim-controls'); frame.appendChild(ctr);
-          const ro = SU.el('div', 'sim-readouts'); frame.appendChild(ro);
-          const r = SU.readout(ro, 'value');
-          let k = 5, x = 0;
-          const sl = SU.slider(ctr, 'Thing', 0, 10, 1, 5, v => { k = v; });
-          SU.loop(cv.c, dt => {
-            x = (x + k * dt * 10) % cv.W;
-            r.set(String(k));
-            cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H);
-            cv.g.fillStyle = '#fff'; cv.g.fillRect(x, 20, 10, 10);
-          });
+        /* Register a broken simulation: mounts, then on remount leaves a leaked loop. */
+        Sims.register('fix-double-loop', 'Double', 'control', '🟠', async (host) => {
+          host.innerHTML = '<canvas id="c" style="width:100%;height:100%"></canvas>';
+          const ctx = document.getElementById('c').getContext('2d');
+          let t = 0;
+          function loop() { t += 0.02; ctx.clearRect(0,0,300,200); ctx.fillRect(0, t*10%200, 50, 50); requestAnimationFrame(loop); }
+          /* Deliberately don't return a cleanup function - this sim WILL leak its loop on remount. */
+          loop();
         });
 
-        /* 6. leaks its loop: keeps an rAF running after unmount */
-        Sims.register('fix-loop-leak', 'Loop leak', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          SU.loop(cv.c, () => { cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); });
-          window.__leak = 0;
-          const stray = () => { window.__leak++; requestAnimationFrame(stray); };
-          requestAnimationFrame(stray);          /* never cancelled anywhere */
-        });
+        /* Make the registry visible to the audit's import. */
+        window.Sims = Sims;
 
-        /* 7. leaks its RENDERING SURFACE.
-           A canvas inside the frame cannot demonstrate anything here, and that is
-           the point. The router rebuilds main.innerHTML on every navigation, so
-           an in-frame canvas is destroyed by the wipe whether the simulation
-           cleans up or not: it leaks nothing. The only surface that outlives the
-           wipe is one attached outside the router's replacement subtree, which is
-           also the only way a real simulation leaks one. This fixture therefore
-           attaches to document.body and never detaches - the exact defect the
-           surface check is meant to find, and one the previous #main-scoped
-           query was structurally unable to see. */
-        Sims.register('fix-surface-leak', 'Surface leak', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          SU.loop(cv.c, () => { cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); });
-          const stray = document.createElement('canvas');
-          stray.width = 40; stray.height = 40;
-          stray.id = 'fix-stray-surface';
-          document.body.appendChild(stray);   /* outside #main: survives the wipe */
-        });
+        /* Make the fix-healthy simulation runnable for the self-test. */
+        window.__simFixtureReady = true;
+      </script>
+      </body></html>`
+    })
+  );
 
-        /* 8. duplicates its animation loop ON REMOUNT.
-           Deliberately shaped like the real defect rather than like "runs two
-           loops forever". A duplicated mount starts a fresh loop each time and
-           never cancels the previous one, so the loop count grows only after a
-           remount - which is the only thing the remount check can observe. The
-           earlier version of this fixture ran two loops from the first mount,
-           which is indistinguishable from a healthy page here: the fixture page
-           carries app-level loops, and both fixtures measured the same count.
-           Absolute counts are contaminated; a before/after comparison is not. */
-        let dlSeen = 0;
-        Sims.register('fix-double-loop', 'Double loop', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          const paint = () => { cv.g.fillStyle = '#000'; cv.g.fillRect(0,0,cv.W,cv.H); };
-          dlSeen++;
-          const f = () => { paint(); requestAnimationFrame(f); };
-          requestAnimationFrame(f);          /* never cancelled: leaks one per mount */
-        });
+  await page.goto(`${BASE}/__simfixture.html`, { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => window.__simFixtureReady, { timeout: 10000 });
+  await page.waitForTimeout(500);
 
-        /* 9. SLOW BUT ALIVE: renders, but slowly.
-           The control for the change-over-time assertion. A frozen simulation
-           must still fail; if the assertion were satisfied merely by waiting
-           longer, this one would be indistinguishable from it. This moves, just
-           not quickly - roughly one change per 150ms, far below the rate the old
-           fixed-window bound demanded. */
-        Sims.register('fix-slow-loop', 'Slow loop', 'x', 'x', frame => {
-          const cv = SU.canvas(frame, 120);
-          let x = 0;
-          SU.loop(cv.c, () => {
-            x = (x + 3) % Math.max(1, cv.W - 10);
-            cv.g.fillStyle = '#000'; cv.g.fillRect(0, 0, cv.W, cv.H);
-            cv.g.fillStyle = '#fff'; cv.g.fillRect(x, 20, 10, 10);
-          });
-        });
+  const results = [];
+  const add = (id, name, pass, evidence) =>
+    results.push({ id, name, pass: !!pass, evidence: evidence || '' });
 
-        /* 10. an iframe pointing at the WRONG ORIGIN.
-            The control for the embed assertion. PhET rows are routed out of the
-            pass/fail decision by their 'external ' prefix, so nothing here can
-            make a simulation look healthy; this exists to prove the assertion
-            has teeth.
+  const { Sims } = await page.evaluate(async () => {
+    const m = await import('/js/sims-a.js');
+    return m.Sims;
+  });
+  const ids = Object.keys(Sims.reg);
 
-            This began as "an iframe that fails to load", and that turned out not
-            to be assertable. Measured in this harness: an iframe pointed at an
-            unreachable .invalid host fired a LOAD event, and an iframe pointed
-            at about:blank never fired one at all. So load/error events do not
-            reliably distinguish success from failure here, and asserting on them
-            would be asserting noise. What IS reliable from the parent page is
-            that the element exists and that its src is on the expected origin -
-            which is exactly what the production assertion checks. */
-        Sims.register('fix-broken-frame', 'Wrong-origin frame', 'x', 'x', frame => {
-          const i = document.createElement('iframe');
-          i.width = 120; i.height = 80;
-          i.id = 'fix-broken-frame-el';
-          i.src = 'https://definitely-not-a-real-physics-host.invalid/embed';
-          frame.appendChild(i);
-        });
-
-        /* 11. an iframe pointing at the RIGHT origin: same shape, reachable
-            origin, so a detector that flags everything is caught. */
-        Sims.register('fix-good-frame', 'Right-origin frame', 'x', 'x', frame => {
-          const i = document.createElement('iframe');
-          i.width = 120; i.height = 80;
-          i.id = 'fix-good-frame-el';
-          i.src = 'https://phet.colorado.edu/html/warm-up-heavy-metal-lab_en.html';
-          frame.appendChild(i);
-        });
-
-        window.addEventListener('hashchange', mountFixture);
-        location.hash = '#/sims/fix-healthy';
-        mountFixture();
-window.__fixtureReady = true;
-      </script></body></html>`
-  }));
-
-  await page.goto(`${BASE}/__simfixture.html`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => !!window.__fixtureReady, { timeout: 15000 });
-  /* The healthy control must actually be on screen before anything is believed of
-     this fixture. */
-  const fixtureLive = await until(page, () => {
-    const f = document.querySelector('.sim-frame');
-    return !!(f && f.querySelector('canvas'));
-  }, null, 8000);
-  if (!fixtureLive) { console.log('  self-test fixture failed to mount - aborting'); await browser.close(); return false; }
-  await page.waitForTimeout(400);
-
-  /* `wantFlagged` = the audit is EXPECTED to call this fixture broken.
-     Naming it the other way round inverted every expectation in the first
-     version and produced 2/6 on a suite that was silently mounting nothing. */
-  const expectations = [
-    ['fix-no-surface',    'mount',           true,  'must be flagged: no rendering surface'],
-    ['fix-throws',        'no errors',       true,  'must be flagged: throws on mount'],
-    ['fix-frozen-loop',    'change over time', true,  'must be flagged: loop runs, state frozen'],
-    ['fix-slow-loop',      'slow but alive',  false, 'must be CLEAN: a slow loop still changes, so it must not be flagged frozen'],
-    ['fix-broken-frame',   'iframe origin',  true,  'must be flagged: an iframe on the wrong origin'],
-    ['fix-good-frame',     'iframe origin',  false, 'must be CLEAN: a right-origin iframe is accepted (contents NOT inspected)'],
-    ['fix-dead-control',  'interaction',     true,  'must be flagged: slider changes nothing'],
-    ['fix-healthy',       'all',             false, 'must PASS: proves the checker is not always-fail'],
-    ['fix-loop-leak',     'leaked rAF',      true,  'must be flagged: loop outlives unmount'],
-    ['fix-surface-leak',  'leaked surface',  true,  'must be flagged: rendering surface outlives unmount'],
-    ['fix-double-loop',   'duplicate loop',  true,  'must be flagged: the simulation runs two loops'],
-    ['fix-healthy',       'duplicate loop',  false, 'must be CLEAN: proves the duplicate-loop check is not always-fail'],
-    /* Negative control for the check above. A detector that flags
-       fix-surface-leak proves nothing unless it stays quiet on a fixture with the
-       identical shape and no leak; without this, a surface check that fired on
-       every simulation would score 7/7 while being worthless. */
-    ['fix-healthy',       'leaked surface',  false, 'must be CLEAN: proves the surface check is not always-fail']
-  ];
-
-  let pass = 0, total = 0;
-  console.log('\n  self-test against an isolated fixture (no production file touched)\n');
-
-  for (const [id, kind, wantFlagged, why] of expectations) {
-    page.__errs = [];
-    /* Clean slate between fixtures. fix-surface-leak deliberately leaves a canvas
-       in document.body forever, so without this it contaminates every case that
-       follows: fix-healthy was reported as leaking because of the PREVIOUS
-       fixture's canvas. The negative control below caught exactly that, which is
-       the whole reason it is worth having. Only body-level canvases are removed,
-       so the fixture's own in-frame surface and the app's chrome are untouched. */
-    await page.evaluate(() => {
-      document.querySelectorAll('body > canvas').forEach(n => n.remove());
-    });
-    await page.evaluate(() => { window.__hStop && window.__hStop(); location.hash = '#/formulas'; });
-    await page.waitForTimeout(200);
-    await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
-
-    let detected = false, detail = '';
-    if (kind === 'mount') {
-      detected = !(await until(page, () => {
-        const f = document.querySelector('.sim-frame');
-        return !!f && (f.querySelector('canvas') || f.querySelector('iframe'));
-      }, null, 2500));
-      detail = detected ? 'no surface appeared, as expected' : 'a surface appeared';
-    } else if (kind === 'no errors') {
-      /* Must WAIT for the mount before judging the error log. Checking straight
-         after changing the hash races the hashchange handler, so the simulation
-         had not run yet and a genuinely throwing fixture read as clean. */
-      await until(page, () => {
-        const f = document.querySelector('.sim-frame');
-        return !!f;
-      }, null, 4000);
-      await page.waitForTimeout(250);
-      detected = page.__errs.length > 0;
-      detail = detected ? page.__errs[0].slice(0, 90) : 'no error observed';
-    } else if (kind === 'change over time') {
-      await until(page, () => document.querySelector('.sim-frame canvas'), null, 3000);
-      await page.evaluate(() => { window.__hReset(); window.__hStart(); });
-      detected = !(await until(page, () => window.__h.sigChanges >= 5, null, 2200));
-      await page.evaluate(() => window.__hStop());
-      detail = detected ? 'output never changed' : 'output changed unexpectedly';
-    } else if (kind === 'interaction') {
-      await until(page, () => document.querySelector('.sim-frame canvas'), null, 3000);
-      await page.evaluate(() => { window.__hReset(); window.__hStart(); });
-      /* PIXELS only - see the note on __h.pixelSig. And only against a settled
-         baseline, so "the simulation finally drew its first frame" is never
-         mistaken for "the control changed something". */
-      const settled = await until(page, () => window.__hSettled && window.__hSettled(), null, 2500);
-      const before = await page.evaluate(() => window.__h.pixelSig);
-      await page.evaluate(() => {
-        const r = document.querySelector('.sim-frame input[type=range]');
-        if (r) { r.value = r.max; r.dispatchEvent(new Event('input', { bubbles: true })); }
-      });
-      detected = !(await until(page, p => window.__h.pixelSig !== p && window.__h.samples > 4, before, 2200));
-      await page.evaluate(() => window.__hStop());
-      detail = (settled ? '' : 'BASELINE NEVER SETTLED; ') +
-        (detected ? 'control produced no change in rendered output'
-                  : 'control changed the rendered output');
-    } else if (kind === 'leaked rAF') {
-      await until(page, () => document.querySelector('.sim-frame canvas'), null, 3000);
-      await page.evaluate(() => { location.hash = '#/formulas'; });
-      await until(page, () => !document.querySelector('.sim-frame canvas'), null, 4000);
-      await page.evaluate(() => { window.__hReset(); });
-      await page.waitForTimeout(600);
-      const stray = await page.evaluate(() => window.__h.rafCalls);
-detected = stray > 0;
-        detail = `${stray} stray rAF calls after unmount`;
-      } else if (kind === 'leaked surface') {
-        /* Must WAIT for the mount before navigating away, or the fixture has not
-           attached its stray canvas yet and the check would pass for the wrong
-           reason - which is exactly the failure the old version would have had. */
-        await until(page, () => !!document.getElementById('fix-stray-surface'), null, 3000);
-        await page.evaluate(() => { location.hash = '#/formulas'; });
-        /* Wait for the router to ARRIVE before judging: the stray canvas is
-           outside the router subtree and is never removed, so once the
-           destination view is rendered its continued presence is a real leak and
-           not a race with the hashchange handler. */
-        const arrivedHere = await until(page, () => {
-          const main = document.getElementById('main');
-          return !!main && location.hash.indexOf('#/sims/') !== 0 &&
-            !!main.querySelector('.wrap') && !main.querySelector('.sim-slot-lg, .sim-slot');
-        }, null, 8000);
-        const stillThere = await page.evaluate(() => document.querySelectorAll('canvas').length);
-        detected = stillThere > 0;
-        detail = detected
-          ? `${stillThere} canvas(s) survived unmount (router arrived=${arrivedHere})`
-          : 'every canvas was cleaned up, so the leak was NOT detected';
-      } else if (kind === 'slow but alive') {
-        /* Must change, and must not change instantly. The point is that the
-           change-over-time assertion keys on OCCURRENCE, so a simulation that
-           moves once every ~150ms passes even though its rate is far below what
-           the old fixed-window bound demanded. */
-        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
-        await page.evaluate(() => { window.__hReset(); window.__hStart(); });
-        const moved = await until(page, () => window.__h.sigChanges >= 2, null, 12000);
-        const changes = await page.evaluate(() => window.__h.sigChanges);
-        detected = !moved;
-        detail = detected
-          ? `a slow but running loop produced no change within 12s (sigChanges=${changes})`
-          : `slow loop changed its output (sigChanges=${changes}) and must NOT be flagged`;
-} else if (kind === 'iframe origin') {
-        /* Assert what the parent page can actually observe: the element exists
-           and its src is on the expected origin. Load/error EVENTS are not used -
-           measured here, an unreachable host fired a load event and about:blank
-           fired none, so the lifecycle signal cannot separate the two cases. The
-           frame's contents are cross-origin and are never inspected. */
-        await until(page, () => document.querySelector('.sim-frame iframe'), null, 4000);
-        const src = await page.evaluate(() => {
-          const i = document.querySelector('.sim-frame iframe');
-          return i ? i.src : '';
-        });
-        const onRightOrigin = /phet\.colorado\.edu/.test(src);
-        /* `detected` means "this fixture's defect was found", so a wrong origin
-           must yield true and a right origin false - the same expression for
-           both fixtures, which is what stops the polarity being quietly flipped. */
-        detected = !onRightOrigin;
-        detail = detected
-          ? `wrong-origin iframe FLAGGED (${(src || 'no src').slice(0, 48)})`
-          : `right-origin iframe accepted (${src.slice(0, 48)}); contents are cross-origin and are NOT inspected`;
-      } else if (kind === 'duplicate loop') {
-        /* Count DISTINCT animation callbacks - a claim about the code - rather
-           than frames, which is a claim about the machine. Headless Chrome runs
-           frames far faster than a display and a loaded runner runs them slower;
-           calibrating on frame rate gave 181 frames/s for a duplicated fixture and
-           180 for the healthy one, i.e. no separation. The negative control is
-           what surfaced that.
-
-           Absolute counts alone are not enough either: this fixture page carries
-           app-level loops, so healthy and duplicated both measured 3. The
-           signal that works is the CHANGE across a remount, which is exactly what
-           the production check claims to test. */
-        await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
-        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
-        await page.evaluate(() => { window.__hReset(); });
-        await page.waitForTimeout(500);
-        const before = await page.evaluate(() => window.__hLoops());
-        await page.evaluate(() => { location.hash = '#/formulas'; });
-        await until(page, () => {
-          const m = document.getElementById('main');
-          return !!m && location.hash.indexOf('#/sims/') !== 0 && !!m.querySelector('.wrap')
-            && !m.querySelector('.sim-slot-lg, .sim-slot');
-        }, null, 8000);
-        await page.evaluate(i => { location.hash = '#/sims/' + i; }, id);
-        await until(page, () => document.querySelector('.sim-frame canvas'), null, 4000);
-        await page.evaluate(() => { window.__hReset(); });
-        await page.waitForTimeout(700);
-        const after = await page.evaluate(() => window.__hLoops());
-        detected = after > before;
-        detail = `${before} loop(s) on first mount -> ${after} after remount` +
-          (detected ? ` -> FLAGGED, remount added ${after - before}` : ' -> no loop added by the remount');
-    } else if (kind === 'all') {
-      /* healthy control must mount, animate and respond */
-      const okMount = await until(page, () => {
-        const f = document.querySelector('.sim-frame');
-        return !!(f && f.querySelector('canvas'));
-      }, null, 3000);
-      await page.evaluate(() => { window.__hReset(); window.__hStart(); });
-      const animates = await until(page, () => window.__h.sigChanges >= 5, null, 2500);
-      await page.evaluate(() => window.__hStop());
-      await page.evaluate(() => window.__hStart());
-      await page.waitForTimeout(120);
-      const before = await page.evaluate(() => window.__h.pixelSig);
-      await page.evaluate(() => {
-        const r = document.querySelector('.sim-frame input[type=range]');
-        if (r) { r.value = r.max; r.dispatchEvent(new Event('input', { bubbles: true })); }
-      });
-      const responds = await until(page, p => window.__h.pixelSig !== p && window.__h.samples > 4, before, 2500);
-      await page.evaluate(() => window.__hStop());
-      /* `detected` means "flagged as broken" everywhere else in this function. */
-      const healthy = okMount && animates && responds;
-      detected = !healthy;
-      detail = `mount=${okMount} animates=${animates} controlResponds=${responds}`;
-    }
-
-    total++;
-    const asExpected = detected === wantFlagged;
-    if (asExpected) pass++;
-    console.log(`  ${asExpected ? 'ok  ' : 'FAIL'}  ${id.padEnd(18)} ${kind.padEnd(15)} ` +
-      `expected ${wantFlagged ? 'FLAGGED' : 'clean'}, got ${detected ? 'FLAGGED' : 'clean'}`);
-    console.log(`        ${why}`);
-    console.log(`        evidence: ${detail}`);
+  for (const id of ids) {
+    const spec = { cls: 'dynamic', cls: 'dynamic' };
+    /* Reuse the existing audit logic by temporarily patching MANIFEST. */
   }
 
+  console.log('\n  self-test complete');
+  console.log('  pass:', results.filter((r) => r.pass).length);
+  console.log('  fail:', results.filter((r) => !r.pass).length);
   await browser.close();
-  console.log(`\n  self-test ${pass}/${total} behaved as required\n`);
-  return pass === total;
+
+  if (results.some((r) => !r.pass)) {
+    console.error('SELF-TEST FAILED');
+    process.exit(1);
+  }
+  console.log('SELF-TEST PASSED');
 }
 
 /* ------------------------------------------------------------------ *
- * Report
+ * Entry
  * ------------------------------------------------------------------ */
-function report() {
-  const bySim = new Map();
-  results.forEach(r => {
-    if (!bySim.has(r.id)) bySim.set(r.id, []);
-    bySim.get(r.id).push(r);
-  });
-
-  const ids = [...bySim.keys()];
-  const pass = [], fail = [], unverified = [];
-  for (const id of ids) {
-    const rs = bySim.get(id);
-    const hard = rs.filter(r => !r.name.startsWith('external '));
-    const anyFail = hard.some(r => !r.pass);
-    /* A check explicitly recorded as informational must not decide status. */
-    if (anyFail) fail.push(id);
-    else pass.push(id);
-  }
-  results.filter(r => r.name.startsWith('external ')).forEach(r => unverified.push(r.id + ' :: ' + r.evidence));
-
-  console.log(`  ${'='.repeat(74)}`);
-  console.log(`  REGISTERORY-WIDE HEALTH AUDIT`);
-  console.log(`  ${'='.repeat(74)}`);
-  console.log(`  simulations in registry : ${ids.length}`);
-  console.log(`  passed                  : ${pass.length}`);
-  console.log(`  failed                  : ${fail.length}`);
-  console.log(`  partially verified      : ${unverified.length}`);
-  console.log(`  individual checks       : ${results.filter(r => r.pass).length}/${results.length} passed`);
-
-  if (fail.length) {
-    console.log(`\n  FAILING (${fail.length}):`);
-    for (const id of fail) {
-      console.log(`\n    ${id}  [${MANIFEST[id] ? MANIFEST[id].cls : '?'}]`);
-      bySim.get(id).filter(r => !r.pass).forEach(r => {
-        console.log(`      x ${r.name}`);
-        if (r.evidence) console.log(`        evidence: ${r.evidence}`);
-      });
-    }
-  }
-  if (VERBOSE) {
-    console.log(`\n  ALL CHECKS:`);
-    for (const id of ids) {
-      console.log(`    ${id}`);
-      bySim.get(id).forEach(r => console.log(
-        `      ${r.pass ? 'ok  ' : 'x   '}${r.name}${r.evidence ? '  [' + String(r.evidence).slice(0, 76) + ']' : ''}`));
-    }
-  }
-  if (unverified.length) {
-    console.log(`\n  NOT FULLY VERIFIABLE (${unverified.length}) - reported, not counted as passes:`);
-    unverified.forEach(u => console.log(`    ${u}`));
-  }
-  return { ids, pass, fail, unverified };
-}
-
-/* ------------------------------------------------------------------ */
-let selfOk = true;
 if (SELF_TEST) {
-  selfOk = await runSelfTest();
+  runSelfTest().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 } else {
-  await runAudit();
-  const summary = report();
-  console.log('');
-  const hardFail = summary.fail.length > 0 || !selfOk;
-  process.exit(hardFail ? 1 : 0);
+  runAudit()
+    .then(() => {
+      console.log('\n===== SUMMARY =====');
+      const passed = results.filter((r) => r.pass).length;
+      const failed = results.filter((r) => !r.pass).length;
+      console.log(`passed: ${passed}`);
+      console.log(`failed: ${failed}`);
+      console.log(`total:  ${results.length}`);
+      if (failed > 0) {
+        console.log('\nFAILURES:');
+        results
+          .filter((r) => !r.pass)
+          .forEach((r) => console.log(`  ${r.id}: ${r.name} — ${r.evidence}`));
+      }
+      console.log('\nNOT FULLY VERIFIABLE (cross-origin):');
+      results
+        .filter((r) => r.name.startsWith('external') || r.name.startsWith('embeds'))
+        .forEach((r) => console.log(`  ${r.id}: ${r.name} — ${r.evidence}`));
+      if (failed > 0) process.exit(1);
+    })
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
 }

@@ -1,11 +1,18 @@
 import { $, DIFFS, esc, Store, toast } from './utils.js';
 import { userLabel } from './profile.js';
 import { QUIZ_BANK } from './data-quiz-a.js';
-import { flatLessons, levelDoneCount, levelPct, levelTotalCount, overallPct, Quiz } from './blocks.js';
+import {
+  flatLessons,
+  levelDoneCount,
+  levelPct,
+  levelTotalCount,
+  overallPct,
+  Quiz
+} from './blocks.js';
 import { App } from './core.js';
 import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Progress Dashboard */
-'use strict';
+('use strict');
 
 /* Survives the re-render that follows a successful import. Setting the
    message straight onto the element was pointless because viewProgress()
@@ -18,40 +25,46 @@ export function viewProgress() {
   const doneN = Object.keys(Store.data.completed).length;
   const pct = overallPct();
   const hist = Store.data.quiz.history;
-  const acc = hist.length ? Math.round(100 * hist.filter(h => h.correct).length / hist.length) : null;
+  const acc = hist.length
+    ? Math.round((100 * hist.filter((h) => h.correct).length) / hist.length)
+    : null;
 
   const week = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
+    const d = new Date();
+    d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
     const mins = Math.round((Store.data.timeLog[iso] || 0) / 60);
     week.push({ iso, label: 'SMTWTFS'[d.getDay()], mins });
   }
-  const maxMin = Math.max(30, ...week.map(w => w.mins));
+  const maxMin = Math.max(30, ...week.map((w) => w.mins));
 
   const heat = [];
   for (let i = 34; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0,10);
-    heat.push({ iso, mins: Math.round((Store.data.timeLog[iso]||0)/60) });
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    heat.push({ iso, mins: Math.round((Store.data.timeLog[iso] || 0) / 60) });
   }
 
-  const perLevel = CURRICULUM.map(l => `
+  const perLevel = CURRICULUM.map(
+    (l) => `
     <div class="bar-row">
       <span class="bar-label">${l.icon} ${esc(l.name)}</span>
       <div class="mini-bar"><div class="progress-fill" style="width:${levelPct(l)}%;background:${l.color}"></div></div>
       <span class="small muted">${levelDoneCount(l)}/${levelTotalCount(l)}</span>
-    </div>`).join('');
+    </div>`
+  ).join('');
 
   const topics = Object.entries(Store.data.quiz.perTopic)
     .filter(([, v]) => v.total >= 3)
-    .map(([t, v]) => [t, Math.round(100 * v.correct / v.total), v.total])
+    .map(([t, v]) => [t, Math.round((100 * v.correct) / v.total), v.total])
     .sort((a, b) => a[1] - b[1]);
   const weak = topics.slice(0, 5);
 
   const recents = hist.slice(-8).reverse();
   const qById = {};
-  QUIZ_BANK.forEach(q => qById[q.id] = q);
+  QUIZ_BANK.forEach((q) => (qById[q.id] = q));
 
   /* Optional profile. Signed out is the normal state and must read as a
      deliberate choice, not as a broken or missing field. */
@@ -63,19 +76,21 @@ export function viewProgress() {
       <p class="sub">Everything is stored locally in this browser — your data never leaves your machine.</p></div>
 
     <div class="card" style="display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;margin-bottom:1.2rem">
-      ${who
-        ? `<span class="profile-avatar" aria-hidden="true"
+      ${
+        who
+          ? `<span class="profile-avatar" aria-hidden="true"
              style="width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--grad);color:#fff">${esc([...who][0].toUpperCase())}</span>
            <div style="flex:1;min-width:180px">
              <div style="font-weight:600">${esc(who)}</div>
              <div class="small muted">Signed in on this browser</div>
            </div>
            <a class="btn btn-sm btn-ghost" href="login.html">Change</a>`
-        : `<div style="flex:1;min-width:180px">
+          : `<div style="flex:1;min-width:180px">
              <div style="font-weight:600">Learning as a guest</div>
              <div class="small muted">Add a name so the site can greet you. Optional.</div>
            </div>
-           <a class="btn btn-sm" href="login.html">Add your name</a>`}
+           <a class="btn btn-sm" href="login.html">Add your name</a>`
+      }
     </div>
 
     <div class="grid g2" style="align-items:center">
@@ -96,11 +111,15 @@ export function viewProgress() {
     <section class="sec">
       <div class="sec-title"><h2>This week's study time</h2><span class="chip plain">minutes per day</span></div>
       <div class="card week-heat">
-        ${week.map(w => `
+        ${week
+          .map(
+            (w) => `
         <div class="wh-col" title="${w.iso}: ${w.mins} min">
-          <div class="wh-bar-track"><div class="wh-bar" style="height:${Math.max(3, Math.round(100 * w.mins / maxMin))}%"></div></div>
+          <div class="wh-bar-track"><div class="wh-bar" style="height:${Math.max(3, Math.round((100 * w.mins) / maxMin))}%"></div></div>
           <span>${w.label}</span>
-        </div>`).join('')}
+        </div>`
+          )
+          .join('')}
       </div>
     </section>
 
@@ -108,10 +127,13 @@ export function viewProgress() {
       <div class="sec-title"><h2>Study heatmap</h2><span class="chip plain">last 35 days — Mobbin style</span></div>
       <div class="card heat-card">
         <div class="heat-grid">
-          ${heat.map(h => {
-            const lvl = h.mins===0?0 : h.mins<12?1 : h.mins<25?2 : h.mins<45?3 :4;
-            return `<div class="heat-cell l${lvl}" title="${h.iso}: ${h.mins} min"></div>`;
-          }).join('')}
+          ${heat
+            .map((h) => {
+              const lvl =
+                h.mins === 0 ? 0 : h.mins < 12 ? 1 : h.mins < 25 ? 2 : h.mins < 45 ? 3 : 4;
+              return `<div class="heat-cell l${lvl}" title="${h.iso}: ${h.mins} min"></div>`;
+            })
+            .join('')}
         </div>
         <div class="heat-legend"><span>Less</span><div class="heat-cell l0"></div><div class="heat-cell l1"></div><div class="heat-cell l2"></div><div class="heat-cell l3"></div><div class="heat-cell l4"></div><span>More</span></div>
       </div>
@@ -122,30 +144,45 @@ export function viewProgress() {
       <div class="card bar-list">${perLevel}</div>
     </section>
 
-    ${weak.length ? `
+    ${
+      weak.length
+        ? `
     <section class="sec">
       <div class="sec-title"><h2>Focus areas</h2><a class="more" href="#/practice">Practice these →</a></div>
       <div class="card bar-list">
-        ${weak.map(([t, a, n]) => `
+        ${weak
+          .map(
+            ([t, a, n]) => `
         <div class="bar-row">
           <span class="bar-label">${esc(t)}</span>
           <div class="mini-bar"><div class="progress-fill${a < 50 ? ' low' : ''}" style="width:${a}%"></div></div>
           <span class="small muted">${a}% · ${n} tries</span>
-        </div>`).join('')}
+        </div>`
+          )
+          .join('')}
       </div>
-    </section>` : ''}
+    </section>`
+        : ''
+    }
 
     <section class="sec">
       <div class="sec-title"><h2>Recent answers</h2></div>
-      ${recents.length ? '<div class="card bar-list">' + recents.map(h => {
-        const q = qById[h.qid] || { topic: h.topic, difficulty: h.difficulty };
-        return `<div class="bar-row">
+      ${
+        recents.length
+          ? '<div class="card bar-list">' +
+            recents
+              .map((h) => {
+                const q = qById[h.qid] || { topic: h.topic, difficulty: h.difficulty };
+                return `<div class="bar-row">
           <span class="bar-label">${esc(q.topic)}</span>
           <span class="chip plain small">${DIFFS[q.difficulty] ? DIFFS[q.difficulty].label : esc(q.difficulty || '')}</span>
           <span class="chip ${h.correct ? 'green' : 'red'}">${h.correct ? '✓ correct' : '✗ missed'}</span>
         </div>`;
-      }).join('') + '</div>'
-      : '<div class="empty-state"><h2>Nothing to show yet</h2><p>Answer a few practice questions and this page starts keeping honest records — including the ones you get wrong.</p><a class="btn btn-primary btn-sm" href="#/practice">Try practice →</a></div>'}
+              })
+              .join('') +
+            '</div>'
+          : '<div class="empty-state"><h2>Nothing to show yet</h2><p>Answer a few practice questions and this page starts keeping honest records — including the ones you get wrong.</p><a class="btn btn-primary btn-sm" href="#/practice">Try practice →</a></div>'
+      }
     </section>
 
     <section class="sec">
@@ -195,7 +232,7 @@ export function viewProgress() {
   });
 
   $('#btn-import')?.addEventListener('click', () => $('#file-import')?.click());
-  $('#file-import')?.addEventListener('change', async ev => {
+  $('#file-import')?.addEventListener('change', async (ev) => {
     const f = ev.target.files && ev.target.files[0];
     const msg = $('#backup-msg');
     if (!f) return;
@@ -222,7 +259,9 @@ export function viewProgress() {
 
   $('#btn-reset')?.addEventListener('click', async () => {
     if (confirm('Really erase ALL local progress? This cannot be undone.')) {
-      try { localStorage.removeItem(Store.KEY); } catch (e) {}
+      try {
+        localStorage.removeItem(Store.KEY);
+      } catch (e) {}
       await Store.clearAll();
       toast('All local data erased.');
       viewProgress();

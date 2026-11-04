@@ -27,7 +27,9 @@ function copyVerbatim() {
   let outDir = 'dist';
   return {
     name: 'copy-verbatim',
-    configResolved(cfg) { outDir = cfg.build.outDir; },
+    configResolved(cfg) {
+      outDir = cfg.build.outDir;
+    },
     closeBundle() {
       for (const dir of VERBATIM) {
         const from = path.resolve(dir);
@@ -74,7 +76,7 @@ export default defineConfig({
       // html5-sims/, and an empty document is not a valid input.
       input: {
         index: 'index.html',
-        '404': '404.html',
+        404: '404.html',
         privacy: 'privacy.html',
         terms: 'terms.html',
         login: 'login.html',

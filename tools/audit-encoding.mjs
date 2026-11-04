@@ -18,24 +18,64 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SKIP = new Set(['node_modules', 'dist', 'graphify-out', 'release', 'astra', 'electron', '.git', '.shots', 'downloads']);
+const SKIP = new Set([
+  'node_modules',
+  'dist',
+  'graphify-out',
+  'release',
+  'astra',
+  'electron',
+  '.git',
+  '.shots',
+  'downloads'
+]);
 const EXTS = new Set(['.js', '.html', '.css', '.json', '.md', '.mjs', '.cjs', '.txt', '.svg']);
 
 /* Markers of text that was decoded as cp1252/latin1 and then saved as UTF-8.
    These are valid UTF-8, so a strict decoder will not flag them. */
 const MOJIBAKE = [
-  'â€™', 'â€œ', 'â€\u009d', 'â€¦', 'â€“', 'â€”', 'â€˜', 'â€¦',
-  'Ã©', 'Ã¨', 'Ã¼', 'Ã¶', 'Ã¤', 'Ã±', 'Ã¢', 'Ã¯', 'Ã³',
-  'Â°', 'Â·', 'Â«', 'Â»', 'Â±', 'Â½', 'Âµ', 'Â§', 'Â£', 'Â©', 'Â®', 'â„¢',
-  'ðŸ', 'ï¿½', 'Ã\x83', 'Ã\x82'
+  'â€™',
+  'â€œ',
+  'â€\u009d',
+  'â€¦',
+  'â€“',
+  'â€”',
+  'â€˜',
+  'â€¦',
+  'Ã©',
+  'Ã¨',
+  'Ã¼',
+  'Ã¶',
+  'Ã¤',
+  'Ã±',
+  'Ã¢',
+  'Ã¯',
+  'Ã³',
+  'Â°',
+  'Â·',
+  'Â«',
+  'Â»',
+  'Â±',
+  'Â½',
+  'Âµ',
+  'Â§',
+  'Â£',
+  'Â©',
+  'Â®',
+  'â„¢',
+  'ðŸ',
+  'ï¿½',
+  'Ã\x83',
+  'Ã\x82'
 ];
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (e.name.startsWith('.') && e.name !== '.gitignore') continue;
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(p, out); }
-    else if (EXTS.has(path.extname(e.name).toLowerCase())) out.push(p);
+    if (e.isDirectory()) {
+      if (!SKIP.has(e.name)) walk(p, out);
+    } else if (EXTS.has(path.extname(e.name).toLowerCase())) out.push(p);
   }
   return out;
 }
@@ -48,13 +88,16 @@ const SELF = new Set(['tools/audit-encoding.mjs', 'tools/fix-mojibake.mjs']);
 
 const files = walk(ROOT);
 const rows = [];
-let invalidTotal = 0, fffdTotal = 0, mojiTotal = 0;
+let invalidTotal = 0,
+  fffdTotal = 0,
+  mojiTotal = 0;
 
 for (const f of files) {
   const buf = fs.readFileSync(f);
   const rel = path.relative(ROOT, f).replace(/\\/g, '/');
 
-  let invalid = 0, text;
+  let invalid = 0,
+    text;
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
   } catch {
@@ -63,12 +106,14 @@ for (const f of files) {
     invalid = (text.match(/\uFFFD/g) || []).length;
   }
   const fffd = (text.match(/\uFFFD/g) || []).length;
-  const hits = MOJIBAKE.filter(m => text.includes(m));
+  const hits = MOJIBAKE.filter((m) => text.includes(m));
   const nMoji = hits.reduce((n, m) => n + text.split(m).length - 1, 0);
 
   if ((invalid || fffd || nMoji) && !SELF.has(rel)) {
     rows.push({ rel, invalid, fffd, nMoji, hits });
-    invalidTotal += invalid; fffdTotal += fffd; mojiTotal += nMoji;
+    invalidTotal += invalid;
+    fffdTotal += fffd;
+    mojiTotal += nMoji;
   }
 }
 
@@ -76,15 +121,19 @@ console.log(`  scanned ${files.length} files\n`);
 if (!rows.length) {
   console.log('  CLEAN: no encoding damage anywhere');
 } else {
-  rows.sort((a, b) => (b.invalid + b.fffd + b.nMoji) - (a.invalid + a.fffd + a.nMoji));
+  rows.sort((a, b) => b.invalid + b.fffd + b.nMoji - (a.invalid + a.fffd + a.nMoji));
   for (const r of rows) {
     const tags = [
       r.invalid ? `invalid-utf8:${r.invalid}` : '',
       r.fffd ? `U+FFFD:${r.fffd}` : '',
       r.nMoji ? `mojibake:${r.nMoji}` : ''
-    ].filter(Boolean).join('  ');
+    ]
+      .filter(Boolean)
+      .join('  ');
     console.log(`  ${r.rel}\n      ${tags}${r.hits.length ? '  [' + r.hits.join(' ') + ']' : ''}`);
   }
-  console.log(`\n  TOTALS  invalid-utf8=${invalidTotal}  U+FFFD=${fffdTotal}  mojibake=${mojiTotal}`);
+  console.log(
+    `\n  TOTALS  invalid-utf8=${invalidTotal}  U+FFFD=${fffdTotal}  mojibake=${mojiTotal}`
+  );
 }
 console.log(`\n${JSON.stringify({ invalidTotal, fffdTotal, mojiTotal })}`);

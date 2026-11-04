@@ -4,8 +4,13 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 
@@ -22,34 +27,53 @@ async function shot(name, vw, vh, setup) {
   /* Clicking a control scrolls the scrollable panel to bring it into view,
      which made the reservoir sliders vanish from the mobile screenshots. That
      was the capture script's doing, not the layout's. */
-  await page.evaluate(() => { const p = document.querySelector('.panel'); if (p) p.scrollTop = 0; });
-  if (setup) { await setup(page); await page.evaluate(() => { const p = document.querySelector('.panel'); if (p) p.scrollTop = 0; }); }
+  await page.evaluate(() => {
+    const p = document.querySelector('.panel');
+    if (p) p.scrollTop = 0;
+  });
+  if (setup) {
+    await setup(page);
+    await page.evaluate(() => {
+      const p = document.querySelector('.panel');
+      if (p) p.scrollTop = 0;
+    });
+  }
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${OUT}/${name}.png` });
   console.log(`  wrote ${OUT}/${name}.png  (${vw}x${vh})`);
   await page.close();
 }
 
-const set = (id, v) => async page => {
-  await page.evaluate(([i, val]) => {
-    const e = document.getElementById(i); e.value = String(val);
-    e.dispatchEvent(new Event('input', { bubbles: true }));
-  }, [id, v]);
+const set = (id, v) => async (page) => {
+  await page.evaluate(
+    ([i, val]) => {
+      const e = document.getElementById(i);
+      e.value = String(val);
+      e.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    [id, v]
+  );
 };
 
-await shot('thermo-default-desktop', 1440, 900, async p => { await p.click('#bGo'); });
-await shot('thermo-hot-carnot', 1440, 900, async p => {
+await shot('thermo-default-desktop', 1440, 900, async (p) => {
   await p.click('#bGo');
-  await set('sTh', 1100)(p); await set('sTc', 300)(p);
 });
-await shot('thermo-lossy', 1440, 900, async p => {
+await shot('thermo-hot-carnot', 1440, 900, async (p) => {
+  await p.click('#bGo');
+  await set('sTh', 1100)(p);
+  await set('sTc', 300)(p);
+});
+await shot('thermo-lossy', 1440, 900, async (p) => {
   await p.click('#bGo');
   await set('sIr', 0.9)(p);
 });
-await shot('thermo-mobile', 390, 844, async p => { await p.click('#bGo'); });
-await shot('thermo-mobile-wide-range', 390, 844, async p => {
+await shot('thermo-mobile', 390, 844, async (p) => {
   await p.click('#bGo');
-  await set('sTh', 1200)(p); await set('sTc', 200)(p);
+});
+await shot('thermo-mobile-wide-range', 390, 844, async (p) => {
+  await p.click('#bGo');
+  await set('sTh', 1200)(p);
+  await set('sTc', 200)(p);
 });
 
 await browser.close();

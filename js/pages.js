@@ -5,8 +5,15 @@ import { flatLessons, mdInline, Quiz } from './blocks.js';
 import { App } from './core.js';
 import { Tutor } from './tutor.js';
 import { CURRICULUM } from './data-core.js';
+import { ensureAll } from './sims-loader.js';
 /* PhysiX Academy — Pages: Practice sessions, Simulations gallery, AI Tutor page */
-'use strict';
+('use strict');
+
+/* Global promise that resolves when all sim modules are loaded */
+window.__SimsReady = ensureAll();
+
+/* Global promise that resolves when all sim modules are loaded */
+window.__SimsReady = ensureAll();
 
 /* ---------------- Practice ---------------- */
 const Session = { qs: [], i: 0, correct: 0, misses: [] };
@@ -19,13 +26,32 @@ export function viewPractice() {
       <p class="sub">Every question explains itself after you answer. Wrong answers teach more than right ones — we wrote extra explanations for them.</p></div>
     <div class="card" style="max-width:640px">
       <h3>Build a session</h3>
-      <div class="pills" id="p-lvl">${['all', ...CURRICULUM.map(l => l.id)].map((p, i) => {
-        const l = CURRICULUM.find(x => x.id === p);
-        return '<button class="pill' + (i === 0 ? ' active' : '') + '" data-v="' + p + '">' + (l ? l.icon + ' ' + esc(l.name) : 'Any level') + '</button>';
-      }).join('')}</div>
-      <div class="pills" style="margin-top:.5rem" id="p-diff">${diffs.map((d, i) =>
-        '<button class="pill' + (i === 0 ? ' active' : '') + '" data-v="' + d + '">' +
-        (d === 'any' ? 'Any difficulty' : DIFFS[d].dot + ' ' + DIFFS[d].label) + '</button>').join('')}</div>
+      <div class="pills" id="p-lvl">${['all', ...CURRICULUM.map((l) => l.id)]
+        .map((p, i) => {
+          const l = CURRICULUM.find((x) => x.id === p);
+          return (
+            '<button class="pill' +
+            (i === 0 ? ' active' : '') +
+            '" data-v="' +
+            p +
+            '">' +
+            (l ? l.icon + ' ' + esc(l.name) : 'Any level') +
+            '</button>'
+          );
+        })
+        .join('')}</div>
+      <div class="pills" style="margin-top:.5rem" id="p-diff">${diffs
+        .map(
+          (d, i) =>
+            '<button class="pill' +
+            (i === 0 ? ' active' : '') +
+            '" data-v="' +
+            d +
+            '">' +
+            (d === 'any' ? 'Any difficulty' : DIFFS[d].dot + ' ' + DIFFS[d].label) +
+            '</button>'
+        )
+        .join('')}</div>
       <div class="btn-row" style="margin-top:1rem">
         <label class="muted small">Questions:
           <select id="p-count" style="background:var(--panel2);border:1px solid var(--card-brd);color:var(--txt);border-radius:8px;padding:.4rem .6rem;margin-left:.4rem">
@@ -33,34 +59,59 @@ export function viewPractice() {
           </select></label>
         <button class="btn btn-primary" id="p-start">Start session →</button>
       </div>
-      ${Store.data.quiz.history.length ? '<hr class="divider"><p class="small muted mb0">So far: <b>' + Store.data.solved + '</b> answers · accuracy <b>' +
-        Math.round(100 * Store.data.quiz.history.filter(h => h.correct).length / Store.data.quiz.history.length) + '%</b></p>' : ''}
+      ${
+        Store.data.quiz.history.length
+          ? '<hr class="divider"><p class="small muted mb0">So far: <b>' +
+            Store.data.solved +
+            '</b> answers · accuracy <b>' +
+            Math.round(
+              (100 * Store.data.quiz.history.filter((h) => h.correct).length) /
+                Store.data.quiz.history.length
+            ) +
+            '%</b></p>'
+          : ''
+      }
     </div>
     <div id="session-zone"></div>
   </div>`;
 
-  const pick = zone => {
-    $$('.pill', zone).forEach(p => p.addEventListener('click', () => {
-      $$('.pill', zone).forEach(x => x.classList.remove('active'));
-      p.classList.add('active');
-    }));
+  const pick = (zone) => {
+    $$('.pill', zone).forEach((p) =>
+      p.addEventListener('click', () => {
+        $$('.pill', zone).forEach((x) => x.classList.remove('active'));
+        p.classList.add('active');
+      })
+    );
   };
-  pick($('#p-lvl')); pick($('#p-diff'));
-  const activeVal = zone => { const a = $('.pill.active', zone); return a ? a.dataset.v : 'all'; };
+  pick($('#p-lvl'));
+  pick($('#p-diff'));
+  const activeVal = (zone) => {
+    const a = $('.pill.active', zone);
+    return a ? a.dataset.v : 'all';
+  };
 
   $('#p-start').addEventListener('click', () => {
-    const lvl = activeVal($('#p-lvl')), diff = activeVal($('#p-diff'));
+    const lvl = activeVal($('#p-lvl')),
+      diff = activeVal($('#p-diff'));
     let pool = QUIZ_BANK.slice();
     if (lvl !== 'all') {
-      const level = CURRICULUM.find(l => l.id === lvl);
-      const ids = new Set(level.chapters.flatMap(c => c.lessons.flatMap(ls =>
-        ls.content.filter(b => b.quiz).flatMap(b => b.quiz))));
-      pool = pool.filter(q => ids.has(q.id));
+      const level = CURRICULUM.find((l) => l.id === lvl);
+      const ids = new Set(
+        level.chapters.flatMap((c) =>
+          c.lessons.flatMap((ls) => ls.content.filter((b) => b.quiz).flatMap((b) => b.quiz))
+        )
+      );
+      pool = pool.filter((q) => ids.has(q.id));
     }
-    if (diff !== 'any') pool = pool.filter(q => q.difficulty === diff);
-    if (!pool.length) { toast('No questions match that filter — widen it a little.', 'bad'); return; }
+    if (diff !== 'any') pool = pool.filter((q) => q.difficulty === diff);
+    if (!pool.length) {
+      toast('No questions match that filter — widen it a little.', 'bad');
+      return;
+    }
     Session.qs = pool.sort(() => Math.random() - 0.5).slice(0, +$('#p-count').value);
-    Session.i = 0; Session.correct = 0; Session.misses = [];
+    Session.i = 0;
+    Session.correct = 0;
+    Session.misses = [];
     renderQ();
     $('#session-zone').scrollIntoView({ behavior: 'smooth' });
   });
@@ -74,14 +125,18 @@ export function viewPractice() {
         <b>Question ${Session.i + 1}/${Session.qs.length}</b>
         <span class="sb-score">Score ${Session.correct}</span>
       </div><div id="q-here"></div>`;
-    Quiz.renderOne($('#q-here'), q, ok => {
-      if (!ok) Session.misses.push(q.topic); else Session.correct++;
+    Quiz.renderOne($('#q-here'), q, (ok) => {
+      if (!ok) Session.misses.push(q.topic);
+      else Session.correct++;
       $('.sb-score', zone).textContent = 'Score ' + Session.correct;
       const nextBtn = document.createElement('button');
       nextBtn.className = 'btn btn-primary btn-sm';
       nextBtn.style.margin = '.8rem 0';
       nextBtn.textContent = Session.i + 1 >= Session.qs.length ? 'See results' : 'Next question →';
-      nextBtn.addEventListener('click', () => { Session.i++; renderQ(); });
+      nextBtn.addEventListener('click', () => {
+        Session.i++;
+        renderQ();
+      });
       $('#q-here').appendChild(nextBtn);
       Tex.render($('#q-here'));
     });
@@ -89,9 +144,11 @@ export function viewPractice() {
   }
 
   function finish(zone) {
-    const pct = Math.round(100 * Session.correct / Session.qs.length);
-    const worst = Session.misses.sort((a, b) =>
-      Session.misses.filter(x => x === b).length - Session.misses.filter(x => x === a).length)[0];
+    const pct = Math.round((100 * Session.correct) / Session.qs.length);
+    const worst = Session.misses.sort(
+      (a, b) =>
+        Session.misses.filter((x) => x === b).length - Session.misses.filter((x) => x === a).length
+    )[0];
     zone.innerHTML = `
       <div class="card center">
         <h2>${pct >= 80 ? 'Excellent.' : pct >= 50 ? 'Solid.' : 'Not yet — go again.'}</h2>
@@ -108,41 +165,66 @@ export function viewPractice() {
 }
 
 /* ---------------- Simulations ---------------- */
-export function viewSimsPage(id) {
+
+export async function viewSimsPage(id) {
+  console.log('[viewSimsPage] called with id:', id, 'Sims.reg[id]:', !!Sims.reg[id]);
   if (id && Sims.reg[id]) {
     const d = Sims.reg[id];
-    const usedIn = flatLessons().filter(e => e.lesson.content.some(b => b.sim === id));
+    const usedIn = flatLessons().filter((e) => e.lesson.content.some((b) => b.sim === id));
     App.el.innerHTML = `
     <div class="wrap">
       <div class="page-head"><a class="small" href="#/sims">‹ All simulations</a>
         <h1>${d.icon} ${esc(d.title)}</h1><p class="sub">${esc(d.desc)}</p></div>
       <div class="sim-slot-lg"></div>
-      ${usedIn.length ? '<p class="small muted">Used in: ' + usedIn.map(e =>
-        '<a href="#/lesson/' + e.lesson.id + '">' + esc(e.chapter.title) + '</a>').join(' · ') + '</p>' : ''}
+      ${
+        usedIn.length
+          ? '<p class="small muted">Used in: ' +
+            usedIn
+              .map((e) => '<a href="#/lesson/' + e.lesson.id + '">' + esc(e.chapter.title) + '</a>')
+              .join(' · ') +
+            '</p>'
+          : ''
+      }
     </div>`;
-    Sims.mount(id, $('.sim-slot-lg', App.el));
+    await Sims.mount(id, $('.sim-slot-lg', App.el));
     return;
   }
-    const items = Object.values(Sims.reg);
-    /* Standalone pages under /html5-sims/. These are whole documents rather
+  /* Ensure all sim modules are loaded for the catalogue view */
+  await ensureAll();
+  const items = Object.values(Sims.reg);
+  /* Standalone pages under /html5-sims/. These are whole documents rather
        than Sims.register() modules, so they open as normal navigations. */
-    const threeD = (window.Sims3D || []);
-    App.el.innerHTML = `
+  const threeD = window.Sims3D || [];
+  App.el.innerHTML = `
     <div class="wrap">
       <div class="page-head"><h1>Simulations</h1>
       <p class="sub">Physics you can poke. Every simulation runs live in your browser &mdash; drag the sliders and watch the equations respond.</p></div>
-      ${items.length ? '<div class="grid g3">' + items.map(d => `
+      ${
+        items.length
+          ? '<div class="grid g3">' +
+            items
+              .map(
+                (d) => `
         <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
           ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">dYs? Official PhET</em></div>' : ''}
           <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
           <p class="muted">${esc(d.desc)}</p>
           <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open &rarr;</a></div>
-        </div>`).join('') + '</div>'
-        : '<div class="empty-state"><div class="big">dY"</div><p>No simulations registered yet.</p></div>'}
-      ${threeD.length ? `
+        </div>`
+              )
+              .join('') +
+            '</div>'
+          : '<div class="empty-state"><div class="big">dY"</div><p>No simulations registered yet.</p></div>'
+      }
+      ${
+        threeD.length
+          ? `
       <div class="sec-title" style="margin-top:34px"><h2>Standalone 3D set</h2>
         <a class="more" href="/html5-sims/index.html">All ${threeD.length} &rarr;</a></div>
-      <div class="grid g3">` + threeD.map(d => `
+      <div class="grid g3">` +
+            threeD
+              .map(
+                (d) => `
         <div class="card hover topic-card">
           <h3>${d.i} ${esc(d.t)}</h3>
           <p class="muted">${esc(d.d)}</p>
@@ -150,15 +232,20 @@ export function viewSimsPage(id) {
             <a class="btn btn-sm btn-primary" href="/html5-sims/${d.f}">Open &rarr;</a>
           </div>
           <code style="font-size:10px;opacity:.5">${d.f}</code>
-        </div>`).join('') + '</div>' : ''}
+        </div>`
+              )
+              .join('') +
+            '</div>'
+          : ''
+      }
     </div>`;
-  }
+}
 
 /* ---------------- Tutor page ---------------- */
 export function viewTutorPage() {
   // Load conversation history
   Tutor.loadHistory();
-  
+
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>PhysiX Tutor</h1>
@@ -197,7 +284,7 @@ export function viewTutorPage() {
     const m = document.createElement('div');
     m.className = 'msg ' + cls;
     let content = (tag ? '<span class="msg-tag">' + tag + '</span>' : '') + html;
-    
+
     // Add action buttons to AI messages
     if (addActions && cls === 'ai') {
       content += `<div class="msg-actions">
@@ -209,28 +296,31 @@ export function viewTutorPage() {
         </button>
       </div>`;
     }
-    
+
     m.innerHTML = content;
     log.appendChild(m);
     log.scrollTop = log.scrollHeight;
     Tex.render(m);
-    
+
     // Attach event listeners to action buttons
     if (addActions && cls === 'ai') {
       const copyBtn = m.querySelector('[data-action="copy"]');
       const regenBtn = m.querySelector('[data-action="regenerate"]');
-      
+
       if (copyBtn) {
         copyBtn.addEventListener('click', () => {
           const textContent = m.innerText.replace(/Copy response.*Regenerate response/s, '').trim();
-          navigator.clipboard.writeText(textContent).then(() => {
-            Toast.show('Response copied to clipboard');
-          }).catch(() => {
-            Toast.show('Failed to copy');
-          });
+          navigator.clipboard
+            .writeText(textContent)
+            .then(() => {
+              Toast.show('Response copied to clipboard');
+            })
+            .catch(() => {
+              Toast.show('Failed to copy');
+            });
         });
       }
-      
+
       if (regenBtn) {
         regenBtn.addEventListener('click', () => {
           // Find the last user message before this AI message
@@ -243,40 +333,53 @@ export function viewTutorPage() {
         });
       }
     }
-    
+
     return m;
   };
 
-  push('ai', '<p>Ask me <i>why</i> something happens, or name a formula and I\'ll take it apart. For example:</p>' +
-    '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>', null, false);
+  push(
+    'ai',
+    "<p>Ask me <i>why</i> something happens, or name a formula and I'll take it apart. For example:</p>" +
+      '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>',
+    null,
+    false
+  );
 
   const ask = (text, isRegenerate = false) => {
     if (!text.trim()) return;
-    
+
     // Only push user message if not regenerating
     if (!isRegenerate) {
       push('user', mdInline(text), null, false);
     }
-    
+
     const typing = document.createElement('div');
     typing.className = 'msg ai typing-indicator';
-    typing.innerHTML = '<span class="typing"><i></i><i></i><i></i></span><span class="typing-text">Thinking...</span>';
-    log.appendChild(typing); 
+    typing.innerHTML =
+      '<span class="typing"><i></i><i></i><i></i></span><span class="typing-text">Thinking...</span>';
+    log.appendChild(typing);
     log.scrollTop = log.scrollHeight;
-    
-    setTimeout(() => {
-      typing.remove();
-      const ans = Tutor.answer(text);
-      push('ai', ans.html, 'PhysiX Tutor', true);
-    }, 450 + Math.random() * 400);
+
+    setTimeout(
+      () => {
+        typing.remove();
+        const ans = Tutor.answer(text);
+        push('ai', ans.html, 'PhysiX Tutor', true);
+      },
+      450 + Math.random() * 400
+    );
   };
 
   $('#chat-send').addEventListener('click', () => {
     const inp = $('#chat-in');
-    ask(inp.value); inp.value = '';
+    ask(inp.value);
+    inp.value = '';
   });
-  $('#chat-in').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { ask($('#chat-in').value); $('#chat-in').value = ''; }
+  $('#chat-in').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      ask($('#chat-in').value);
+      $('#chat-in').value = '';
+    }
   });
 
   // Export conversation
@@ -286,7 +389,7 @@ export function viewTutorPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `physix-tutor-${new Date().toISOString().slice(0,10)}.txt`;
+    a.download = `physix-tutor-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     Toast.show('Conversation exported');
@@ -297,16 +400,22 @@ export function viewTutorPage() {
     if (confirm('Clear all conversation history? This cannot be undone.')) {
       Tutor.clearHistory();
       log.innerHTML = '';
-      push('ai', '<p>Ask me <i>why</i> something happens, or name a formula and I\'ll take it apart. For example:</p>' +
-        '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>', null, false);
+      push(
+        'ai',
+        "<p>Ask me <i>why</i> something happens, or name a formula and I'll take it apart. For example:</p>" +
+          '<ul><li>Why do astronauts float?</li><li>What is the photoelectric effect?</li><li>Give me the SHM period formula</li></ul>',
+        null,
+        false
+      );
       Toast.show('Conversation cleared');
     }
   });
 
   const sugs = $('#tutor-sugs');
-  Tutor.suggestions(5).forEach(s => {
+  Tutor.suggestions(5).forEach((s) => {
     const b = document.createElement('button');
-    b.className = 'tb'; b.textContent = s;
+    b.className = 'tb';
+    b.textContent = s;
     b.addEventListener('click', () => ask(s));
     sugs.appendChild(b);
   });

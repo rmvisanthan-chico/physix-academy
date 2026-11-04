@@ -2,7 +2,7 @@ import { $$, DIFFS, esc, Store } from './utils.js';
 import { QUIZ_BANK } from './data-quiz-a.js';
 import { CURRICULUM } from './data-core.js';
 /* PhysiX Academy — Content Block Renderers + Quiz Engine */
-'use strict';
+('use strict');
 
 export function mdInline(s) {
   return esc(String(s == null ? '' : s)).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
@@ -12,86 +12,167 @@ function formulaCard(f) {
   let h = '<div class="formula-card">';
   if (f.name) h += '<div class="f-name"><b>' + mdInline(f.name) + '</b></div>';
   h += '<div class="f-eq">$$' + (f.tex || '') + '$$</div>';
-  if (f.vars && f.vars.length) h += '<div class="f-vars">' + f.vars.map(v => '<b>' + mdInline(v[0]) + '</b> = ' + mdInline(v[1])).join(' &nbsp;·&nbsp; ') + '</div>';
+  if (f.vars && f.vars.length)
+    h +=
+      '<div class="f-vars">' +
+      f.vars
+        .map((v) => '<b>' + mdInline(v[0]) + '</b> = ' + mdInline(v[1]))
+        .join(' &nbsp;·&nbsp; ') +
+      '</div>';
   if (f.note) h += '<div class="f-note">ℹ️ ' + mdInline(f.note) + '</div>';
   return h + '</div>';
 }
 
 function calloutBox(cls, label, inner) {
-  return '<div class="callout ' + cls + '"><div class="co-label">' + label + '</div>' + inner + '</div>';
+  return (
+    '<div class="callout ' + cls + '"><div class="co-label">' + label + '</div>' + inner + '</div>'
+  );
 }
 
 const Blocks = {
-  h: t => '<h3>' + mdInline(t) + '</h3>',
-  p: t => '<p>' + mdInline(t) + '</p>',
-  ul: a => '<ul>' + a.map(i => '<li>' + mdInline(i) + '</li>').join('') + '</ul>',
-  why: b => calloutBox('co-why', 'Why it matters',
-    '<p><b>' + mdInline(b.q) + '</b></p><p>' + mdInline(b.p) + '</p>'),
-  intuition: a => calloutBox('co-intuition', 'Build intuition',
-    a.map(x => '<p><b>' + mdInline(x.h) + '</b> ' + mdInline(x.p) + '</p>').join('')),
-  def: a => calloutBox('co-def', 'Key definitions',
-    a.map(x => '<p><b>' + mdInline(x.term) + '</b> — ' + mdInline(x.text) + '</p>').join('')),
-  mistakes: a => calloutBox('co-mistake', 'Where people slip',
-    '<ul>' + a.map(i => '<li>' + mdInline(i) + '</li>').join('') + '</ul>'),
-  revise: a => calloutBox('co-revise', 'Quick revision',
-    '<ul>' + a.map(i => '<li>' + mdInline(i) + '</li>').join('') + '</ul>'),
-  formula: f => formulaCard(f),
-  formulas: a => a.map(formulaCard).join(''),
-  derive: d => '<div class="derive">' +
+  h: (t) => '<h3>' + mdInline(t) + '</h3>',
+  p: (t) => '<p>' + mdInline(t) + '</p>',
+  ul: (a) => '<ul>' + a.map((i) => '<li>' + mdInline(i) + '</li>').join('') + '</ul>',
+  why: (b) =>
+    calloutBox(
+      'co-why',
+      'Why it matters',
+      '<p><b>' + mdInline(b.q) + '</b></p><p>' + mdInline(b.p) + '</p>'
+    ),
+  intuition: (a) =>
+    calloutBox(
+      'co-intuition',
+      'Build intuition',
+      a.map((x) => '<p><b>' + mdInline(x.h) + '</b> ' + mdInline(x.p) + '</p>').join('')
+    ),
+  def: (a) =>
+    calloutBox(
+      'co-def',
+      'Key definitions',
+      a.map((x) => '<p><b>' + mdInline(x.term) + '</b> — ' + mdInline(x.text) + '</p>').join('')
+    ),
+  mistakes: (a) =>
+    calloutBox(
+      'co-mistake',
+      'Where people slip',
+      '<ul>' + a.map((i) => '<li>' + mdInline(i) + '</li>').join('') + '</ul>'
+    ),
+  revise: (a) =>
+    calloutBox(
+      'co-revise',
+      'Quick revision',
+      '<ul>' + a.map((i) => '<li>' + mdInline(i) + '</li>').join('') + '</ul>'
+    ),
+  formula: (f) => formulaCard(f),
+  formulas: (a) => a.map(formulaCard).join(''),
+  derive: (d) =>
+    '<div class="derive">' +
     (d.title ? '<strong>' + mdInline(d.title) + '</strong>' : '') +
-    d.steps.map(s => '<div class="step">' + mdInline(s.do) +
-      '<span class="why">Why: ' + mdInline(s.why || '') + '</span></div>').join('') + '</div>',
-  example: e => {
+    d.steps
+      .map(
+        (s) =>
+          '<div class="step">' +
+          mdInline(s.do) +
+          '<span class="why">Why: ' +
+          mdInline(s.why || '') +
+          '</span></div>'
+      )
+      .join('') +
+    '</div>',
+  example: (e) => {
     const cells = [];
     if (e.given && e.given.length) cells.push(['Given', e.given]);
     if (e.concept) cells.push(['Concept', [e.concept]]);
-    return '<details class="example-box"><summary>✏️ Worked example: ' + mdInline(e.title || '') +
+    return (
+      '<details class="example-box"><summary>✏️ Worked example: ' +
+      mdInline(e.title || '') +
       '<span class="caret">▾</span></summary><div class="example-body">' +
-      '<div class="ex-grid">' + cells.map(c =>
-        '<div class="ex-cell"><b>' + c[0] + '</b>' + c[1].map(mdInline).join('<br>') + '</div>').join('') + '</div>' +
-      (e.solution && e.solution.length ?
-        '<ol class="sol-steps">' + e.solution.map(s => '<li>' + mdInline(s) + '</li>').join('') + '</ol>' : '') +
-      (e.answer ? '<p class="mt0"><span class="answer-pill">✓ ' + mdInline(e.answer) + '</span></p>' : '') +
-      (e.interp ? '<p class="muted small mb0"><b>Interpretation:</b> ' + mdInline(e.interp) + '</p>' : '') +
-      '</div></details>';
+      '<div class="ex-grid">' +
+      cells
+        .map(
+          (c) =>
+            '<div class="ex-cell"><b>' + c[0] + '</b>' + c[1].map(mdInline).join('<br>') + '</div>'
+        )
+        .join('') +
+      '</div>' +
+      (e.solution && e.solution.length
+        ? '<ol class="sol-steps">' +
+          e.solution.map((s) => '<li>' + mdInline(s) + '</li>').join('') +
+          '</ol>'
+        : '') +
+      (e.answer
+        ? '<p class="mt0"><span class="answer-pill">✓ ' + mdInline(e.answer) + '</span></p>'
+        : '') +
+      (e.interp
+        ? '<p class="muted small mb0"><b>Interpretation:</b> ' + mdInline(e.interp) + '</p>'
+        : '') +
+      '</div></details>'
+    );
   },
-  table: t => '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
-    t.head.map(h => '<th>' + mdInline(h) + '</th>').join('') +
-    '</tr></thead><tbody>' + t.rows.map(r => '<tr>' + r.map(c => '<td>' + mdInline(c) + '</td>').join('') + '</tr>').join('') +
+  table: (t) =>
+    '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+    t.head.map((h) => '<th>' + mdInline(h) + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    t.rows
+      .map((r) => '<tr>' + r.map((c) => '<td>' + mdInline(c) + '</td>').join('') + '</tr>')
+      .join('') +
     '</tbody></table></div>',
-  svg: s => '<div class="svg-box" style="margin:1rem 0;text-align:center">' + s + '</div>',
-  sim: id => '<div class="sim-slot" data-sim="' + esc(id) + '"></div>',
-  quiz: ids => '<div class="quiz-slot" data-quiz="' + ids.map(esc).join(',') + '"></div>',
-  video: url => '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' + esc(url) + '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
+  svg: (s) => '<div class="svg-box" style="margin:1rem 0;text-align:center">' + s + '</div>',
+  sim: (id) => '<div class="sim-slot" data-sim="' + esc(id) + '"></div>',
+  quiz: (ids) => '<div class="quiz-slot" data-quiz="' + ids.map(esc).join(',') + '"></div>',
+  video: (url) =>
+    '<div class="video-wrap" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:1px solid var(--card-brd);margin:1.2rem 0;background:#000"><iframe src="' +
+    esc(url) +
+    '" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy" title="Video lesson" referrerpolicy="no-referrer"></iframe></div>'
 };
 
 export function renderBlocks(content) {
   if (!Array.isArray(content)) return '';
-  return content.map((b, i) => {
-    if (!b) return '';
-    const k = Object.keys(b)[0];
-    const fn = Blocks[k];
-    if (!fn) { console.warn('Unknown block type:', k); return ''; }
-    try { return fn(b[k]); } catch (err) { console.error('Block render error', k, err); return ''; }
-  }).join('');
+  return content
+    .map((b, i) => {
+      if (!b) return '';
+      const k = Object.keys(b)[0];
+      const fn = Blocks[k];
+      if (!fn) {
+        console.warn('Unknown block type:', k);
+        return '';
+      }
+      try {
+        return fn(b[k]);
+      } catch (err) {
+        console.error('Block render error', k, err);
+        return '';
+      }
+    })
+    .join('');
 }
 
 /* ---------------- Quiz engine ---------------- */
 export const Quiz = {
   byId: null,
   init() {
-    this.byId = new Map(QUIZ_BANK.map(q => [q.id, q]));
+    this.byId = new Map(QUIZ_BANK.map((q) => [q.id, q]));
   },
-  get(id) { return this.byId.get(id); },
+  get(id) {
+    return this.byId.get(id);
+  },
 
   renderOne(parent, q, onAnswered) {
     const box = document.createElement('div');
     box.className = 'quiz-q';
     const diff = DIFFS[q.difficulty] || DIFFS.beginner;
     box.innerHTML =
-      '<div class="q-head"><span class="chip plain">' + esc(q.topic) + '</span>' +
-      '<span class="diff-dot">' + diff.dot + ' ' + diff.label + '</span></div>' +
-      '<div class="q-text">' + mdInline(q.q) + '</div><div class="opts"></div>' +
+      '<div class="q-head"><span class="chip plain">' +
+      esc(q.topic) +
+      '</span>' +
+      '<span class="diff-dot">' +
+      diff.dot +
+      ' ' +
+      diff.label +
+      '</span></div>' +
+      '<div class="q-text">' +
+      mdInline(q.q) +
+      '</div><div class="opts"></div>' +
       '<div class="feedback"></div>';
     const optsBox = box.querySelector('.opts');
     const fb = box.querySelector('.feedback');
@@ -101,7 +182,8 @@ export const Quiz = {
     q.choices.forEach((choiceText, i) => {
       const b = document.createElement('button');
       b.className = 'opt';
-      b.innerHTML = '<span class="k">' + letters[i] + '</span><span>' + mdInline(choiceText) + '</span>';
+      b.innerHTML =
+        '<span class="k">' + letters[i] + '</span><span>' + mdInline(choiceText) + '</span>';
       b.addEventListener('click', () => {
         if (answered) return;
         answered = true;
@@ -129,23 +211,36 @@ export const Quiz = {
           if (n(picked) !== n(answerTxt)) {
             /* scalar-vs-vector style confusion: the right words, wrong category */
             if (/scalar|vector/.test(n(picked)) && /scalar|vector/.test(n(answerTxt))) {
-              diagnose = 'These are the same *kind* of quantity, so the distinction is not about category. Look at what each one includes that the other leaves out.';
+              diagnose =
+                'These are the same *kind* of quantity, so the distinction is not about category. Look at what each one includes that the other leaves out.';
             }
             /* "it does not change" vs "it is zero" */
-            else if (/\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(picked)) &&
-                     /\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(answerTxt))) {
-              diagnose = 'Both options talk about the quantity not changing, so read the difference between "stays the same" and "goes to zero".';
+            else if (
+              /\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(picked)) &&
+              /\bzero\b|\bconstant\b|\bunchang|\bno change\b/.test(n(answerTxt))
+            ) {
+              diagnose =
+                'Both options talk about the quantity not changing, so read the difference between "stays the same" and "goes to zero".';
             }
             /* proportional vs inverse */
-            else if (/\bproportional\b|\binversely\b/.test(n(picked)) && /\bproportional\b|\binversely\b/.test(n(answerTxt))) {
-              diagnose = 'These differ in direction, not in kind. Try a specific case: double one quantity and see which way the other moves.';
+            else if (
+              /\bproportional\b|\binversely\b/.test(n(picked)) &&
+              /\bproportional\b|\binversely\b/.test(n(answerTxt))
+            ) {
+              diagnose =
+                'These differ in direction, not in kind. Try a specific case: double one quantity and see which way the other moves.';
             }
           }
         }
 
-        fb.innerHTML = (correct ? '<b>✓ Correct!</b> ' : '<b>✗ Not quite.</b> ') +
-          (diagnose ? '<div class="q-diagnose"><b>What went wrong:</b> ' + diagnose + '</div>' : '') +
-          '<div class="q-explain"><b>Why:</b> ' + mdInline(q.why) + '</div>';
+        fb.innerHTML =
+          (correct ? '<b>✓ Correct!</b> ' : '<b>✗ Not quite.</b> ') +
+          (diagnose
+            ? '<div class="q-diagnose"><b>What went wrong:</b> ' + diagnose + '</div>'
+            : '') +
+          '<div class="q-explain"><b>Why:</b> ' +
+          mdInline(q.why) +
+          '</div>';
         Store.recordAnswer(q, correct, i);
         if (typeof onAnswered === 'function') onAnswered(correct, fb);
       });
@@ -157,9 +252,12 @@ export const Quiz = {
   },
 
   renderList(host, ids) {
-    ids.forEach(id => {
+    ids.forEach((id) => {
       const q = this.get(id);
-      if (!q) { console.warn('Missing quiz:', id); return; }
+      if (!q) {
+        console.warn('Missing quiz:', id);
+        return;
+      }
       this.renderOne(host, q);
     });
   }
@@ -169,22 +267,32 @@ export const Quiz = {
 export function flatLessons() {
   if (flatLessons._c) return flatLessons._c;
   flatLessons._c = [];
-  CURRICULUM.forEach(level => level.chapters.forEach(ch =>
-    ch.lessons.forEach(ls => flatLessons._c.push({ level, chapter: ch, lesson: ls }))));
+  CURRICULUM.forEach((level) =>
+    level.chapters.forEach((ch) =>
+      ch.lessons.forEach((ls) => flatLessons._c.push({ level, chapter: ch, lesson: ls }))
+    )
+  );
   return flatLessons._c;
 }
-export function findLesson(id) { return flatLessons().find(e => e.lesson.id === id); }
+export function findLesson(id) {
+  return flatLessons().find((e) => e.lesson.id === id);
+}
 export function levelDoneCount(level) {
-  return level.chapters.reduce((n, ch) => n + ch.lessons.filter(ls => Store.isComplete(ls.id)).length, 0);
+  return level.chapters.reduce(
+    (n, ch) => n + ch.lessons.filter((ls) => Store.isComplete(ls.id)).length,
+    0
+  );
 }
 export function levelTotalCount(level) {
   return level.chapters.reduce((n, ch) => n + ch.lessons.length, 0);
 }
 export function levelPct(level) {
   const t = levelTotalCount(level);
-  return t ? Math.round(100 * levelDoneCount(level) / t) : 0;
+  return t ? Math.round((100 * levelDoneCount(level)) / t) : 0;
 }
 export function overallPct() {
   const all = flatLessons();
-  return all.length ? Math.round(100 * all.filter(e => Store.isComplete(e.lesson.id)).length / all.length) : 0;
+  return all.length
+    ? Math.round((100 * all.filter((e) => Store.isComplete(e.lesson.id)).length) / all.length)
+    : 0;
 }

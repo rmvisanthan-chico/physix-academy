@@ -41,7 +41,9 @@ export function readUser() {
    saved (quota exceeded, storage blocked) — the caller should still let the
    learner through, since the gate should never be able to trap anyone. */
 export function writeUser(name, cls) {
-  const clean = String(name == null ? '' : name).trim().slice(0, NAME_MAX);
+  const clean = String(name == null ? '' : name)
+    .trim()
+    .slice(0, NAME_MAX);
   if (!clean) return null;
   const u = { name: clean, class: String(cls || ''), since: Date.now() };
   try {
@@ -53,7 +55,11 @@ export function writeUser(name, cls) {
 }
 
 export function clearUser() {
-  try { localStorage.removeItem(KEY); } catch (e) { /* nothing to do */ }
+  try {
+    localStorage.removeItem(KEY);
+  } catch (e) {
+    /* nothing to do */
+  }
 }
 
 /* Short label for the greeting, e.g. "Aarav · Class 11". */

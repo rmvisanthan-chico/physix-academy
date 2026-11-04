@@ -31,11 +31,14 @@ export function splitWords(el) {
   const text = el.textContent.trim();
   if (!text) return;
   el.dataset.split = 'done';
-  el.setAttribute('aria-label', text);   // screen readers get the plain sentence
+  el.setAttribute('aria-label', text); // screen readers get the plain sentence
   el.setAttribute('aria-hidden', 'true'); // ...while the spans are decorative
   el.textContent = '';
-  text.split(/(\s+)/).forEach(part => {
-    if (/^\s+$/.test(part)) { el.append(' '); return; }
+  text.split(/(\s+)/).forEach((part) => {
+    if (/^\s+$/.test(part)) {
+      el.append(' ');
+      return;
+    }
     const w = document.createElement('span');
     w.className = 'p-word';
     w.textContent = part;
@@ -62,7 +65,7 @@ function attachSpotlight(card) {
 function attachSparks(canvas, host) {
   if (!canvas || noMotion()) return;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;                       // no 2d context, just skip the effect
+  if (!ctx) return; // no 2d context, just skip the effect
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const bits = [];
   const ACCENT = [109, 93, 246];
@@ -97,10 +100,13 @@ function attachSparks(canvas, host) {
       const b = bits[i];
       b.x += b.vx;
       b.y += b.vy;
-      b.vy += 0.12;            // gravity, so sparks arc rather than fly straight
+      b.vy += 0.12; // gravity, so sparks arc rather than fly straight
       b.vx *= 0.97;
       b.life -= 0.022;
-      if (b.life <= 0) { bits.splice(i, 1); continue; }
+      if (b.life <= 0) {
+        bits.splice(i, 1);
+        continue;
+      }
       ctx.globalAlpha = Math.max(b.life, 0);
       ctx.fillStyle = `rgb(${ACCENT[0]},${ACCENT[1]},${ACCENT[2]})`;
       ctx.fillRect(b.x, b.y, 2.5, 2.5);
@@ -108,7 +114,9 @@ function attachSparks(canvas, host) {
     ctx.globalAlpha = 1;
     raf = bits.length ? requestAnimationFrame(tick) : null;
   };
-  const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+  const kick = () => {
+    if (!raf) raf = requestAnimationFrame(tick);
+  };
 
   /* Wrap the original handler rather than replacing it: the form must still
      submit exactly as it did before the decoration was added. */
@@ -148,20 +156,27 @@ async function attachVideoBackdrop(video) {
   for (const url of BG_CANDIDATES) {
     try {
       const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-      if (r.ok) { found.push(url); break; }   // first hit wins: avoids probing
-    } catch (e) { /* not there, or no network: just skip this candidate */ }
+      if (r.ok) {
+        found.push(url);
+        break;
+      } // first hit wins: avoids probing
+    } catch (e) {
+      /* not there, or no network: just skip this candidate */
+    }
   }
   if (!found.length) {
     video.remove();
     return false;
   }
-  video.innerHTML = found.map(u => `<source src="${u}">`).join('');
+  video.innerHTML = found.map((u) => `<source src="${u}">`).join('');
   video.load();
   /* Fade in on real playback, not on load: a video that loaded but refused to
      autoplay would otherwise reveal a frozen first frame over the gradient. */
   video.addEventListener('playing', () => video.classList.add('is-ready'), { once: true });
   video.addEventListener('error', () => video.remove(), { once: true });
-  video.play().catch(() => { /* autoplay refused: gradient stands, no harm */ });
+  video.play().catch(() => {
+    /* autoplay refused: gradient stands, no harm */
+  });
   return true;
 }
 
@@ -189,8 +204,9 @@ export function initProfileFx({ card, heading, wordmark, sparkHost, video }) {
   if (ready) pauseWhenHidden(video);
 
   /* Honour a mid-session change to the OS motion setting. */
-  const onChange = () => { if (noMotion()) document.body.classList.add('p-still'); };
+  const onChange = () => {
+    if (noMotion()) document.body.classList.add('p-still');
+  };
   reduced.addEventListener?.('change', onChange);
   onChange();
 }
-

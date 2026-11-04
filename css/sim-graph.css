@@ -8,10 +8,15 @@
  */
 
 /* ---------- Frame ---------- */
-.pgraph { border-top: 1px solid var(--card-brd); background: var(--panel2); }
+.pgraph {
+  border-top: 1px solid var(--card-brd);
+  background: var(--panel2);
+}
 .pgraph-title {
-  padding: .55rem .8rem .3rem;
-  font-size: .78rem; font-weight: 700; color: var(--txt2);
+  padding: 0.55rem 0.8rem 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--txt2);
 }
 
 /* ---------- Plot ---------- */
@@ -26,20 +31,38 @@
   align-items: stretch;
 }
 .pgraph-ycap {
-  grid-column: 1; grid-row: 1;
-  align-self: center; justify-self: center;
-  writing-mode: vertical-rl; transform: rotate(180deg);
-  font-size: .68rem; color: var(--txt3); white-space: nowrap;
-  padding: 0 .25rem;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  justify-self: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.68rem;
+  color: var(--txt3);
+  white-space: nowrap;
+  padding: 0 0.25rem;
 }
-.pgraph-inner { grid-column: 2; grid-row: 1; min-width: 0; }
+.pgraph-inner {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
 .pgraph-xcap {
-  grid-column: 2; grid-row: 2;
-  text-align: center; font-size: .68rem; color: var(--txt3);
-  padding-top: .1rem;
+  grid-column: 2;
+  grid-row: 2;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--txt3);
+  padding-top: 0.1rem;
 }
-.pgraph-plot { position: relative; width: 100%; }
-.pgraph-plot canvas { display: block; width: 100%; }
+.pgraph-plot {
+  position: relative;
+  width: 100%;
+}
+.pgraph-plot canvas {
+  display: block;
+  width: 100%;
+}
 
 /* ---------- Legend ----------
    This is also the accessible text representation of the plot. Each entry
@@ -47,34 +70,59 @@
    is readable with any form of colour blindness and by a screen reader. Colour
    is never the only channel. */
 .pgraph-foot {
-  display: flex; flex-wrap: wrap; gap: .3rem .9rem;
-  padding: .4rem .8rem .6rem; font-size: .78rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  padding: 0.4rem 0.8rem 0.6rem;
+  font-size: 0.78rem;
 }
 .pgraph-entry {
-  display: inline-flex; align-items: baseline; gap: .3rem; color: var(--txt2);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  color: var(--txt2);
 }
-.pgraph-entry.off { opacity: .45; }
+.pgraph-entry.off {
+  opacity: 0.45;
+}
 .pgraph-swatch {
-  width: 14px; height: 3px; border-radius: 2px;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
   background: var(--c, var(--acc2));
-  align-self: center; flex: 0 0 auto;
+  align-self: center;
+  flex: 0 0 auto;
 }
-.pgraph-name { font-weight: 600; }
-.pgraph-entry b { color: var(--txt); font-variant-numeric: tabular-nums; }
+.pgraph-name {
+  font-weight: 600;
+}
+.pgraph-entry b {
+  color: var(--txt);
+  font-variant-numeric: tabular-nums;
+}
 .pgraph-at {
-  color: var(--txt3); font-family: "DM Mono", monospace; font-size: .72rem;
+  color: var(--txt3);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
 }
 
 /* ---------- Phone ----------
    The legend stacks rather than shrinking into an unreadable row, and the plot
    keeps a usable height instead of being scaled down to fit the width. */
 @media (max-width: 560px) {
-  .pgraph-title { font-size: .74rem; padding: .5rem .6rem .25rem; }
-  .pgraph-foot {
-    flex-direction: column; gap: .2rem;
-    padding: .35rem .6rem .55rem; font-size: .74rem;
+  .pgraph-title {
+    font-size: 0.74rem;
+    padding: 0.5rem 0.6rem 0.25rem;
   }
-  .pgraph-at { font-size: .68rem; }
+  .pgraph-foot {
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.35rem 0.6rem 0.55rem;
+    font-size: 0.74rem;
+  }
+  .pgraph-at {
+    font-size: 0.68rem;
+  }
 }
 
 /* ---------- Reduced motion ----------

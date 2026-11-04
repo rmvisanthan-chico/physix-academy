@@ -6,8 +6,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 const OUT = path.join(os.tmpdir(), 'opencode', 'shots');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4195';
@@ -22,9 +27,9 @@ async function shot(name, { motion = 'no-preference', act } = {}) {
   });
   const page = await ctx.newPage();
   const errs = [];
-  page.on('pageerror', e => errs.push(String(e)));
+  page.on('pageerror', (e) => errs.push(String(e)));
   await page.goto(`${BASE}/login.html`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);          // let the stagger settle
+  await page.waitForTimeout(900); // let the stagger settle
   if (act) await act(page);
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });

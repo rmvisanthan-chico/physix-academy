@@ -61,27 +61,52 @@ export const LAB_EXPERIMENTS = [
     source: 'js/sims-c.js',
     parameters: [
       {
-        key: 'u', label: 'Speed u', unit: 'm/s', si: true,
-        min: 5, max: 45, step: 1, default: 25,
+        key: 'u',
+        label: 'Speed u',
+        unit: 'm/s',
+        si: true,
+        min: 5,
+        max: 45,
+        step: 1,
+        default: 25
       },
       {
-        key: 'theta', label: 'Launch angle', unit: 'deg', si: false,
-        min: 10, max: 80, step: 1, default: 45,
+        key: 'theta',
+        label: 'Launch angle',
+        unit: 'deg',
+        si: false,
+        min: 10,
+        max: 80,
+        step: 1,
+        default: 45
       },
       {
-        key: 'h0', label: 'Launch height', unit: 'm', si: true,
-        min: 0, max: 30, step: 1, default: 0,
+        key: 'h0',
+        label: 'Launch height',
+        unit: 'm',
+        si: true,
+        min: 0,
+        max: 30,
+        step: 1,
+        default: 0
       },
       {
-        key: 'drag', label: 'Air drag k', unit: 'm^-1', si: true,
-        min: 0, max: 0.4, step: 0.01, default: 0,
+        key: 'drag',
+        label: 'Air drag k',
+        unit: 'm^-1',
+        si: true,
+        min: 0,
+        max: 0.4,
+        step: 0.01,
+        default: 0,
         /* Full derivation of the unit is in the block comment at the top of
          * this file: a_drag = -k * v * |v|, so [k] = [a]/[v|v|] = m^-1. */
-        note: 'Quadratic drag coefficient in m^-1. Drag acceleration is -k*v*|v| '
-            + '(magnitude k|v|^2). Not the same quantity as the SHM spring constant, '
-            + 'which is N/m. Do not label this k/s or leave it dimensionless.',
-      },
-    ],
+        note:
+          'Quadratic drag coefficient in m^-1. Drag acceleration is -k*v*|v| ' +
+          '(magnitude k|v|^2). Not the same quantity as the SHM spring constant, ' +
+          'which is N/m. Do not label this k/s or leave it dimensionless.'
+      }
+    ]
   },
 
   {
@@ -93,14 +118,26 @@ export const LAB_EXPERIMENTS = [
     source: 'js/sims-b.js',
     parameters: [
       {
-        key: 'u', label: 'Initial velocity u', unit: 'm/s', si: true,
-        min: -15, max: 15, step: 0.5, default: 4,
+        key: 'u',
+        label: 'Initial velocity u',
+        unit: 'm/s',
+        si: true,
+        min: -15,
+        max: 15,
+        step: 0.5,
+        default: 4
       },
       {
-        key: 'a', label: 'Acceleration a', unit: 'm/s^2', si: true,
-        min: -4, max: 4, step: 0.1, default: 1,
-      },
-    ],
+        key: 'a',
+        label: 'Acceleration a',
+        unit: 'm/s^2',
+        si: true,
+        min: -4,
+        max: 4,
+        step: 0.1,
+        default: 1
+      }
+    ]
   },
 
   {
@@ -112,16 +149,34 @@ export const LAB_EXPERIMENTS = [
     source: 'js/sims-c.js',
     parameters: [
       {
-        key: 'm', label: 'Mass m', unit: 'kg', si: true,
-        min: 0.5, max: 5, step: 0.25, default: 1.5,
+        key: 'm',
+        label: 'Mass m',
+        unit: 'kg',
+        si: true,
+        min: 0.5,
+        max: 5,
+        step: 0.25,
+        default: 1.5
       },
       {
-        key: 'k', label: 'Spring constant k', unit: 'N/m', si: true,
-        min: 5, max: 80, step: 1, default: 25,
+        key: 'k',
+        label: 'Spring constant k',
+        unit: 'N/m',
+        si: true,
+        min: 5,
+        max: 80,
+        step: 1,
+        default: 25
       },
       {
-        key: 'damping', label: 'Damping', unit: 's^-1', si: true,
-        min: 0, max: 0.6, step: 0.02, default: 0,
+        key: 'damping',
+        label: 'Damping',
+        unit: 's^-1',
+        si: true,
+        min: 0,
+        max: 0.6,
+        step: 0.02,
+        default: 0
       },
       {
         /* Amplitude is a PIXEL quantity and stays one. The simulation's state
@@ -131,27 +186,32 @@ export const LAB_EXPERIMENTS = [
          * integrator is scale-invariant, so it changes no period, frequency or
          * damping rate. It is not a physical derivation, and the pixel
          * amplitude must not be presented as an SI amplitude. */
-        key: 'A', label: 'Amplitude A', unit: 'px', si: false,
+        key: 'A',
+        label: 'Amplitude A',
+        unit: 'px',
+        si: false,
         siStatus: 'unverified',
-        min: 30, max: 110, step: 5, default: 80,
-        note: 'Pixel amplitude, not metres. The simulation integrates in pixel space and '
-            + 'its readouts apply the chosen display constant PX_PER_M = 60 (js/sims-c.js), '
-            + 'which is scale-invariant and not a physical derivation. Must not be presented '
-            + 'as an SI amplitude.',
-      },
+        min: 30,
+        max: 110,
+        step: 5,
+        default: 80,
+        note:
+          'Pixel amplitude, not metres. The simulation integrates in pixel space and ' +
+          'its readouts apply the chosen display constant PX_PER_M = 60 (js/sims-c.js), ' +
+          'which is scale-invariant and not a physical derivation. Must not be presented ' +
+          'as an SI amplitude.'
+      }
     ],
     caveats: [
       'The integrator runs in pixel space: v += (-k/m * xPix - damping*v) * h, with xPix in pixels.',
-      'The /60 applied by the readouts and the graph is the chosen display constant PX_PER_M = 60 '
-      + '(js/sims-c.js), not a derived scale.',
-      'The period readout uses T = 2*pi*sqrt(m/k) in SI, which is an idealised value rather than a '
-      + 'measurement of the pixel-space motion actually being drawn.',
-    ],
-  },
+      'The /60 applied by the readouts and the graph is the chosen display constant PX_PER_M = 60 ' +
+        '(js/sims-c.js), not a derived scale.',
+      'The period readout uses T = 2*pi*sqrt(m/k) in SI, which is an idealised value rather than a ' +
+        'measurement of the pixel-space motion actually being drawn.'
+    ]
+  }
 ];
 
-export const LAB_EXPERIMENTS_BY_ID = Object.fromEntries(
-  LAB_EXPERIMENTS.map(e => [e.id, e]),
-);
+export const LAB_EXPERIMENTS_BY_ID = Object.fromEntries(LAB_EXPERIMENTS.map((e) => [e.id, e]));
 
-export const getLabExperiment = id => LAB_EXPERIMENTS_BY_ID[id] || null;
+export const getLabExperiment = (id) => LAB_EXPERIMENTS_BY_ID[id] || null;

@@ -3,7 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SKIP = new Set(['node_modules', 'dist', 'graphify-out', 'release', 'astra', 'electron', '.git']);
+const SKIP = new Set([
+  'node_modules',
+  'dist',
+  'graphify-out',
+  'release',
+  'astra',
+  'electron',
+  '.git'
+]);
 const EXTS = new Set(['.js', '.html']);
 
 const files = [];
@@ -11,8 +19,9 @@ const files = [];
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
     if (e.name.startsWith('.')) continue;
     const p = path.join(d, e.name);
-    if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(p); }
-    else if (EXTS.has(path.extname(e.name).toLowerCase())) files.push(p);
+    if (e.isDirectory()) {
+      if (!SKIP.has(e.name)) walk(p);
+    } else if (EXTS.has(path.extname(e.name).toLowerCase())) files.push(p);
   }
 })(ROOT);
 
@@ -29,7 +38,9 @@ for (const f of files) {
   const rel = path.relative(ROOT, f).replace(/\\/g, '/');
   const lines = s.split('\n');
   lines.forEach((l, i) => {
-    if (PAT.test(l)) { PAT.lastIndex = 0; }
+    if (PAT.test(l)) {
+      PAT.lastIndex = 0;
+    }
     if ([...l.matchAll(PAT)].length) {
       console.log(`  ${rel}:${i + 1}`);
       console.log(`      ${l.trim().slice(0, 120)}`);

@@ -24,7 +24,11 @@
 
   /* Never let the reporter be the reason a page dies. */
   function safe(fn, fallback) {
-    try { return fn(); } catch (e) { return fallback; }
+    try {
+      return fn();
+    } catch (e) {
+      return fallback;
+    }
   }
 
   function record(kind, detail) {
@@ -66,7 +70,8 @@
 
       var p = document.createElement('p');
       p.className = 'muted';
-      p.textContent = opts.message ||
+      p.textContent =
+        opts.message ||
         'Something went wrong on our side, not yours. The rest of the site still works.';
       card.appendChild(p);
 
@@ -79,7 +84,9 @@
       again.type = 'button';
       again.textContent = 'Try again';
       again.addEventListener('click', function () {
-        safe(function () { location.reload(); });
+        safe(function () {
+          location.reload();
+        });
       });
       row.appendChild(again);
 
@@ -88,7 +95,9 @@
       home.href = '#/';
       home.textContent = 'Back to home';
       home.addEventListener('click', function () {
-        safe(function () { location.hash = '#/'; });
+        safe(function () {
+          location.hash = '#/';
+        });
       });
       row.appendChild(home);
       card.appendChild(row);
@@ -100,8 +109,9 @@
         var s = document.createElement('summary');
         s.textContent = 'Technical detail';
         var pre = document.createElement('pre');
-        pre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-size:.8rem;'
-          + 'background:var(--panel2);padding:.8rem;border-radius:10px;overflow:auto;max-height:14rem';
+        pre.style.cssText =
+          'white-space:pre-wrap;word-break:break-word;font-size:.8rem;' +
+          'background:var(--panel2);padding:.8rem;border-radius:10px;overflow:auto;max-height:14rem';
         pre.textContent = detail;
         d.appendChild(s);
         d.appendChild(pre);
@@ -116,9 +126,16 @@
   }
 
   /* ---- global listeners, installed as early as possible ---- */
-  window.addEventListener('error', function (ev) {
-    record('error', (ev.message || 'error') + (ev.filename ? ' @ ' + ev.filename + ':' + ev.lineno : ''));
-  }, true);
+  window.addEventListener(
+    'error',
+    function (ev) {
+      record(
+        'error',
+        (ev.message || 'error') + (ev.filename ? ' @ ' + ev.filename + ':' + ev.lineno : '')
+      );
+    },
+    true
+  );
 
   window.addEventListener('unhandledrejection', function (ev) {
     var r = ev && ev.reason;
@@ -132,17 +149,25 @@
     if (window.__PHYSIX_BOOTED) return;
     fail({
       title: 'The app did not start',
-      message: 'A script failed to load, so the interactive parts could not start. '
-             + 'Your saved progress is untouched.',
-      detail: errors.map(function (e) { return e.kind + ': ' + e.detail; }).join('\n\n')
-             || 'No error was reported, which usually means the script never arrived (offline, or a proxy stripped it).'
+      message:
+        'A script failed to load, so the interactive parts could not start. ' +
+        'Your saved progress is untouched.',
+      detail:
+        errors
+          .map(function (e) {
+            return e.kind + ': ' + e.detail;
+          })
+          .join('\n\n') ||
+        'No error was reported, which usually means the script never arrived (offline, or a proxy stripped it).'
     });
   }, BOOT_TIMEOUT_MS);
 
   /* If boot succeeds, disarm the watchdog so it can never race a slow render. */
   Object.defineProperty(window, '__PHYSIX_BOOTED', {
     configurable: true,
-    get: function () { return window.__physixBooted === true; },
+    get: function () {
+      return window.__physixBooted === true;
+    },
     set: function (v) {
       window.__physixBooted = v === true;
       if (window.__physixBooted) clearTimeout(timer);

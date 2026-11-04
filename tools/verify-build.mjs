@@ -10,33 +10,55 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4236';
 const DIST = path.join(ROOT, 'dist');
 
 const results = [];
-const ok = (n, p, d = '') => { results.push(p); console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`); };
+const ok = (n, p, d = '') => {
+  results.push(p);
+  console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`);
+};
 
 /* ---------- 1. dist/ contains what the HTML actually references ---------- */
 const indexHtml = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
 const refs = [...indexHtml.matchAll(/(?:href|src)="([^"#][^"]*)"/g)]
-  .map(m => m[1])
+  .map((m) => m[1])
   /* not filesystem paths: external URLs, Vercel's own endpoints, data URIs,
      and non-http schemes like mailto: and tel: */
-  .filter(u => !/^https?:|^\/_vercel|^data:|^mailto:|^tel:|^javascript:/.test(u));
+  .filter((u) => !/^https?:|^\/_vercel|^data:|^mailto:|^tel:|^javascript:/.test(u));
 
 let missing = 0;
 for (const u of refs) {
   const p = path.join(DIST, u.replace(/^\//, '').split('?')[0]);
-  if (!fs.existsSync(p)) { ok(`dist has ${u}`, false, 'referenced by index.html but absent'); missing++; }
+  if (!fs.existsSync(p)) {
+    ok(`dist has ${u}`, false, 'referenced by index.html but absent');
+    missing++;
+  }
 }
-ok(`all ${refs.length} local references in dist/index.html resolve`, missing === 0, missing ? `${missing} missing` : '');
+ok(
+  `all ${refs.length} local references in dist/index.html resolve`,
+  missing === 0,
+  missing ? `${missing} missing` : ''
+);
 
 /* every root page referenced by the rollup inputs */
-for (const f of ['index.html', '404.html', 'privacy.html', 'terms.html', 'login.html', 'motion-graphs.html']) {
+for (const f of [
+  'index.html',
+  '404.html',
+  'privacy.html',
+  'terms.html',
+  'login.html',
+  'motion-graphs.html'
+]) {
   ok(`dist/${f}`, fs.existsSync(path.join(DIST, f)));
 }
 
@@ -47,12 +69,15 @@ for (const f of ['css/style.css', 'css/progress-dashboard.css', 'js/boot-guard.j
 
 /* ---------- 2. and the served dist/ really renders ---------- */
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
-const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
+const c = await browser.newContext({
+  viewport: { width: 1280, height: 900 },
+  reducedMotion: 'reduce'
+});
 const page = await c.newPage();
 const IGNORED = /\/_vercel\//;
 const errs = [];
-page.on('pageerror', e => errs.push(String(e)));
-page.on('console', m => {
+page.on('pageerror', (e) => errs.push(String(e)));
+page.on('console', (m) => {
   if (m.type() !== 'error') return;
   const loc = m.location() || {};
   if (IGNORED.test(loc.url || '')) return;
@@ -61,9 +86,13 @@ page.on('console', m => {
 
 await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
-await page.evaluate(() => { location.hash = '#/dashboard'; });
+await page.evaluate(() => {
+  location.hash = '#/dashboard';
+});
 await page.waitForTimeout(1200);
-await page.evaluate(() => { location.hash = '#/'; });
+await page.evaluate(() => {
+  location.hash = '#/';
+});
 await page.waitForTimeout(1200);
 const home = await page.evaluate(() => ({
   len: (document.querySelector('#main')?.textContent || '').trim().length,
@@ -103,11 +132,14 @@ const dash = await page.evaluate(() => {
 });
 ok('dist dashboard renders', dash.hasHello);
 ok('dist dashboard is styled (title sized by CSS)', dash.titleSize > 16, `${dash.titleSize}px`);
-ok('dist dashboard stylesheet applied (.mastery-track)',
-  /99px/.test(dash.trackRadius), `radius=${dash.trackRadius}`);
+ok(
+  'dist dashboard stylesheet applied (.mastery-track)',
+  /99px/.test(dash.trackRadius),
+  `radius=${dash.trackRadius}`
+);
 ok('no errors on dist', errs.length === 0, errs.slice(0, 3).join(' | '));
 
 await browser.close();
-const bad = results.filter(r => !r).length;
+const bad = results.filter((r) => !r).length;
 console.log(`\nbundled build  ${results.length - bad}/${results.length} ok`);
 process.exit(bad ? 1 : 0);
