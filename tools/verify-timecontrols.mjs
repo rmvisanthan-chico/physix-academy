@@ -591,4 +591,3 @@ for (const r of results) {
 }
 console.log(`\ntime controls  ${pass}/${results.length} ok`);
 process.exit(pass === results.length ? 0 : 1);
-

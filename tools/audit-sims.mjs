@@ -1741,4 +1741,3 @@ if (SELF_TEST) {
   const hardFail = summary.fail.length > 0 || !selfOk;
   process.exit(hardFail ? 1 : 0);
 }
-
