@@ -2,7 +2,7 @@
 
 **"Understand Physics. Don't Just Memorize It."**
 
-An interactive physics learning platform built entirely by **R.M.VISANTHAN** — from scratch, using vanilla HTML, CSS, and JavaScript. No frameworks. No templates. No AI-generated code.
+An interactive physics learning platform built entirely by **R.M. Visanthan** — from scratch, using vanilla HTML, CSS, and JavaScript. No frameworks. No templates. No AI-generated code.
 
 ---
 
@@ -10,9 +10,9 @@ An interactive physics learning platform built entirely by **R.M.VISANTHAN** —
 
 |            |                                                |
 | ---------- | ---------------------------------------------- |
-| **Name**   | R.M.VISANTHAN                                  |
+| **Name**   | R.M. Visanthan                                  |
 | **Email**  | r.m.visanthan@gmail.com                        |
-| **GitHub** | [@rmvisanthan](https://github.com/rmvisanthan) |
+| **GitHub** | [physix-academy](https://github.com/rmvisanthan-chico/physix-academy) |
 | **Role**   | Sole developer, designer, and content creator  |
 
 ---
@@ -43,7 +43,7 @@ This project has been developed over **72+ versions**, with each commit represen
 
 ### Git Commit Proof
 
-All commits are attributed to **R.M.VISANTHAN <r.m.visanthan@gmail.com>**:
+All commits are attributed to **R.M. Visanthan <r.m.visanthan@gmail.com>**:
 
 ```
 f706967 2026-08-28 AI Tutor problem solver v72: offline numerics
@@ -168,7 +168,7 @@ PhysiX Academy/
 
 ## Ownership Statement
 
-This project was built entirely by **R.M.VISANTHAN**. Every line of code, every simulation, every lesson, and every feature was written, tested, and iterated upon by the author.
+This project was built entirely by **R.M. Visanthan**. Every line of code, every simulation, every lesson, and every feature was written, tested, and iterated upon by the author.
 
 **No AI was used to generate this code.** The git history, commit messages, and development timeline above serve as proof of authorship.
 
@@ -176,8 +176,8 @@ This project was built entirely by **R.M.VISANTHAN**. Every line of code, every 
 
 ## License
 
-This project is the intellectual property of R.M.VISANTHAN. All rights reserved.
+This project is the intellectual property of R.M. Visanthan. All rights reserved.
 
 ---
 
-_Built with ❤️ by R.M.VISANTHAN — PhysiX Academy, 2026_
+_Built with ❤️ by R.M. Visanthan — PhysiX Academy, 2026_
