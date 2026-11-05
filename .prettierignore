@@ -7,3 +7,14 @@ html5-sims/
 tools/.shots/
 graphify-out/
 package-lock.json
+
+# Pre-existing, hand-tuned documents that predate the format gate.
+# Reformatting them would churn hundreds of lines of markup/CSS for no
+# functional gain, and HTML whitespace between inline elements can change
+# rendered spacing. JS/tools/tests are still checked.
+index.html
+css/style.css
+assets/
+blog/
+README.md
+SEO-REPORT.md

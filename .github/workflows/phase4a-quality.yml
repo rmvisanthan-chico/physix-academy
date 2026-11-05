@@ -1,6 +1,7 @@
 # Phase 4A Quality Check (CI gate)
 #
-# Runs the Phase 4A quality harness on every push/PR to the phase4a branch.
+# Runs the quality harness on every push/PR to main (and to the historical
+# phase4a branch). Phase 4A is merged, so main is where the gate now matters.
 # Includes lint, format check, unit tests, and verification suites.
 # TypeScript check excluded due to pre-existing codebase issues (not Phase 4A regressions).
 
@@ -8,9 +9,9 @@ name: Phase 4A Quality Check
 
 on:
   push:
-    branches: [phase4a]
+    branches: [main, phase4a]
   pull_request:
-    branches: [phase4a]
+    branches: [main, phase4a]
   workflow_dispatch:
 
 concurrency:
@@ -80,6 +81,9 @@ jobs:
 
       - name: Run prediction verification
         run: node tools/verify-prediction.mjs http://localhost:4311
+
+      - name: Run physics invariant verification
+        run: node tools/verify-physics.mjs http://localhost:4311
 
       - name: Run dashboard verification
         run: node tools/verify-dashboard.mjs http://localhost:4311

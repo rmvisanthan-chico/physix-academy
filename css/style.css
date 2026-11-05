@@ -981,31 +981,86 @@ ol.sol-steps li {
 /* ---------- simulation frame ---------- */
 .sim-frame {
   border: 1px solid var(--card-brd);
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
   margin: 1.2rem 0;
   background: var(--panel2);
+  box-shadow: 0 24px 60px -34px rgba(0, 0, 0, 0.85);
 }
 .sim-frame .sim-head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.7rem 1rem;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--card-brd);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
 }
-.sim-frame .sim-head .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--acc2);
-  box-shadow: 0 0 10px var(--acc2);
+.sim-icon {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  border-radius: 12px;
+  border: 1px solid rgba(109, 93, 246, 0.35);
+  background: radial-gradient(120% 120% at 20% 0%, rgba(109, 93, 246, 0.38), rgba(34, 211, 238, 0.1));
+}
+.sim-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.sim-title {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.sim-desc {
+  font-size: 0.79rem;
+  line-height: 1.35;
+  color: var(--txt3);
+}
+.sim-badge {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .sim-badge {
+    display: none;
+  }
+  .sim-icon {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+    font-size: 1.05rem;
+    border-radius: 10px;
+  }
 }
 .sim-canvas-wrap {
   position: relative;
-  background: #05070d;
+  background: radial-gradient(120% 90% at 50% 0%, #0b1224 0%, #05070d 62%);
+}
+.sim-canvas-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.45);
 }
 [data-theme='light'] .sim-canvas-wrap {
-  background: #0b1120;
+  background: radial-gradient(120% 90% at 50% 0%, #101a2e 0%, #0b1120 62%);
 }
 .sim-frame canvas {
   display: block;
@@ -1013,12 +1068,86 @@ ol.sol-steps li {
   height: auto;
 }
 .sim-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem 1.6rem;
-  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.9rem 1.4rem;
+  padding: 1rem;
   border-top: 1px solid var(--card-brd);
 }
+/* ---------- simulation catalogue ---------- */
+.sim-cat-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin: 0.2rem 0 1rem;
+}
+.sim-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 260px;
+  max-width: 420px;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--card-brd);
+  border-radius: 11px;
+  background: var(--panel2);
+  color: var(--txt3);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sim-search:focus-within {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px rgba(109, 93, 246, 0.18);
+}
+.sim-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--txt1);
+  font-size: 0.88rem;
+  outline: none;
+}
+.sim-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--txt3);
+  font-variant-numeric: tabular-nums;
+}
+.sim-cat-card[hidden] {
+  display: none;
+}
+.sim-cat-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sim-cat-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 1.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--card-brd);
+  background: radial-gradient(120% 120% at 20% 0%, rgba(109, 93, 246, 0.28), rgba(34, 211, 238, 0.08));
+  transition: transform 0.18s;
+}
+.sim-cat-card:hover .sim-cat-icon {
+  transform: translateY(-2px);
+}
+.phet-badge {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  border: 1px solid rgba(165, 180, 252, 0.35);
+  background: rgba(165, 180, 252, 0.1);
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+}
+
 .phet-launch {
   display: flex;
   align-items: center;
@@ -1203,14 +1332,19 @@ input[type='range'] {
   padding: 0 1rem 1rem;
 }
 .readout {
-  background: var(--card);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent), var(--card);
   border: 1px solid var(--card-brd);
-  border-radius: 9px;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8rem;
+  border-radius: 10px;
+  padding: 0.42rem 0.7rem;
+  font-size: 0.74rem;
+  color: var(--txt3);
 }
 .readout b {
   color: var(--acc2);
+  font-size: 0.86rem;
   font-variant-numeric: tabular-nums;
 }
 .sim-actions {
