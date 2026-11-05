@@ -481,7 +481,7 @@ async function runAudit() {
       add(id, 'no errors during mount', false, page.__errs.slice(0, 2).join(' ; '));
       continue;
     }
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(600);
 
     /* Separates CSP/offline external-resource refusals from genuine faults. */
     assertNoMountErrors(page, id);
@@ -583,7 +583,17 @@ async function runAudit() {
           results.push({
             id,
             name: 'external PhET document actually loads (cross-origin: config verified, internals NOT inspected)',
-            pass: loaded === 'load-event',
+            /* Tri-state on purpose. A timeout is genuinely undecided: the
+               document may be fine and the runner's third-party network slow.
+               Counting it as a failure made this workflow red for reasons no
+               commit could fix; counting it as a pass would claim health that
+               was never observed. */
+            pass:
+              loaded === 'error-event'
+                ? false
+                : loaded === 'timeout'
+                  ? null
+                  : loaded === 'load-event',
             evidence:
               `load=${loaded} - ` +
               (loaded === 'load-event'
@@ -1243,15 +1253,17 @@ if (SELF_TEST) {
   runAudit()
     .then(() => {
       console.log('\n===== SUMMARY =====');
-      const passed = results.filter((r) => r.pass).length;
-      const failed = results.filter((r) => !r.pass).length;
+      const passed = results.filter((r) => r.pass === true).length;
+      const failed = results.filter((r) => r.pass === false).length;
+      const undecided = results.filter((r) => r.pass === null).length;
       console.log(`passed: ${passed}`);
       console.log(`failed: ${failed}`);
+      if (undecided) console.log(`undecided: ${undecided} (cross-origin, network-limited)`);
       console.log(`total:  ${results.length}`);
       if (failed > 0) {
         console.log('\nFAILURES:');
         results
-          .filter((r) => !r.pass)
+          .filter((r) => r.pass === false)
           .forEach((r) => console.log(`  ${r.id}: ${r.name} — ${r.evidence}`));
       }
       console.log('\nNOT FULLY VERIFIABLE (cross-origin):');

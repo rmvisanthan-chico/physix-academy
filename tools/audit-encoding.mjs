@@ -142,7 +142,11 @@ if (!rows.length) {
 } else {
   rows.sort(
     (a, b) =>
-      b.invalid + b.fffd + b.nMoji + b.nCtrl + b.nLost -
+      b.invalid +
+      b.fffd +
+      b.nMoji +
+      b.nCtrl +
+      b.nLost -
       (a.invalid + a.fffd + a.nMoji + a.nCtrl + a.nLost)
   );
   for (const r of rows) {
@@ -161,8 +165,6 @@ if (!rows.length) {
     `\n  TOTALS  invalid-utf8=${invalidTotal}  U+FFFD=${fffdTotal}  mojibake=${mojiTotal}  control=${ctrlTotal}  lost-glyphs=${lostTotal}`
   );
 }
-console.log(
-  `\n${JSON.stringify({ invalidTotal, fffdTotal, mojiTotal, ctrlTotal, lostTotal })}`
-);
+console.log(`\n${JSON.stringify({ invalidTotal, fffdTotal, mojiTotal, ctrlTotal, lostTotal })}`);
 /* Non-zero when anything was found, so CI can gate on it. */
 if (rows.length) process.exitCode = 1;
