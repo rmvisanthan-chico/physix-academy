@@ -14,6 +14,7 @@
     "verify:live": "node tools/verify.mjs https://physix-academy.vercel.app live",
     "verify:profile": "node tools/verify-profile.mjs http://localhost:4173 preview",
     "verify:4a": "node --test tests/unit/*.test.mjs",
+    "verify:physics": "node tools/verify-physics.mjs",
     "astra": "node astra/server/index.mjs",
     "astra:smoke": "node astra/tools/smoke.mjs",
     "start": "electron .",

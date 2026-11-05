@@ -497,40 +497,81 @@ Sims.register(
     const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 5, 0.25, 1.5, () => reset());
     const K = SU.slider(ctr, 'Spring k', 5, 80, 1, 25, () => reset());
     let AM;
+    /* Range spans ζ ≈ 0 → 1.5 at the default m/k, so the damping-ratio readout
+       can actually demonstrate underdamped, critical and overdamped motion.
+       The old 0–0.6 ceiling could never reach ζ = 1: the label would have had
+       only one value to show, which teaches nothing. */
     const D = SU.slider(
       ctr,
       'Damping',
       0,
-      0.6,
-      0.02,
+      12,
+      0.1,
       0,
       () => {},
-      (v) => v.toFixed(2)
+      (v) => v.toFixed(1)
     );
-    const rT = SU.readout(ro, 'Period T'),
+    const rT = SU.readout(ro, 'Period T (theory)'),
+      rTM = SU.readout(ro, 'T measured'),
+      rZ = SU.readout(ro, 'Damping ζ'),
       rX = SU.readout(ro, 'x'),
       rV = SU.readout(ro, 'v');
     AM = SU.slider(ctr, 'Amplitude A (px)', 30, 110, 5, 80, () => reset());
+
+    /* Two successive downward equilibrium crossings are exactly one period
+       apart, so the run measures its own period instead of only quoting the
+       undamped ideal. With damping the measured value is slightly longer than
+       2π√(m/k), which is the physically correct behaviour and worth seeing. */
+    let prevX = 0,
+      lastCross = null,
+      measuredT = 0;
+
     function reset() {
       xPix = AM ? AM.get() : 80;
       v = 0;
       trace = [];
       gt = 0;
+      prevX = xPix;
+      lastCross = null;
+      measuredT = 0;
       graph.clear();
     }
     reset();
 
+    /* ω_n = √(k/m); the equation is x'' = -(k/m)x - dmp·v, so dmp = 2ζω_n. */
+    const naturalOmega = () => Math.sqrt(K.get() / M.get());
+    const dampingRatio = () => D.get() / (2 * naturalOmega());
+    function regimeOf(z) {
+      if (z < 0.001) return 'undamped';
+      if (z < 0.99) return 'underdamped';
+      if (z < 1.01) return 'critical';
+      return 'overdamped';
+    }
+
     /* Phase 3C: same three-way split as the projectile - advance integrates one
-     fixed sub-step, sample records one graph point, render draws only. The SHM
-     integrator is unchanged; only the timestep is now constant. */
-    function advance(h) {
+     fixed sub-step, sample records one graph point, render draws only.
+     Semi-implicit Euler drifted here exactly as it did in the pendulum: at
+     k=80 N/m the amplitude grew run after run. Velocity Verlet keeps the
+     second-order accuracy that makes an "energy is conserved" claim honest. */
+    function accel(x, vel) {
       const m = M.get(),
         k = K.get(),
         dmp = D.get();
-      /* physics, in PIXELS per second - exactly as before this change */
-      v += ((-k / m) * xPix - dmp * v) * h;
-      xPix += v * h;
+      return (-k / m) * x - dmp * vel;
+    }
+
+    function advance(h) {
+      const a1 = accel(xPix, v);
+      xPix += v * h + 0.5 * a1 * h * h;
+      const vHalf = v + 0.5 * a1 * h;
+      v = vHalf + 0.5 * accel(xPix, vHalf) * h;
       gt += h;
+      /* Downward equilibrium crossing (x > 0 → x ≤ 0). */
+      if (prevX > 0 && xPix <= 0) {
+        if (lastCross !== null) measuredT = gt - lastCross;
+        lastCross = gt;
+      }
+      prevX = xPix;
       trace.push(xPix);
       if (trace.length > 320) trace.shift();
     }
@@ -545,9 +586,12 @@ Sims.register(
 
     function render() {
       const m = M.get(),
-        k = K.get(),
-        dmp = D.get();
-      rT.set((2 * Math.PI * Math.sqrt(m / k)).toFixed(2) + ' s');
+        k = K.get();
+      const tTheory = 2 * Math.PI * Math.sqrt(m / k);
+      const z = dampingRatio();
+      rT.set(tTheory.toFixed(2) + ' s');
+      rTM.set(measuredT ? measuredT.toFixed(2) + ' s' : '—');
+      rZ.set(z.toFixed(2) + ' · ' + regimeOf(z));
       rX.set((xPix / PX_PER_M).toFixed(2) + ' m');
       rV.set((v / PX_PER_M).toFixed(2) + ' m/s');
       const g = cv.g,
@@ -626,7 +670,13 @@ Sims.register(
       t: gt,
       x: xPix / PX_PER_M,
       v: v / PX_PER_M,
+      m: M.get(),
+      k: K.get(),
       y0: (AM ? AM.get() : 80) / PX_PER_M,
+      periodTheory: 2 * Math.PI * Math.sqrt(M.get() / K.get()),
+      periodMeasured: measuredT || null,
+      zeta: dampingRatio(),
+      regime: regimeOf(dampingRatio()),
       paused: controls.isPaused(),
       samples: graph.sampleCount('x') /* one series only - see the projectile note */,
       calls: controls.advanceCalls()

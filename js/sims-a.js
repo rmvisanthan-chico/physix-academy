@@ -158,7 +158,10 @@ Sims.register(
       rN = SU.readout(ro, 'Normal N'),
       rFr = SU.readout(ro, 'Friction f'),
       rNet = SU.readout(ro, 'Net F (N)'),
-      rReg = SU.readout(ro, 'Regime');    /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
+      rReg = SU.readout(
+        ro,
+        'Regime'
+      ); /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
      - same three-branch friction logic, same semi-implicit Euler - it just no
      longer shares a body with the drawing. */
     let a = 0,
@@ -290,6 +293,7 @@ Sims.register(
   '🎢',
   (frame) => {
     const cv = SU.canvas(frame, 280);
+    const cvT = SU.canvas(frame, 132);
     const ctr = SU.el('div', 'sim-controls');
     frame.appendChild(ctr);
     const ro = SU.el('div', 'sim-readouts');
@@ -298,7 +302,15 @@ Sims.register(
     frame.appendChild(act);
     let th = (48 * Math.PI) / 180,
       om = 0,
-      t = 0;
+      t = 0,
+      prevTh = th;
+    /* Energy trace: one sample per fixed step, showing the last TRACE_WIN
+       seconds. The whole point of this simulation is that the total line is
+       flat, so it needs to be visible as a line, not just three numbers. */
+    const trace = [];
+    const TRACE_WIN = 12;
+    let lastCross = null,
+      measuredT = 0;
     const L = SU.slider(ctr, 'Length L', 90, 200, 5, 150, () => {});
     const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 3, 0.25, 1, () => {});
     const D = SU.slider(
@@ -314,11 +326,16 @@ Sims.register(
     const rP = SU.readout(ro, 'PE'),
       rK = SU.readout(ro, 'KE'),
       rT = SU.readout(ro, 'Total'),
-      rTh = SU.readout(ro, 'Angle θ');
+      rTh = SU.readout(ro, 'Angle θ'),
+      rPer = SU.readout(ro, 'Period T');
     const reSwing = () => {
       th = (48 * Math.PI) / 180;
+      prevTh = th;
       om = 0;
       t = 0;
+      trace.length = 0;
+      lastCross = null;
+      measuredT = 0;
     };
     const G = 340;
     function bar(g, x, base, h, col, lab) {
@@ -338,12 +355,79 @@ Sims.register(
      dependent). Not "fixed" here because this simulation's whole point is that
      the total stays flat, and switching to a symplectic scheme would change the
      teaching claim rather than the plumbing. Worth revisiting deliberately. */
+    /* Velocity Verlet on the angle. It is symplectic, so an undamped swing
+     keeps its total energy to within a fraction of a percent indefinitely;
+     the previous plain semi-implicit Euler drifted visibly over a minute and
+     undermined the simulation's own claim. Damping is applied through the
+     acceleration term, so a damped swing still loses energy monotonically. */
     function advance(h) {
       t += h;
       const l = L.get(),
         dmp = D.get();
-      om += ((-G / l) * Math.sin(th) - dmp * om) * h;
-      th += om * h;
+      const a1 = (-G / l) * Math.sin(th) - dmp * om;
+      th += om * h + 0.5 * a1 * h * h;
+      const omHalf = om + 0.5 * a1 * h;
+      const a2 = (-G / l) * Math.sin(th) - dmp * omHalf;
+      om = omHalf + 0.5 * a2 * h;
+      /* Positive-going zero crossing marks the start of a new full period. */
+      if (prevTh < 0 && th >= 0 && om > 0) {
+        if (lastCross != null) measuredT = t - lastCross;
+        lastCross = t;
+      }
+      prevTh = th;
+      const m = M.get();
+      trace.push({
+        t,
+        pe: (m * G * l * (1 - Math.cos(th))) / 1e6,
+        ke: (0.5 * m * l * l * om * om) / 1e6
+      });
+      while (trace.length && t - trace[0].t > TRACE_WIN) trace.shift();
+    }
+    /* Energy-vs-time strip. Scaling uses the running maximum so the flatness
+       of Σ is judged against the actual swing, not an arbitrary axis. */
+    function drawTrace() {
+      const g = cvT.g,
+        W = cvT.W,
+        H = cvT.H;
+      g.fillStyle = '#05070d';
+      g.fillRect(0, 0, W, H);
+      const padL = 34,
+        padB = 16,
+        padT = 8;
+      const plotW = W - padL - 8,
+        plotH = H - padB - padT;
+      let emax = 1e-9;
+      for (const s of trace) emax = Math.max(emax, s.pe + s.ke);
+      g.strokeStyle = 'rgba(148,163,184,.18)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(padL, padT);
+      g.lineTo(padL, H - padB);
+      g.lineTo(W - 8, H - padB);
+      g.stroke();
+      g.fillStyle = '#64748b';
+      g.font = '10px Segoe UI';
+      g.fillText('energy vs time — last ' + TRACE_WIN + ' s', padL + 4, padT + 10);
+      const xOf = (s) => padL + ((s.t - (t - TRACE_WIN)) / TRACE_WIN) * plotW;
+      const yOf = (e) => H - padB - (e / emax) * plotH;
+      const line = (key, col, w) => {
+        g.strokeStyle = col;
+        g.lineWidth = w;
+        g.beginPath();
+        trace.forEach((s, i) => {
+          const x = xOf(s),
+            y = yOf(key === 'sum' ? s.pe + s.ke : s[key]);
+          i ? g.lineTo(x, y) : g.moveTo(x, y);
+        });
+        g.stroke();
+      };
+      line('pe', '#6d5df6', 1.5);
+      line('ke', '#22d3ee', 1.5);
+      line('sum', '#34d399', 2);
+      g.fillStyle = '#34d399';
+      g.textAlign = 'right';
+      g.fillText('Σ E', padL - 4, yOf(emax) + 4);
+      g.textAlign = 'left';
     }
     function render() {
       const l = L.get(),
@@ -354,6 +438,10 @@ Sims.register(
       rK.set(ke.toFixed(2) + ' J');
       rT.set((pe + ke).toFixed(2) + ' J');
       rTh.set(((th * 180) / Math.PI).toFixed(0) + '°');
+      /* Measured period once a full swing is available, otherwise the
+         small-angle prediction so the readout is never blank. */
+      const predicted = 2 * Math.PI * Math.sqrt(l / G);
+      rPer.set(measuredT ? measuredT.toFixed(2) + ' s' : predicted.toFixed(2) + ' s (pred)');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -392,6 +480,7 @@ Sims.register(
       g.fill();
       pxArrow(g, bx, by, l * om * Math.cos(th) * 0.05, -l * om * Math.sin(th) * 0.05, '#34d399');
       pxLabel(g, bx + 14, by - 4, 'v', '#34d399');
+      drawTrace();
     }
     attachTimeControls({
       frame,
@@ -414,6 +503,8 @@ Sims.register(
           pe,
           ke,
           total: pe + ke,
+          period: measuredT || null,
+          predictedPeriod: 2 * Math.PI * Math.sqrt(l / G),
           state: { th: +th.toFixed(8), om: +om.toFixed(8) }
         };
       }
@@ -689,6 +780,11 @@ Sims.register(
           t,
           speed: Math.hypot(pl.vx, pl.vy),
           r: Math.hypot(dx, dy),
+          dx,
+          dy,
+          vx: pl.vx,
+          vy: pl.vy,
+          mu: GM,
           state: { x: +pl.x.toFixed(6), y: +pl.y.toFixed(6) }
         };
       }

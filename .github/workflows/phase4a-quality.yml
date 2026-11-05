@@ -81,6 +81,9 @@ jobs:
       - name: Run prediction verification
         run: node tools/verify-prediction.mjs http://localhost:4311
 
+      - name: Run physics invariant verification
+        run: node tools/verify-physics.mjs http://localhost:4311
+
       - name: Run dashboard verification
         run: node tools/verify-dashboard.mjs http://localhost:4311
 

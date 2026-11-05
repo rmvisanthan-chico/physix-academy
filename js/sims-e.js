@@ -1,5 +1,6 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { Sims } from './sims-a.js';
+import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part E: richer, more realistic, classroom-friendly sims */
 ('use strict');
@@ -20,8 +21,32 @@ Sims.register(
     frame.appendChild(ro);
     const act = SU.el('div', 'sim-actions');
     frame.appendChild(act);
+    /* v–t graph: the block's acceleration is constant while it slides, so the
+       trace must be a straight line. That is the claim the sim makes and the
+       graph is the evidence; before this, a student had to take the number on
+       trust. It also makes the threshold case visible — the trace stays flat
+       until tan θ passes μ. */
+    const graph = createGraph(
+      frame,
+      {
+        xLabel: 'Time',
+        xUnit: 's',
+        xKey: 't',
+        yLabel: 'Velocity',
+        yUnit: 'm/s',
+        title: 'v–t: constant slope while sliding, flat while held by friction',
+        height: 170,
+        capacity: 900
+      },
+      [{ id: 'v', label: 'Velocity v', unit: 'm/s', color: GC.b }]
+    );
     const G = 9.8,
       Lp = 220,
+      /* Chosen display scale: the 220 px ramp reads as a 2.2 m bench, so the
+         distance readout has a unit a student can picture. It scales the
+         printed value only - s itself stays in pixels, and the dynamics are
+         unchanged by it. */
+      PX_PER_M = 100,
       kf = 0.72;
     let s = 0,
       v = 0,
@@ -30,6 +55,7 @@ Sims.register(
       s = 0;
       v = 0;
       t = 0;
+      graph.clear();
     };
     const TH = SU.slider(ctr, 'Angle θ (°)', 0, 65, 1, 32, reset);
     const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 12, 0.5, 4, reset);
@@ -37,6 +63,7 @@ Sims.register(
     const rA = SU.readout(ro, 'a'),
       rN = SU.readout(ro, 'Normal N'),
       rFr = SU.readout(ro, 'Friction f'),
+      rS = SU.readout(ro, 'Distance s'),
       rSt = SU.readout(ro, 'Status');
     /* Phase 3C.1: split from the drawing.
 
@@ -53,15 +80,24 @@ Sims.register(
       const N = M.get() * G * Math.cos(th),
         fp = M.get() * G * Math.sin(th);
       const slides = fp > mu * N && th > 0.001;
-      if (slides) {
-        const a = G * (Math.sin(th) - mu * Math.cos(th));
-        v += a * h;
-        s += v * h;
-        if (s > Lp) {
-          s = Lp;
-          v = 0;
-        }
+      if (!slides) {
+        /* Held (or flat): no acceleration, and any residual velocity is gone. */
+        v = 0;
+        return;
       }
+      /* Constant acceleration over the sub-step, so this update is exact for
+         the slide phase instead of first-order Euler. */
+      const a = G * (Math.sin(th) - mu * Math.cos(th));
+      s += v * h + 0.5 * a * h * h;
+      v += a * h;
+      if (s >= Lp) {
+        s = Lp;
+        v = 0;
+      }
+    }
+
+    function sample() {
+      graph.push({ t, v });
     }
     function render() {
       const th = (TH.get() * Math.PI) / 180,
@@ -76,6 +112,7 @@ Sims.register(
       rA.set(a.toFixed(2) + ' m/s²');
       rN.set(N.toFixed(1) + ' N');
       rFr.set((slides ? fmax : fp).toFixed(1) + ' N');
+      rS.set((s / PX_PER_M).toFixed(2) + ' m');
       rSt.set(
         !slides && th < 0.001 ? 'Flat — no slide' : slides ? 'Sliding ⏷' : 'Held by friction'
       );
@@ -127,6 +164,7 @@ Sims.register(
     attachTimeControls({
       frame,
       advance,
+      sample,
       render,
       reset,
       replaceButtons: ['Reset'],
@@ -136,16 +174,36 @@ Sims.register(
        forward past the end of the run. */
       canAdvance: () => s < Lp,
       stepLabel: 'time step',
-      probe: () => ({
-        t,
-        s,
-        v,
-        a:
-          9.8 *
-          (Math.sin((TH.get() * Math.PI) / 180) - MU.get() * Math.cos((TH.get() * Math.PI) / 180)),
-        state: { s: +s.toFixed(6), v: +v.toFixed(6) }
-      })
+      probe: () => {
+        const th = (TH.get() * Math.PI) / 180,
+          mu = MU.get(),
+          N = M.get() * G * Math.cos(th),
+          fp = M.get() * G * Math.sin(th),
+          slides = fp > mu * N && th > 0.001;
+        return {
+          t,
+          s,
+          v,
+          /* Static case really has a = 0; reporting g(sin θ − μ cos θ) there
+             was wrong - that is the sliding acceleration, not the block's. */
+          a: slides ? G * (Math.sin(th) - mu * Math.cos(th)) : 0,
+          N,
+          friction: slides ? mu * N : fp,
+          slides,
+          state: { s: +s.toFixed(6), v: +v.toFixed(6) }
+        };
+      }
     });
+
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          graph.destroy();
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -163,6 +221,24 @@ Sims.register(
     frame.appendChild(ro);
     const act = SU.el('div', 'sim-actions');
     frame.appendChild(act);
+    /* v–t graph: the whole point of an ideal Atwood machine is that a is
+       CONSTANT, so the trace is a straight line whose slope equals the
+       acceleration the readout quotes. It also makes the balanced case
+       obvious: equal masses produce a flat line at zero. */
+    const graph = createGraph(
+      frame,
+      {
+        xLabel: 'Time',
+        xUnit: 's',
+        xKey: 't',
+        yLabel: 'Speed',
+        yUnit: 'm/s',
+        title: 'v–t: slope = a = (m₂−m₁)g / (m₁+m₂)',
+        height: 170,
+        capacity: 900
+      },
+      [{ id: 'v', label: 'Speed v', unit: 'm/s', color: GC.b }]
+    );
     const G = 9.8,
       kf = 0.9,
       PMAX = 84;
@@ -173,6 +249,7 @@ Sims.register(
       d = 0;
       v = 0;
       t = 0;
+      graph.clear();
     };
     const M1 = SU.slider(ctr, 'Mass m₁ (kg)', 0.5, 8, 0.5, 2, reset);
     const M2 = SU.slider(ctr, 'Mass m₂ (kg)', 0.5, 8, 0.5, 5, reset);
@@ -184,24 +261,34 @@ Sims.register(
       const m1 = M1.get(),
         m2 = M2.get();
       const aMag = (Math.abs(m2 - m1) * G) / (m1 + m2);
-      if (d < PMAX) {
-        v += aMag * h;
-        d += v * h;
-      }
-      if (d > PMAX) {
+      if (aMag === 0 || d >= PMAX) return;
+      /* Constant acceleration, exact over the sub-step. */
+      d += v * h + 0.5 * aMag * h * h;
+      v += aMag * h;
+      if (d >= PMAX) {
         d = PMAX;
         v = 0;
       }
     }
+
+    function sample() {
+      graph.push({ t, v });
+    }
     function render() {
       const m1 = M1.get(),
         m2 = M2.get();
-      const heavyRight = m2 >= m1;
+      const balanced = m2 === m1;
+      const heavyRight = m2 > m1;
+      /* d is a magnitude. The picture must move in the direction of the net
+         force: with m₂ heavier the left block rises, but when m₁ is heavier the
+         left block must DESCEND. The old code always raised the left side, so
+         it drew the opposite motion for half the settings. */
+      const dir = heavyRight ? 1 : -1;
       const aMag = (Math.abs(m2 - m1) * G) / (m1 + m2);
       const T = (2 * m1 * m2 * G) / (m1 + m2);
       rA.set(aMag.toFixed(2) + ' m/s²');
       rT.set(T.toFixed(1) + ' N');
-      rDir.set(heavyRight ? 'm₂ ↓' : 'm₁ ↓');
+      rDir.set(balanced ? 'balanced' : heavyRight ? 'm₂ ↓' : 'm₁ ↓');
       const g = cv.g,
         cx = cv.W / 2,
         py = 42,
@@ -218,8 +305,8 @@ Sims.register(
       g.fill();
       g.strokeStyle = '#9aa8c3';
       g.lineWidth = 2;
-      const yL = y0 - d,
-        yR = y0 + d;
+      const yL = y0 - dir * d,
+        yR = y0 + dir * d;
       g.beginPath();
       g.moveTo(cx - 26, py);
       g.lineTo(cx - 26, yL);
@@ -248,6 +335,7 @@ Sims.register(
     attachTimeControls({
       frame,
       advance,
+      sample,
       render,
       reset,
       replaceButtons: ['Reset'],
@@ -263,10 +351,22 @@ Sims.register(
           v,
           a: (Math.abs(m2 - m1) * G) / (m1 + m2),
           T: (2 * m1 * m2 * G) / (m1 + m2),
+          balanced: m2 === m1,
+          heavier: m2 === m1 ? 'none' : m2 > m1 ? 'm2' : 'm1',
           state: { d: +d.toFixed(6), v: +v.toFixed(6) }
         };
       }
     });
+
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          graph.destroy();
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
