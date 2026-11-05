@@ -3,6 +3,7 @@ import { Sims } from './sims-a.js';
 import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
 import { createSimControls } from './sim-controls.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part C: projectile, SHM, doppler */
 ('use strict');
 
@@ -804,37 +805,65 @@ Sims.register(
     const C = 90;
     let rings = [],
       srcX = 60,
-      emitAcc = 0;
+      emitAcc = 0,
+      t = 0;
     const VS = SU.slider(ctr, 'Source velocity', -60, 160, 5, 55, () => {
       rings = [];
       srcX = 60;
+      t = 0;
     });
     const FR = SU.slider(ctr, 'Emitted frequency f (Hz)', 0.5, 3, 0.1, 1.2, () => {});
     const rF = SU.readout(ro, "Heard f'"),
+      rGap = SU.readout(ro, 'Wavefront gap λ′'),
       rSt = SU.readout(ro, 'Status');
-    SU.loop(cv.c, (dt) => {
+
+    /* advance() integrates; render() only draws and reports. The rings are
+       SPACED by the emission rhythm: over one period 1/f the source moves
+       vs/f and each wavefront gains C/f, so the spacing between successive
+       right edges is (C − vs)/f. That spacing - not the instantaneous
+       formula - is what a listener actually hears, so the probe exposes it
+       and the tests use it to check f′ = fC/(C − vs). */
+    function advance(h) {
+      t += h;
       const vs = VS.get(),
         f = FR.get();
-      srcX += vs * dt;
+      srcX += vs * h;
       if (srcX < 20 || srcX > cv.W * 0.62) {
         VS.set(-vs);
         rings = [];
       }
-      emitAcc += dt;
+      emitAcc += h;
       if (emitAcc > 1 / f) {
         emitAcc = 0;
         rings.push({ x: srcX, y: cv.H * 0.45, r: 2 });
       }
       rings.forEach((r) => {
-        r.r += C * dt;
+        r.r += C * h;
       });
       rings = rings.filter((r) => r.r < cv.W * 1.2);
+    }
+
+    /* Distance in x between the two most recent wavefronts, measured along
+       the direction the observer looks. Both rings grow at C, both drift with
+       the source, so this gap is a real measurement of (C − vs)/f. Needs two
+       rings; before the second is emitted the readout shows an em dash. */
+    function measureGap() {
+      if (rings.length < 2) return null;
+      const a = rings[rings.length - 2],
+        b = rings[rings.length - 1];
+      return a.x + a.r - (b.x + b.r);
+    }
+
+    function render() {
+      const vs = VS.get(),
+        f = FR.get();
       const obsX = cv.W - 60,
         obsY = cv.H * 0.45;
-      const dist = Math.abs(obsX - srcX);
       const vr = vs * Math.sign(obsX - srcX);
       const fObs = (f * C) / Math.max(20, C - vr);
+      const gap = measureGap();
       rF.set(fObs.toFixed(2) + ' Hz');
+      rGap.set(gap ? gap.toFixed(1) + ' px' : '—');
       rSt.set(
         vr > C
           ? '💥 Sonic boom!'
@@ -868,6 +897,40 @@ Sims.register(
       g.fill();
       g.fillStyle = '#e8edf7';
       g.fillText('observer', obsX - 22, obsY - 16);
+    }
+
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        rings = [];
+        srcX = 60;
+        t = 0;
+        emitAcc = 0;
+      },
+      /* The source bounces between walls forever, so Step always has work. */
+      canAdvance: () => true,
+      getTime: () => t,
+      stepLabel: 'time step',
+      probe: () => {
+        const vs = VS.get(),
+          f = FR.get();
+        const obsX = cv.W - 60;
+        const vr = vs * Math.sign(obsX - srcX);
+        const gap = measureGap();
+        return {
+          t,
+          srcX,
+          vs,
+          f,
+          nRings: rings.length,
+          gap: gap == null ? null : gap,
+          obsX,
+          fHeard: (f * C) / Math.max(20, C - vr),
+          state: { srcX: +srcX.toFixed(6) }
+        };
+      }
     });
   }
 );
