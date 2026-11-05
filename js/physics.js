@@ -231,13 +231,17 @@ export const escapeSpeed = (mu, r) => Math.sqrt((2 * mu) / r);
  * @param {{x:number,y:number,vx:number,vy:number}} s
  * @param {number} mu
  * @param {number} h
+ * @param {number} [cx=0] x coordinate of the central body
+ * @param {number} [cy=0] y coordinate of the central body
  */
-export function stepOrbit(s, mu, h) {
+export function stepOrbit(s, mu, h, cx = 0, cy = 0) {
   const a = (x, y) => {
-    const r2 = x * x + y * y;
+    const dx = x - cx;
+    const dy = y - cy;
+    const r2 = dx * dx + dy * dy;
     const r = Math.sqrt(r2) || 1;
     const f = -mu / (r2 * r);
-    return { ax: f * x, ay: f * y };
+    return { ax: f * dx, ay: f * dy };
   };
 
   const a1 = a(s.x, s.y);
@@ -252,7 +256,7 @@ export function stepOrbit(s, mu, h) {
 }
 
 /** Specific orbital energy (J/kg) — negative for bound orbits. */
-export function orbitalEnergy(s, mu) {
-  const r = Math.hypot(s.x, s.y) || 1;
+export function orbitalEnergy(s, mu, cx = 0, cy = 0) {
+  const r = Math.hypot(s.x - cx, s.y - cy) || 1;
   return 0.5 * (s.vx * s.vx + s.vy * s.vy) - mu / r;
 }

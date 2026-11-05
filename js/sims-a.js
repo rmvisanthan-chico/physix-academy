@@ -1,6 +1,7 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { esc, Store } from './utils.js';
 import { attachTimeControls } from './sim-controls-helper.js';
+import { collide1D, stepOrbit, orbitalEnergy } from './physics.js';
 /* PhysiX Academy — Simulations Part A: registry, helpers + mechanics */
 ('use strict');
 
@@ -39,11 +40,20 @@ export const Sims = {
     }
     const frame = SU.el('div', 'sim-frame');
     frame.innerHTML =
-      '<div class="sim-head"><span class="dot"></span><b>' +
+      '<div class="sim-head">' +
+      '<span class="sim-icon" aria-hidden="true">' +
+      esc(def.icon || '🧪') +
+      '</span>' +
+      '<div class="sim-head-text">' +
+      '<b class="sim-title">' +
       esc(def.title) +
-      '</b><span class="muted small">' +
+      '</b>' +
+      '<span class="sim-desc">' +
       esc(def.desc) +
-      '</span></div>';
+      '</span>' +
+      '</div>' +
+      '<span class="sim-badge">Interactive</span>' +
+      '</div>';
     host.appendChild(frame);
     /* The per-simulation page passes a .sim-slot-lg that lives INSIDE #main,
          so observing that host is not enough: the router replaces #main's
@@ -147,12 +157,14 @@ Sims.register(
     const rA = SU.readout(ro, 'a'),
       rN = SU.readout(ro, 'Normal N'),
       rFr = SU.readout(ro, 'Friction f'),
-      rNet = SU.readout(ro, 'Net F (N)');    /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
+      rNet = SU.readout(ro, 'Net F (N)'),
+      rReg = SU.readout(ro, 'Regime');    /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
      - same three-branch friction logic, same semi-implicit Euler - it just no
      longer shares a body with the drawing. */
     let a = 0,
       fr = 0,
-      N = 0;
+      N = 0,
+      regime = 'static';
     function advance(h) {
       t += h;
       const f = F.get(),
@@ -160,17 +172,25 @@ Sims.register(
         mu = MU.get();
       const dir = v > 0.01 ? 1 : v < -0.01 ? -1 : 0;
       N = m * G;
-      const fmax = mu * N;
+      /* Static friction is stronger than kinetic friction: a cart at rest can
+         resist a push that would keep it moving once it has started. Using one
+         coefficient for both made the cart creep at a force it should have
+         ignored. muK = mu (the slider) and muS = 1.25 * mu. */
+      const fk = mu * N;
+      const fsMax = mu * 1.25 * N;
       if (dir !== 0) {
-        fr = -dir * fmax;
+        fr = -dir * fk;
         a = (f + fr) / m;
-      } else if (Math.abs(f) <= fmax) {
+        regime = 'kinetic';
+      } else if (Math.abs(f) <= fsMax) {
         fr = -f;
         a = 0;
         v = 0;
+        regime = 'static';
       } else {
-        fr = -Math.sign(f) * fmax;
+        fr = -Math.sign(f) * fk;
         a = (f + fr) / m;
+        regime = 'kinetic';
       }
       v += a * h;
       x += v * h;
@@ -190,6 +210,7 @@ Sims.register(
       rN.set(N.toFixed(0) + ' N');
       rFr.set(fr.toFixed(0) + ' N');
       rNet.set((f + fr).toFixed(0) + ' N');
+      rReg.set(regime);
       const g = cv.g,
         gy = cv.H * 0.72;
       g.fillStyle = '#05070d';
@@ -253,6 +274,7 @@ Sims.register(
         N: N,
         fr,
         fNet: F.get() + fr,
+        regime,
         calls: 0,
         state: { x: +x.toFixed(6), v: +v.toFixed(6) }
       })
@@ -462,8 +484,9 @@ Sims.register(
         const u1 = a.v,
           u2 = b.v,
           e = E.get();
-        a.v = (e * b.m * (u2 - u1) + a.m * u1 + b.m * u2) / (a.m + b.m);
-        b.v = (e * a.m * (u1 - u2) + a.m * u1 + b.m * u2) / (a.m + b.m);
+        const hit = collide1D(a.m, u1, b.m, u2, e);
+        a.v = hit.v1;
+        b.v = hit.v2;
         const mid = (a.x + b.x) / 2;
         a.x = mid - gap / 2;
         b.x = mid + gap / 2;
@@ -587,16 +610,12 @@ Sims.register(
         pl = {};
         return;
       }
-      const dx = pl.x - CX(),
-        dy = pl.y - CY,
-        r = Math.hypot(dx, dy) || 1;
-      const acc = GM / (r * r);
-      pl.vx -= ((acc * dx) / r) * h;
-      pl.vy -= ((acc * dy) / r) * h;
-      pl.x += pl.vx * h;
-      pl.y += pl.vy * h;
+      /* Velocity Verlet: second-order and time-reversible, so a bound orbit keeps
+       its radius instead of spiralling out the way semi-implicit Euler does. */
+      stepOrbit(pl, GM, h, CX(), CY);
       trail.push([pl.x, pl.y]);
       if (trail.length > 600) trail.shift();
+      const r = Math.hypot(pl.x - CX(), pl.y - CY) || 1;
       if (r < 18 || r > 1500) dead = 1.2;
     }
     function render() {
@@ -640,7 +659,7 @@ Sims.register(
       const dx = pl.x - CX(),
         dy = pl.y - CY,
         r = Math.hypot(dx, dy) || 1;
-      const en = 0.5 * (pl.vx * pl.vx + pl.vy * pl.vy) - GM / r;
+      const en = orbitalEnergy(pl, GM, CX(), CY);
       rV.set(Math.hypot(pl.vx, pl.vy).toFixed(0) + ' px/s');
       rR.set(r.toFixed(0) + ' px');
       if (r < 18) rS.set('💥 Crashed!');

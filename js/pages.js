@@ -12,9 +12,6 @@ import { ensureAll } from './sims-loader.js';
 /* Global promise that resolves when all sim modules are loaded */
 window.__SimsReady = ensureAll();
 
-/* Global promise that resolves when all sim modules are loaded */
-window.__SimsReady = ensureAll();
-
 /* ---------------- Practice ---------------- */
 const Session = { qs: [], i: 0, correct: 0, misses: [] };
 
@@ -167,19 +164,24 @@ export function viewPractice() {
 /* ---------------- Simulations ---------------- */
 
 export async function viewSimsPage(id) {
-  console.log('[viewSimsPage] called with id:', id, 'Sims.reg[id]:', !!Sims.reg[id]);
   if (id && Sims.reg[id]) {
     const d = Sims.reg[id];
     const usedIn = flatLessons().filter((e) => e.lesson.content.some((b) => b.sim === id));
+    const seenChapters = new Set();
+    const usedChapters = usedIn.filter((e) => {
+      if (seenChapters.has(e.chapter.id)) return false;
+      seenChapters.add(e.chapter.id);
+      return true;
+    });
     App.el.innerHTML = `
     <div class="wrap">
       <div class="page-head"><a class="small" href="#/sims">‹ All simulations</a>
         <h1>${d.icon} ${esc(d.title)}</h1><p class="sub">${esc(d.desc)}</p></div>
       <div class="sim-slot-lg"></div>
       ${
-        usedIn.length
+        usedChapters.length
           ? '<p class="small muted">Used in: ' +
-            usedIn
+            usedChapters
               .map((e) => '<a href="#/lesson/' + e.lesson.id + '">' + esc(e.chapter.title) + '</a>')
               .join(' · ') +
             '</p>'
@@ -191,7 +193,7 @@ export async function viewSimsPage(id) {
   }
   /* Ensure all sim modules are loaded for the catalogue view */
   await ensureAll();
-  const items = Object.values(Sims.reg);
+  const all = Object.values(Sims.reg).sort((a, b) => a.title.localeCompare(b.title));
   /* Standalone pages under /html5-sims/. These are whole documents rather
        than Sims.register() modules, so they open as normal navigations. */
   const threeD = window.Sims3D || [];
@@ -199,23 +201,36 @@ export async function viewSimsPage(id) {
     <div class="wrap">
       <div class="page-head"><h1>Simulations</h1>
       <p class="sub">Physics you can poke. Every simulation runs live in your browser &mdash; drag the sliders and watch the equations respond.</p></div>
+      <div class="sim-cat-bar">
+        <label class="sim-search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="sim-search" type="search" placeholder="Search simulations…" autocomplete="off" aria-label="Search simulations">
+        </label>
+        <span class="sim-count" id="sim-count">${all.length} simulations</span>
+      </div>
       ${
-        items.length
-          ? '<div class="grid g3">' +
-            items
+        all.length
+          ? '<div class="grid g3 sim-cat-grid" id="sim-cat-grid">' +
+            all
               .map(
                 (d) => `
-        <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
-          ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">⚛️ Official PhET</em></div>' : ''}
-          <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
+        <article class="card hover topic-card sim-cat-card" data-search="${esc(
+          (d.title + ' ' + d.desc + ' ' + d.id).toLowerCase()
+        )}">
+          <div class="sim-cat-top">
+            <span class="sim-cat-icon" aria-hidden="true">${esc(d.icon || '🧪')}</span>
+            ${d.phet ? '<em class="phet-badge">⚛️ Official PhET</em>' : ''}
+          </div>
+          <h3>${esc(d.title)}</h3>
           <p class="muted">${esc(d.desc)}</p>
           <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open &rarr;</a></div>
-        </div>`
+        </article>`
               )
               .join('') +
             '</div>'
           : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
+      <p class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></p>
       ${
         threeD.length
           ? `
@@ -239,6 +254,27 @@ export async function viewSimsPage(id) {
           : ''
       }
     </div>`;
+
+  /* Catalogue search. Filters in place, so the grid does not re-render and
+     focus stays in the box while typing. */
+  const search = document.getElementById('sim-search');
+  const grid = document.getElementById('sim-cat-grid');
+  if (search && grid) {
+    const count = document.getElementById('sim-count');
+    const none = document.getElementById('sim-no-results');
+    const cards = [...grid.querySelectorAll('.sim-cat-card')];
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      let shown = 0;
+      for (const card of cards) {
+        const hit = !q || card.dataset.search.includes(q);
+        card.hidden = !hit;
+        if (hit) shown++;
+      }
+      count.textContent = q ? `${shown} of ${cards.length}` : `${cards.length} simulations`;
+      if (none) none.hidden = shown !== 0;
+    });
+  }
 }
 
 /* ---------------- Tutor page ---------------- */
