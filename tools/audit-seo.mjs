@@ -117,6 +117,27 @@ else {
   if (homepage.title !== expectedTitle) failures.push(`index.html: title ${homepage.title} != ${expectedTitle}`);
   if (homepage.description !== expectedDescription) failures.push('index.html: description does not match the mandated master value');
   if (homepage.robots && /noindex/i.test(homepage.robots)) failures.push('index.html: is noindex');
+  if (!homepage.html.includes('Learn physics for free, without advertisements.')) {
+    failures.push('index.html: missing visible "Learn physics for free, without advertisements." line');
+  }
+  for (const link of ['html5-sims/index.html', 'motion-graphs.html']) {
+    if (!homepage.html.includes(`href="${link}"`)) failures.push(`index.html: footer missing link to ${link}`);
+  }
+  const graphNodes = homepage.jsonLd.flatMap((block) => block['@graph'] ?? [block]);
+  for (const type of ['WebSite', 'EducationalOrganization']) {
+    const node = graphNodes.find((candidate) => candidate['@type'] === type);
+    if (!node) {
+      failures.push(`index.html: JSON-LD missing ${type}`);
+      continue;
+    }
+    const names = node.alternateName ?? [];
+    if (!Array.isArray(names) || !names.includes('PhysixAcademy')) {
+      failures.push(`index.html: JSON-LD ${type} alternateName missing "PhysixAcademy"`);
+    }
+  }
+  if (!graphNodes.some((node) => node['@type'] === 'EducationalOrganization' && node.slogan === "Understand Physics. Don't Just Memorize It.")) {
+    failures.push('index.html: JSON-LD EducationalOrganization missing official slogan');
+  }
 }
 
 const noindexPages = ['404.html', 'login.html', 'privacy.html', 'terms.html'];
@@ -145,12 +166,42 @@ for (const loc of sitemapLocs) {
 
 for (const page of pages) {
   if (!page.jsonLd.length) continue;
-  const types = page.jsonLd.flatMap((block) => (block['@graph'] ?? [block]).map((node) => node['@type']));
+  const types = page.jsonLd.flatMap((block) => block['@graph'] ?? [block]).map((node) => node['@type']);
   if (page.rel === 'index.html' && !types.includes('Person')) failures.push('index.html: JSON-LD missing Person');
   if (page.rel === 'blog/index.html' && !types.includes('Blog')) failures.push('blog/index.html: JSON-LD missing Blog');
   if (page.rel.startsWith('blog/') && page.rel !== 'blog/index.html' && !types.includes('Article')) {
     failures.push(`${page.rel}: JSON-LD missing Article`);
   }
+}
+
+/* Brand-consistency and internal-link-graph assertions (40-search-variation project). */
+for (const page of pages) {
+  if (page.rel.startsWith('html5-sims/') && page.rel !== 'html5-sims/index.html') {
+    if (!page.title || !page.title.includes('PhysiX Academy')) {
+      failures.push(`${page.rel}: title missing brand suffix "PhysiX Academy" (${page.title})`);
+    }
+  }
+}
+const simHub = pages.find((page) => page.rel === 'html5-sims/index.html');
+if (simHub) {
+  for (const link of ['../index.html', '../motion-graphs.html']) {
+    if (!simHub.html.includes(`href="${link}"`)) failures.push(`html5-sims/index.html: missing link to ${link}`);
+  }
+} else {
+  failures.push('missing html5-sims/index.html');
+}
+const motion = pages.find((page) => page.rel === 'motion-graphs.html');
+if (motion && !motion.html.includes('href="html5-sims/index.html"')) {
+  failures.push('motion-graphs.html: missing link to html5-sims/index.html');
+}
+for (const page of pages.filter((candidate) => candidate.rel.startsWith('blog/'))) {
+  if (!page.html.includes('href="../html5-sims/index.html"')) {
+    failures.push(`${page.rel}: missing link to ../html5-sims/index.html`);
+  }
+}
+const blogIndex = pages.find((page) => page.rel === 'blog/index.html');
+if (blogIndex && !blogIndex.html.includes('href="../index.html"')) {
+  failures.push('blog/index.html: missing link to ../index.html');
 }
 
 console.log(`Scanned ${pages.length} HTML files`);
