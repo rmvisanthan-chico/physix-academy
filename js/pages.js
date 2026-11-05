@@ -206,7 +206,7 @@ export async function viewSimsPage(id) {
               .map(
                 (d) => `
         <div class="card hover topic-card ${d.phet ? 'phet-card' : ''}">
-          ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">dYs? Official PhET</em></div>' : ''}
+          ${d.phet ? '<div class="phet-thumb"><span>' + d.icon + '</span><em class="phet-badge">⚛️ Official PhET</em></div>' : ''}
           <h3>${d.phet ? '' : d.icon + ' '}${esc(d.title)}</h3>
           <p class="muted">${esc(d.desc)}</p>
           <div class="topic-meta"><a class="btn btn-sm btn-primary" href="#/sims/${d.id}">Open &rarr;</a></div>
@@ -214,7 +214,7 @@ export async function viewSimsPage(id) {
               )
               .join('') +
             '</div>'
-          : '<div class="empty-state"><div class="big">dY"</div><p>No simulations registered yet.</p></div>'
+          : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
       ${
         threeD.length

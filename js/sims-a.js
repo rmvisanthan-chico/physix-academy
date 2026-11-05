@@ -147,8 +147,7 @@ Sims.register(
     const rA = SU.readout(ro, 'a'),
       rN = SU.readout(ro, 'Normal N'),
       rFr = SU.readout(ro, 'Friction f'),
-      rNet = SU.readout(ro, 'Net F');
-    /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
+      rNet = SU.readout(ro, 'Net F (N)');    /* Phase 3C.1: split into advance/render. The force balance itself is unchanged
      - same three-branch friction logic, same semi-implicit Euler - it just no
      longer shares a body with the drawing. */
     let a = 0,
@@ -190,7 +189,7 @@ Sims.register(
       rA.set(a.toFixed(2) + ' m/s²');
       rN.set(N.toFixed(0) + ' N');
       rFr.set(fr.toFixed(0) + ' N');
-      rNet.set(f.toFixed(0) + ' N');
+      rNet.set((f + fr).toFixed(0) + ' N');
       const g = cv.g,
         gy = cv.H * 0.72;
       g.fillStyle = '#05070d';
@@ -253,6 +252,7 @@ Sims.register(
         a,
         N: N,
         fr,
+        fNet: F.get() + fr,
         calls: 0,
         state: { x: +x.toFixed(6), v: +v.toFixed(6) }
       })
