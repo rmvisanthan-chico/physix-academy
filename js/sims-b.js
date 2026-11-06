@@ -27,12 +27,26 @@ Sims.register(
     const WL = SU.slider(ctr, 'Wavelength λ (px)', 60, 400, 5, 180, upd);
     const AM = SU.slider(ctr, 'Amplitude (px)', 10, 80, 2, 45, () => {});
     vRead = SU.readout(ro, 'Wave speed');
+    const rPer = SU.readout(ro, 'Period T');
     upd();
-    SU.loop(cv.c, (dt, t) => {
+
+    /* A travelling wave is an analytic function of time: y(x) = A·sin(kx − ωt).
+       There is nothing to integrate, so advance() only walks the clock and the
+       shape is drawn exactly — Step stays trustworthy at any step size. The
+       replacement for the old bare SU.loop is the shared time-control bar,
+       which also gives the probe used by the physics tests. */
+    let t = 0;
+
+    function advance(h) {
+      t += h;
+    }
+
+    function render() {
       const g = cv.g,
         A = AM.get(),
         k = (2 * Math.PI) / WL.get(),
         w = 2 * Math.PI * FR.get();
+      rPer.set((1 / FR.get()).toFixed(2) + ' s');
       const mid = cv.H / 2;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -73,6 +87,38 @@ Sims.register(
         g.font = '12px Segoe UI';
         g.fillText('λ', (crest + c2) / 2 - 4, mid + A + 34);
       }
+    }
+
+    /* crestX is the x of the tracked crest. It is what probe physics uses:
+       d(crestX)/dt must equal f·λ, so "v = fλ" stops being a label and
+       becomes a measurement. */
+    const crestX = () => {
+      const k = (2 * Math.PI) / WL.get(),
+        w = 2 * Math.PI * FR.get();
+      return ((((w * t) / k) % WL.get()) + WL.get()) % WL.get();
+    };
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+      },
+      /* A wave runs forever - nothing to gate Step on. */
+      canAdvance: () => true,
+      getTime: () => t,
+      stepLabel: 'time step',
+      probe: () => ({
+        t,
+        phase: 2 * Math.PI * FR.get() * t,
+        f: FR.get(),
+        lambda: WL.get(),
+        amp: AM.get(),
+        crest: crestX(),
+        T: 1 / FR.get(),
+        v: FR.get() * WL.get(),
+        state: { crest: +crestX().toFixed(6) }
+      })
     });
   }
 );
@@ -92,16 +138,59 @@ Sims.register(
     const V = SU.slider(ctr, 'Battery V (volts)', 1.5, 24, 0.5, 12, () => {});
     const R = SU.slider(ctr, 'Resistance R (Ω)', 2, 100, 1, 24, () => {});
     const rI = SU.readout(ro, 'Current I'),
-      rP = SU.readout(ro, 'Power P');
-    let phase = 0;
-    SU.loop(cv.c, (dt) => {
+      rP = SU.readout(ro, 'Power P'),
+      rQ = SU.readout(ro, 'Charge moved');
+
+    /* q–t graph. The physics claim of a simple circuit is that I = V/R is
+       CONSTANT, so the charge passing any point grows linearly and the line's
+       slope IS the current the readout quotes. The graph turns that into
+       visible evidence instead of a number to take on trust. */
+    const graph = createGraph(
+      frame,
+      {
+        xLabel: 'Time',
+        xUnit: 's',
+        xKey: 't',
+        yLabel: 'Charge',
+        yUnit: 'C',
+        title: 'Charge through the cell — slope = I = V/R',
+        height: 170,
+        capacity: 900
+      },
+      [{ id: 'q', label: 'Charge q', unit: 'C', color: GC.a }]
+    );
+
+    let t = 0,
+      q = 0,
+      phase = 0;
+
+    function advance(h) {
+      const I = V.get() / R.get();
+      q += I * h;
+      t += h;
+      /* Electron-drift animation phase - visual only, same law as before. */
+      phase = (phase + Math.min(220, I * 30) * h) % 1;
+    }
+
+    function sample() {
+      graph.push({ t, q });
+    }
+
+    function reset() {
+      t = 0;
+      q = 0;
+      phase = 0;
+      graph.clear();
+    }
+
+    function render() {
       const v = V.get(),
         r = R.get(),
         I = v / r,
         P = I * I * r;
       rI.set(I.toFixed(2) + ' A');
       rP.set(P.toFixed(1) + ' W');
-      phase = (phase + Math.min(220, I * 30) * dt) % 1;
+      rQ.set(q.toFixed(2) + ' C');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -193,7 +282,44 @@ Sims.register(
       g.textAlign = 'center';
       g.fillText('R = ' + r + ' Ω', mx, T - 20);
       g.textAlign = 'left';
+    }
+
+    attachTimeControls({
+      frame,
+      advance,
+      sample,
+      render,
+      reset,
+      /* A resistor never saturates - current keeps flowing, so Step always has
+         something to integrate. */
+      canAdvance: () => true,
+      getTime: () => t,
+      stepLabel: 'time step',
+      probe: () => {
+        const v = V.get(),
+          r = R.get(),
+          I = v / r;
+        return {
+          t,
+          V: v,
+          R: r,
+          I,
+          P: I * I * r,
+          q,
+          state: { q: +q.toFixed(6) }
+        };
+      }
     });
+
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          graph.destroy();
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 

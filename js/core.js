@@ -71,6 +71,12 @@ export const SU = {
   },
   slider(parent, label, min, max, step, val, oninput, fmt) {
     fmt = fmt || ((v) => v);
+    /* Not every slider needs to react on input (many sims only read .get()
+       each frame). The handler was called unconditionally, so dragging any
+       such slider threw "oninput is not a function" - a live error across
+       several simulations. A no-op default makes the helper safe by
+       construction instead of relying on 40+ call sites to pass one. */
+    oninput = oninput || (() => {});
     const w = SU.el('div', 'ctl', '<label></label>');
     /* A label wrapping the text but not the input does NOT name the input for
        assistive tech unless the input is inside the label. It was not, so all

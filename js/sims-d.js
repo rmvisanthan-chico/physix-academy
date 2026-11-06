@@ -1,5 +1,6 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — Simulations Part D: efield, induction, lens */
 ('use strict');
 
@@ -34,7 +35,6 @@ Sims.register(
         const dx = x - cx,
           dy = y - cy,
           r2 = dx * dx + dy * dy || 40;
-        const e = (((q * 40000) / (r2 * Math.sqrt(r2))) * Math.sqrt(r2)) / Math.sqrt(r2);
         const mag = (q * 200000) / r2;
         ex += (mag * dx) / Math.sqrt(r2);
         ey += (mag * dy) / Math.sqrt(r2);
@@ -138,6 +138,34 @@ Sims.register(
       const rc = cv.c.getBoundingClientRect();
       probes.push({ x: e.clientX - rc.left, y: e.clientY - rc.top, vx: 0, vy: 0, tr: [] });
     });
+    /* The field is static between slider changes, so this simulation needs no
+       time controls — but the audit and the physics tests still need numbers.
+       The probe exposes the field at the mid-point between the charges, where
+       the superposition claim is easiest to check: by symmetry the y
+       component is ~0 for equal-magnitude pairs, and the x component's sign
+       flips with the charge balance. */
+    const efieldProbe = () => {
+      const center = fieldAt(cv.W / 2, cv.H / 2);
+      return {
+        q1: Q1.get(),
+        q2: Q2.get(),
+        W: cv.W,
+        H: cv.H,
+        nProbes: probes.length,
+        eCenter: { x: +center[0].toFixed(3), y: +center[1].toFixed(3) },
+        eMag: +Math.hypot(center[0], center[1]).toFixed(3)
+      };
+    };
+    window.__tcProbe = efieldProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === efieldProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -157,10 +185,28 @@ Sims.register(
     frame.appendChild(act);
     let mx,
       phiPrev = 0,
+      emfRaw = 0,
+      dphiDt = 0,
       emfSm = 0,
-      emfTrace = [];
+      emfTrace = [],
+      t = 0;
+    const coilX = () => cv.W * 0.62;
+    function fluxAt(x) {
+      const d = Math.abs(x - coilX());
+      return (9000 / (d * d + 900)) * Math.sign(coilX() - x || 1);
+    }
     const reset = () => {
       mx = 60;
+      t = 0;
+      /* Seed phiPrev with the flux the magnet actually has after the reset;
+         leaving it at 0 (the old behaviour) made the first step after a reset
+         report a large fake EMF spike, since Φ(60) − 0 ≠ 0. The old reset
+         also left emfSm and emfTrace polluted from the previous run. */
+      phiPrev = fluxAt(60);
+      emfSm = 0;
+      emfRaw = 0;
+      dphiDt = 0;
+      emfTrace = [];
     };
     const VS = SU.slider(ctr, 'Magnet velocity', -160, 160, 5, 70, () => {});
     const NC = SU.slider(ctr, 'Coil turns N', 1, 20, 1, 8, () => {});
@@ -168,14 +214,9 @@ Sims.register(
       rEmf = SU.readout(ro, 'EMF'),
       rDir = SU.readout(ro, 'Induced current');
     reset();
-    SU.btn(act, '⟲ Reset', reset);
-    const coilX = () => cv.W * 0.62;
-    function fluxAt(x) {
-      const d = Math.abs(x - coilX());
-      return (9000 / (d * d + 900)) * Math.sign(coilX() - x || 1);
-    }
-    SU.loop(cv.c, (dt) => {
-      mx += VS.get() * dt;
+    function advance(h) {
+      t += h;
+      mx += VS.get() * h;
       if (mx < 30) {
         mx = 30;
         VS.set(Math.abs(VS.get()));
@@ -185,9 +226,15 @@ Sims.register(
         VS.set(-Math.abs(VS.get()));
       }
       const phi = fluxAt(mx);
-      const emf = (-NC.get() * (phi - phiPrev)) / Math.max(dt, 0.001);
+      dphiDt = (phi - phiPrev) / Math.max(h, 0.001);
+      emfRaw = -NC.get() * dphiDt;
       phiPrev = phi;
-      emfSm += (emf - emfSm) * 0.15;
+      emfSm += (emfRaw - emfSm) * 0.15;
+      emfTrace.push(emfSm);
+      if (emfTrace.length > 240) emfTrace.shift();
+    }
+    function render() {
+      const phi = fluxAt(mx);
       rPhi.set(phi.toFixed(2) + ' mWb');
       rEmf.set(emfSm.toFixed(2) + ' V');
       rDir.set(emfSm > 0.05 ? '↻ one way' : emfSm < -0.05 ? '↺ other way' : '— none');
@@ -235,11 +282,31 @@ Sims.register(
         i ? g.lineTo(X, Y) : g.moveTo(X, Y);
       });
       g.stroke();
-      emfTrace.push(emfSm);
-      if (emfTrace.length > 240) emfTrace.shift();
       g.fillStyle = '#6b7a99';
       g.font = '10px Segoe UI';
       g.fillText('EMF(t)', gx0, cv.H - 8);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset,
+      replaceButtons: ['⟲ Reset'],
+      getTime: () => t,
+      /* The magnet bounces between walls forever, so Step is never blocked. */
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => ({
+        t,
+        mx,
+        vs: VS.get(),
+        n: NC.get(),
+        phi: fluxAt(mx),
+        emfRaw,
+        dphiDt,
+        emfSm,
+        state: { mx: +mx.toFixed(6) }
+      })
     });
   }
 );
@@ -268,7 +335,6 @@ Sims.register(
         oh = OH.get();
       const di = 1 / (1 / f - 1 / dobj);
       const m = -di / dobj;
-      const ih = oh * Math.abs(m);
       rV.set(
         (di > 0 ? '+' : '') + di.toFixed(0) + ' px (' + (di > 0 ? 'behind lens' : 'same side') + ')'
       );
@@ -276,8 +342,7 @@ Sims.register(
       rNat.set(di > 0 ? 'Real · inverted' : 'Virtual · upright');
       const g = cv.g,
         axisY = cv.H * 0.55;
-      const lensX = cv.W * 0.52,
-        scale = 1;
+      const lensX = cv.W * 0.52;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
       g.strokeStyle = '#33415c';
@@ -322,8 +387,6 @@ Sims.register(
         g.setLineDash([]);
       };
       ray(objX, tipY, lensX, tipY, 'rgba(248,113,113,.95)');
-      const slopeA = (ih * Math.sign(m) - (tipY - axisY)) / Math.max(1, di);
-      const endYA = axisY + (di > 0 ? ih * Math.sign(-m) : 0);
       ray(lensX, tipY, imgX, axisY - oh * m, 'rgba(248,113,113,.95)');
       ray(objX, tipY, lensX, tipY, 'rgba(52,211,153,.95)');
       ray(lensX, tipY, imgX, axisY - oh * m, 'rgba(52,211,153,.95)');
@@ -357,5 +420,33 @@ Sims.register(
       g.fillText('object', objX - 18, axisY + 16);
       g.fillText(di > 0 ? 'image' : '(virtual image)', imgX - 18, axisY + 16);
     });
+    /* Static bench, like efield: no time controls, but the probe exposes the
+       thin-lens numbers the readouts print, so tests can verify them against
+       1/f = 1/u + 1/v and m = −v/u independently of the rendered text. */
+    const lensProbe = () => {
+      const f = F.get(),
+        dobj = U.get();
+      const di = 1 / (1 / f - 1 / dobj);
+      return {
+        f,
+        u: dobj,
+        oh: OH.get(),
+        di,
+        m: +(-di / dobj).toFixed(4),
+        nature: di > 0 ? 'real' : 'virtual',
+        upright: di < 0,
+        W: cv.W
+      };
+    };
+    window.__tcProbe = lensProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === lensProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
