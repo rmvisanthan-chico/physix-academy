@@ -186,6 +186,7 @@ Sims.register(
     let mx,
       phiPrev = 0,
       emfRaw = 0,
+      dphiDt = 0,
       emfSm = 0,
       emfTrace = [],
       t = 0;
@@ -204,6 +205,7 @@ Sims.register(
       phiPrev = fluxAt(60);
       emfSm = 0;
       emfRaw = 0;
+      dphiDt = 0;
       emfTrace = [];
     };
     const VS = SU.slider(ctr, 'Magnet velocity', -160, 160, 5, 70, () => {});
@@ -224,7 +226,8 @@ Sims.register(
         VS.set(-Math.abs(VS.get()));
       }
       const phi = fluxAt(mx);
-      emfRaw = (-NC.get() * (phi - phiPrev)) / Math.max(h, 0.001);
+      dphiDt = (phi - phiPrev) / Math.max(h, 0.001);
+      emfRaw = -NC.get() * dphiDt;
       phiPrev = phi;
       emfSm += (emfRaw - emfSm) * 0.15;
       emfTrace.push(emfSm);
@@ -300,6 +303,7 @@ Sims.register(
         n: NC.get(),
         phi: fluxAt(mx),
         emfRaw,
+        dphiDt,
         emfSm,
         state: { mx: +mx.toFixed(6) }
       })
