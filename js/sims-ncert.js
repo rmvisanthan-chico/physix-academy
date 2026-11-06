@@ -1,6 +1,7 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
 import { Games } from './games.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — NCERT Simulations: 9th / 10th / 11th */
 ('use strict');
 function ncArrow(g, x, y, dx, dy, col, w) {
@@ -46,17 +47,22 @@ Sims.register(
       rH = SU.readout(ro, 'Heard as');
     let t = 0,
       ping = 0;
-    SU.loop(cv.c, (dt) => {
-      t += dt;
+    /* The round trip is a pure function of d and v, so advance only runs the
+       clock; render computes and draws. This also makes Step trustworthy:
+       one fixed sub-step = exactly 1/60 s of flight time. */
+    function advance(h) {
+      t += h;
+      if (t > 1.4) {
+        t = 0;
+        ping = 1;
+      }
+    }
+    function render() {
       const d = D.get(),
         v = V.get(),
         tt = (2 * d) / v;
       rT.set(tt.toFixed(3) + ' s');
       rH.set(tt >= 0.1 ? '✅ Distinct echo' : '❌ Reverberation (merges)');
-      if (t > 1.4) {
-        t = 0;
-        ping = 1;
-      }
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -100,13 +106,44 @@ Sims.register(
       g.lineTo(wallX, mid);
       g.stroke();
       g.setLineDash([]);
-      ncLabel(g, srcX, mid + 38, 'd = ' + d + ' m', ' #9aa8c3');
+      /* BUG FIX (pre-existing): this colour literal was ' #9aa8c3' with a
+         leading space, which is not a valid CSS colour, so the canvas silently
+         kept the previous stroke and the distance label came out in the wrong
+         colour. */
+      ncLabel(g, srcX, mid + 38, 'd = ' + d + ' m', '#9aa8c3');
       ncLabel(g, wallX - 40, mid + 38, '2d = ' + 2 * d + ' m', '#9aa8c3');
       g.fillStyle = 'rgba(255,255,255,.06)';
       g.fillRect(12, cv.H - 36, cv.W - 24, 24);
       g.fillStyle = '#9aa8c3';
       g.font = '11px JetBrains Mono';
       g.fillText('t = 2d/v = ' + 2 * d + ' / ' + v + ' = ' + tt.toFixed(3) + ' s', 18, cv.H - 20);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+        ping = 0;
+      },
+      getTime: () => t,
+      /* The ping repeats forever, so Step always has flight time to add. */
+      canAdvance: () => true,
+      stepLabel: 'flight time step',
+      probe: () => {
+        const d = D.get(),
+          v = V.get(),
+          rt = (2 * d) / v;
+        return {
+          t,
+          d,
+          v,
+          roundTrip: +rt.toFixed(6),
+          echo: rt >= 0.1,
+          ping,
+          state: {}
+        };
+      }
     });
   }
 );
@@ -115,7 +152,7 @@ Sims.register(
 Sims.register(
   'ncert10-mirror',
   'Spherical Mirror Bench (Class 10 Light)',
-  'Concave f<0, Convex f>0. Mirror equation 1/f=1/v+1/u.',
+  'Concave (f<0) and convex (f>0): 1/f = 1/v + 1/u.',
   '🪞',
   (frame) => {
     const cv = SU.canvas(frame, 280);
@@ -123,14 +160,19 @@ Sims.register(
     frame.appendChild(ctr);
     const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
-    const F = SU.slider(ctr, 'Focal length f (cm)', -30, -6, 1, -15);
+    /* The old slider ran only from −30 to −6 cm, so the convex branch of the
+       drawing could never be reached even though this simulation is labelled
+       for both mirror types. F is now the focal-length magnitude and MODE
+       chooses the sign: concave mirrors have f < 0, convex f > 0. */
+    const MODE = SU.slider(ctr, 'Mirror', 0, 1, 1, 0, (v) => (v ? 'Convex' : 'Concave'));
+    const F = SU.slider(ctr, '|f| (cm)', 6, 30, 1, 15);
     const U = SU.slider(ctr, 'Object distance u (cm)', -60, -8, 1, -25);
     const H = SU.slider(ctr, 'Object height h (cm)', 1, 8, 0.5, 4);
     const rV = SU.readout(ro, 'Image v'),
       rM = SU.readout(ro, 'm = -v/u'),
       rN = SU.readout(ro, 'Nature');
     SU.loop(cv.c, () => {
-      const f = F.get(),
+      const f = (MODE.get() ? 1 : -1) * Math.abs(F.get()),
         u = U.get(),
         h = H.get();
       const v = 1 / (1 / f - 1 / u);
@@ -156,7 +198,7 @@ Sims.register(
       g.moveTo(cx, 20);
       g.lineTo(cx, cv.H - 20);
       g.stroke();
-      const isConcave = f < 0;
+      const isConcave = MODE.get() === 0;
       g.strokeStyle = isConcave ? '#22d3ee' : '#fbbf24';
       g.lineWidth = 3;
       g.beginPath();
@@ -209,6 +251,37 @@ Sims.register(
       g.fillText(isConcave ? 'Concave (f<0)' : 'Convex (f>0)', 12, 18);
       g.fillText('1/f = 1/v + 1/u', 12, cv.H - 10);
     });
+    /* Static bench: nothing integrates, so no time controls — but the numbers
+       behind the readouts are exposed for the physics suite. */
+    const mirrorProbe = () => {
+      const f = (MODE.get() ? 1 : -1) * Math.abs(F.get()),
+        u = U.get(),
+        h = H.get();
+      const v = 1 / (1 / f - 1 / u);
+      const m = -v / u;
+      const finite = isFinite(v);
+      return {
+        mode: MODE.get() ? 'convex' : 'concave',
+        f,
+        u,
+        h,
+        v: finite ? v : null,
+        m: finite ? m : null,
+        hi: finite ? h * m : null,
+        nature: !finite ? 'infinity' : v < 0 ? 'real' : 'virtual',
+        W: cv.W
+      };
+    };
+    window.__tcProbe = mirrorProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === mirrorProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -324,6 +397,29 @@ Sims.register(
         18
       );
     });
+    /* Static ray bench: nothing integrates, so no time controls — but the
+       numbers the readouts print are exposed for the physics suite. */
+    const eyeProbe = () => {
+      const myopia = MODE.get() === 0,
+        p = PWR.get();
+      const f = p ? 100 / p : Infinity;
+      return {
+        mode: myopia ? 'myopia' : 'hypermetropia',
+        P: p,
+        fCm: isFinite(f) ? +f.toFixed(3) : null,
+        correct: myopia ? p < 0 : p > 0
+      };
+    };
+    window.__tcProbe = eyeProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === eyeProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -391,6 +487,33 @@ Sims.register(
       g.font = '11px Segoe UI';
       g.fillText(cur > 5 ? '⚠️ Use >5A fuse' : '✅ 5A fuse OK', cv.W - 110, cv.H - 14);
     });
+    /* Static bill calculator: nothing integrates, so no time controls — but
+       the numbers the readouts print are exposed for the physics suite. */
+    const heatingProbe = () => {
+      const p = P.get(),
+        h = H.get(),
+        rate = RT.get();
+      const daily = (p * h) / 1000;
+      return {
+        P: p,
+        h,
+        rate,
+        dailyKWh: +daily.toFixed(6),
+        monthlyKWh: +(daily * 30).toFixed(4),
+        monthlyCost: +(daily * 30 * rate).toFixed(4),
+        current: p / 220
+      };
+    };
+    window.__tcProbe = heatingProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === heatingProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -594,6 +717,40 @@ Sims.register(
       'Vernier callipers: 10 vernier divisions (VSD) span 9 mm, so 1 VSD = 0.9 mm. Least count LC = 1 MSD − 1 VSD = 1 − 0.9 = <b>0.1 mm</b>. Measurement = MSR + coinciding VC × LC.'
     );
     frame.appendChild(note);
+    /* Static vernier bench: nothing integrates, so no time controls — but the
+       reading the instrument shows is exposed for the physics suite. */
+    const measureProbe = () => {
+      const MSR = Math.floor(Lmm),
+        rem = Lmm - MSR;
+      let VC = 0,
+        best = 1e9;
+      for (let n = 0; n < NVS; n++) {
+        const d = Math.abs((n * VSD - rem) % 1);
+        const c = Math.min(d, 1 - d);
+        if (c < best) {
+          best = c;
+          VC = n;
+        }
+      }
+      return {
+        Lmm: +Lmm.toFixed(2),
+        MSR,
+        VC,
+        LC,
+        reading: rnd(MSR + VC * LC, 1),
+        byFormula: +(MSR + VC * LC).toFixed(2)
+      };
+    };
+    window.__tcProbe = measureProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === measureProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -610,25 +767,31 @@ Sims.register(
     const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
     const R = SU.slider(ctr, 'Arm radius r (m)', 0.2, 0.9, 0.05, 0.8);
-    const rL = SU.readout(ro, 'I ∝ mr²'),
-      rW = SU.readout(ro, 'ω'),
+    const rL = SU.readout(ro, 'I = r²'),
+      rW = SU.readout(ro, 'ω = L/I'),
       rK = SU.readout(ro, 'K = ½Iω²');
-    let ang = 0;
-    SU.loop(cv.c, (dt) => {
+    /* One conservation law drives everything: the skater's angular momentum
+       L0 = I0·ω0 is fixed (set at the default r = 0.8 m, ω0 = 2 rad/s), so
+       pulling the arms in changes I and the spin rate follows: ω = L0/I.
+       The old code also computed a second, trivially "conserved" ω that was
+       never used — dead code that made the model harder to trust. */
+    const I0 = 0.64,
+      W0 = 2,
+      L0 = I0 * W0;
+    let ang = 0,
+      t = 0;
+    const omegaAt = (r) => L0 / (r * r);
+    function advance(h) {
+      t += h;
+      ang += omegaAt(R.get()) * h;
+    }
+    function render() {
       const r = R.get(),
         I = r * r,
-        w0 = 2,
-        L = I * w0,
-        w = L / I; // L conserved from w0 at r=0.8
-      const I0 = 0.64,
-        L0 = I0 * w0;
-      const w2 = L0 / (r * r);
-      ang += w2 * dt;
-      const I2 = (r * r).toFixed(2),
-        wF = w2.toFixed(2);
-      rL.set(I2 + ' kg·m²');
-      rW.set(wF + ' rad/s');
-      rK.set((0.5 * (r * r) * w2 * w2).toFixed(2) + ' J');
+        w = omegaAt(r);
+      rL.set(I.toFixed(2) + ' kg·m²');
+      rW.set(w.toFixed(2) + ' rad/s');
+      rK.set((0.5 * I * w * w).toFixed(2) + ' J');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -658,6 +821,32 @@ Sims.register(
       g.fillStyle = '#6b7a99';
       g.font = '11px Segoe UI';
       g.fillText('Arms in → I↓ → spin faster', 12, 18);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+        ang = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const r = R.get(),
+          I = r * r,
+          w = omegaAt(r);
+        return {
+          t,
+          r,
+          I,
+          omega: w,
+          L: I * w,
+          KE: 0.5 * I * w * w,
+          state: { ang: +ang.toFixed(6) }
+        };
+      }
     });
   }
 );
@@ -735,6 +924,35 @@ Sims.register(
       g.font = '10px JetBrains Mono';
       g.fillText('Y = σ/ε', ox + 8, 22);
     });
+    /* Static stress–strain bench: nothing integrates, so no time controls — but
+       the linear-region modulus the readout prints is exposed for the physics
+       suite. E is the ratio the sim actually draws from, so a regression in
+       either material shows up as E ≠ Y. */
+    const solidsProbe = () => {
+      const steel = MAT.get() === 0,
+        eps = STRAIN.get(),
+        Y = steel ? 2e11 : 1e7,
+        stress = Y * eps;
+      return {
+        material: steel ? 'steel' : 'rubber',
+        strain: eps,
+        Y,
+        stress,
+        E: eps > 0 ? stress / eps : null,
+        E_GPa: +(Y / 1e9).toFixed(3),
+        sigmaMPa: +(stress / 1e6).toFixed(4)
+      };
+    };
+    window.__tcProbe = solidsProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === solidsProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -755,14 +973,20 @@ Sims.register(
     const rV2 = SU.readout(ro, 'v₂'),
       rDP = SU.readout(ro, 'ΔP'),
       rL = SU.readout(ro, 'Lift hint');
-    let ph = 0;
-    SU.loop(cv.c, (dt) => {
+    let ph = 0,
+      t = 0;
+    /* Continuity + Bernoulli are closed-form in the two sliders, so advance
+       only walks the flow animation's clock; render recomputes the numbers. */
+    function advance(h) {
+      t += h;
+      ph += h * 3;
+    }
+    function render() {
       const v1 = V1.get(),
         ratio = RATIO.get(),
         v2 = v1 * ratio,
         rho = 1000,
         dP = 0.5 * rho * (v2 * v2 - v1 * v1);
-      ph += dt * 3;
       rV2.set(v2.toFixed(2) + ' m/s');
       rDP.set((dP / 1000).toFixed(1) + ' kPa');
       rL.set('↑ ' + (dP * 0.02).toFixed(0) + ' N (demo)');
@@ -797,12 +1021,12 @@ Sims.register(
         const seg = prog < 0.45 ? prog / 0.45 : 0.45 + (prog - 0.45) / 0.55;
         let x, yw;
         if (seg < 0.5) {
-          const t = seg / 0.5;
-          x = x0 + (x1 - x0) * t;
+          const tt = seg / 0.5;
+          x = x0 + (x1 - x0) * tt;
           yw = h1;
         } else {
-          const t = (seg - 0.5) / 0.5;
-          x = x2 + (x3 - x2) * t;
+          const tt = (seg - 0.5) / 0.5;
+          x = x2 + (x3 - x2) * tt;
           yw = h2;
         }
         const y = y0 + Math.sin(ph * 2 + i) * 6;
@@ -831,6 +1055,39 @@ Sims.register(
       g.fillStyle = '#6b7a99';
       g.font = '11px JetBrains Mono';
       g.fillText('A₁v₁ = A₂v₂', 12, 18);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+        ph = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const v1 = V1.get(),
+          ratio = RATIO.get(),
+          v2 = v1 * ratio,
+          rho = 1000,
+          A1 = 1,
+          A2 = A1 / ratio;
+        return {
+          t,
+          v1,
+          ratio,
+          v2,
+          rho,
+          A1,
+          A2,
+          dP: 0.5 * rho * (v2 * v2 - v1 * v1),
+          continuityIn: A1 * v1,
+          continuityOut: A2 * v2,
+          state: { ph: +ph.toFixed(6) }
+        };
+      }
     });
   }
 );
@@ -933,6 +1190,32 @@ Sims.register(
     );
     const rW = SU.readout(ro, 'W (area)'),
       rE = SU.readout(ro, 'Note');
+    /* Only a CLOSED cycle encloses a work area, so the four corner points of
+       the two closed cycles (axis fractions: x = V, y = P) are declared once
+       and shared by the drawing and the probe. The open curves (isothermal,
+       adiabatic) have no enclosed area, and the readout must say so instead
+       of implying a number. */
+    const CLOSED = {
+      2: [
+        [0.18, 0.2],
+        [0.78, 0.2],
+        [0.78, 0.55],
+        [0.18, 0.55]
+      ],
+      3: [
+        [0.16, 0.22],
+        [0.68, 0.24],
+        [0.6, 0.62],
+        [0.14, 0.58]
+      ]
+    };
+    const shoelace = (pts) =>
+      Math.abs(
+        pts.reduce((s, p, i) => {
+          const q = pts[(i + 1) % pts.length];
+          return s + p[0] * q[1] - q[0] * p[1];
+        }, 0) / 2
+      );
     SU.loop(cv.c, () => {
       const c = CYC.get();
       const g = cv.g;
@@ -970,19 +1253,9 @@ Sims.register(
           pts.push([ox + V * W * 0.7, oy - P * H * 0.55]);
         }
       } else if (c === 2) {
-        pts.push(
-          [ox + W * 0.18, oy - H * 0.2],
-          [ox + W * 0.78, oy - H * 0.2],
-          [ox + W * 0.78, oy - H * 0.55],
-          [ox + W * 0.18, oy - H * 0.55]
-        );
+        pts.push(...CLOSED[2].map(([u, v]) => [ox + u * W, oy - v * H]));
       } else {
-        pts.push(
-          [ox + W * 0.16, oy - H * 0.22],
-          [ox + W * 0.68, oy - H * 0.24],
-          [ox + W * 0.6, oy - H * 0.62],
-          [ox + W * 0.14, oy - H * 0.58]
-        );
+        pts.push(...CLOSED[3].map(([u, v]) => [ox + u * W, oy - v * H]));
       }
       if (c === 2 || c === 3) {
         g.fillStyle = 'rgba(34,211,238,.14)';
@@ -1012,11 +1285,36 @@ Sims.register(
         'Isobaric: W=PΔV',
         'Carnot: 2 isotherms + 2 adiabats'
       ];
-      rW.set(c === 2 || c === 3 ? 'Area >0 = engine' : 'Area = heat input');
+      rW.set(
+        c === 2 || c === 3
+          ? 'W = ' + shoelace(CLOSED[c]).toFixed(3) + ' (plot units)'
+          : 'Area = heat input'
+      );
       rE.set(names[c]);
       g.fillStyle = '#6b7a99';
       g.font = '11px JetBrains Mono';
       g.fillText(names[c], 12, 18);
     });
+    /* Static diagram: nothing integrates, so no time controls — but the work
+       area the readout quotes is exposed for the physics suite. */
+    const pvProbe = () => {
+      const c = CYC.get();
+      return {
+        cycle: c,
+        name: ['Isothermal', 'Adiabatic', 'Isobaric', 'Carnot'][c],
+        closed: c === 2 || c === 3,
+        area: c === 2 || c === 3 ? +shoelace(CLOSED[c]).toFixed(6) : null
+      };
+    };
+    window.__tcProbe = pvProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === pvProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
