@@ -1,5 +1,6 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
+import { attachTimeControls } from './sim-controls-helper.js';
 /* PhysiX Academy — More Sims: Thermo, KTG, Atoms (local trial) */
 ('use strict');
 function msArrow(g, x, y, dx, dy, c, w) {
@@ -176,6 +177,41 @@ Sims.register(
       g.textAlign = 'right';
       g.fillText('V (m³)', ox + W, oy + 28);
     });
+    /* Static diagram: nothing integrates, so no time controls — but every
+       number the cycle claims is exposed for the physics suite. The area the
+       shaded loop encloses IS the work, and efficiency MUST equal 1−Tc/Th
+       for a Carnot cycle; both are asserted by verify-physics. */
+    const thermoProbe = () => {
+      const th = TH.get() + 273.15,
+        tc = Math.min(TC.get() + 273.15, th - 5);
+      const r = Math.pow(th / tc, 1 / (GAMMA - 1));
+      const p1 = (nR * th) / V1;
+      const Qin = nR * th * Math.log(V2 / V1),
+        Qout = nR * tc * Math.log(V2 / V1);
+      return {
+        th,
+        tc,
+        ratio: th / tc,
+        expansionRatio: V2 / V1,
+        r,
+        p1,
+        Qin,
+        Qout,
+        W: Qin - Qout,
+        eff: 1 - tc / th,
+        carnot: 1 - tc / th
+      };
+    };
+    window.__tcProbe = thermoProbe;
+    if (window.MutationObserver) {
+      const mo = new MutationObserver(() => {
+        if (!frame.isConnected) {
+          if (window.__tcProbe === thermoProbe) window.__tcProbe = null;
+          mo.disconnect();
+        }
+      });
+      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
+    }
   }
 );
 
@@ -201,7 +237,35 @@ Sims.register(
         vx: (Math.random() - 0.5) * 2,
         vy: (Math.random() - 0.5) * 2
       });
-    SU.loop(cv.c, (dt) => {
+    let t = 0;
+    /* Fixed-step Brownian motion. The old loop moved every particle by a
+       whole "velocity unit" per FRAME, so a 144 Hz display ran the gas 2.4×
+       faster than a 60 Hz one and the damping constant silently depended on
+       the refresh rate. The step now scales with h, the kick with √h (the
+       correct scaling for a diffusion term), and the damping with an
+       exponential of h. */
+    function advance(h) {
+      t += h;
+      const tK = T.get(),
+        scale = Math.sqrt(tK / 300);
+      const kick = 0.2 * scale * Math.sqrt(h * 60),
+        damp = Math.pow(0.99, h * 60);
+      pts.forEach((p) => {
+        p.vx = (p.vx + (Math.random() - 0.5) * kick) * damp;
+        p.vy = (p.vy + (Math.random() - 0.5) * kick) * damp;
+        p.x += p.vx * scale * h * 60;
+        p.y += p.vy * scale * h * 60;
+        if (p.x < 6 || p.x > cv.W - 6) {
+          p.vx *= -1;
+          p.x = Math.max(6, Math.min(cv.W - 6, p.x));
+        }
+        if (p.y < 6 || p.y > cv.H - 6) {
+          p.vy *= -1;
+          p.y = Math.max(6, Math.min(cv.H - 6, p.y));
+        }
+      });
+    }
+    function render() {
       const tK = T.get(),
         scale = Math.sqrt(tK / 300);
       rRMS.set((483 * scale).toFixed(0) + ' m/s (O₂)');
@@ -212,14 +276,6 @@ Sims.register(
       g.strokeStyle = '#26314a';
       g.strokeRect(4, 4, cv.W - 8, cv.H - 8);
       pts.forEach((p) => {
-        p.vx += (Math.random() - 0.5) * 0.2 * scale;
-        p.vy += (Math.random() - 0.5) * 0.2 * scale;
-        p.vx *= 0.99;
-        p.vy *= 0.99;
-        p.x += p.vx * scale;
-        p.y += p.vy * scale;
-        if (p.x < 6 || p.x > cv.W - 6) p.vx *= -1;
-        if (p.y < 6 || p.y > cv.H - 6) p.vy *= -1;
         g.fillStyle = '#38bdf8';
         g.beginPath();
         g.arc(p.x, p.y, 3, 0, 7);
@@ -228,6 +284,34 @@ Sims.register(
       g.fillStyle = '#6b7a99';
       g.font = '11px Segoe UI';
       g.fillText('Heat → molecules faster → more collisions', 12, 18);
+    }
+    /* v_rms for O₂: √(3RT/M) with M = 0.032 kg/mol. The 483 m/s the readout
+       shows at 300 K is exactly this value — the test asserts the formula,
+       and the mean simulated speed rises with T. */
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const tK = T.get();
+        const vRms = Math.sqrt((3 * 8.314 * tK) / 0.032);
+        const speeds = pts.map((p) => Math.hypot(p.vx, p.vy) * Math.sqrt(tK / 300) * 60);
+        return {
+          t,
+          T: tK,
+          vRms: +vRms.toFixed(6),
+          pressureDemo: +(Math.sqrt(tK / 300) * 1.2).toFixed(6),
+          meanSpeed: +(speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(4),
+          n: pts.length,
+          state: {}
+        };
+      }
     });
   }
 );
@@ -245,13 +329,26 @@ Sims.register(
     frame.appendChild(ro);
     const N = SU.slider(ctr, 'Shell n', 1, 4, 1, 1);
     const rR = SU.readout(ro, 'rₙ'),
-      rE = SU.readout(ro, 'Eₙ');
-    SU.loop(cv.c, () => {
+      rE = SU.readout(ro, 'Eₙ'),
+      rLam = SU.readout(ro, 'Photon n→1');
+    let ang = 0,
+      t = 0;
+    /* The electron used Date.now() as its angle: that ignores pause and step
+       entirely, and (because it reads wall-clock time) jumping back into the
+       tab teleports the electron. A fixed-step phase fixes both. */
+    function advance(h) {
+      t += h;
+      ang += (0.5 + N.get() * 0.2) * h;
+    }
+    function render() {
       const n = N.get(),
         r = 0.53 * n * n,
         E = -13.6 / (n * n);
       rR.set(r.toFixed(2) + ' Å');
       rE.set(E.toFixed(2) + ' eV');
+      /* Lyman-series photon for the n → 1 jump: λ = hc/ΔE with hc = 1240
+         eV·nm. No photon for n = 1 (nothing to fall from). */
+      rLam.set(n > 1 ? (1240 / (13.6 * (1 - 1 / (n * n)))).toFixed(1) + ' nm' : '—');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -274,7 +371,6 @@ Sims.register(
         g.stroke();
       }
       g.fillStyle = '#38bdf8';
-      const ang = Date.now() * 0.001 * (0.5 + n * 0.2);
       const rr = 18 + n * 22;
       g.beginPath();
       g.arc(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr, 5, 0, 7);
@@ -282,6 +378,30 @@ Sims.register(
       g.fillStyle = '#9aa8c3';
       g.font = '11px JetBrains Mono';
       g.fillText('rₙ=n²a₀  Eₙ=-13.6/n² eV', 12, 18);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+        ang = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const n = N.get();
+        return {
+          t,
+          n,
+          radiusA: +(0.53 * n * n).toFixed(6),
+          energyEv: +(-13.6 / (n * n)).toFixed(6),
+          omega: +(0.5 + n * 0.2).toFixed(6),
+          photonNm: n > 1 ? +(1240 / (13.6 * (1 - 1 / (n * n)))).toFixed(4) : null,
+          state: { ang: +ang.toFixed(6) }
+        };
+      }
     });
   }
 );
