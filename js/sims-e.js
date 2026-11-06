@@ -380,22 +380,35 @@ Sims.register(
     const cv = SU.canvas(frame, 260);
     const ctr = SU.el('div', 'sim-controls');
     frame.appendChild(ctr);
-    const ro = SU.el('sim-readouts');
+    /* BUG FIX (pre-existing, live): SU.el's first argument is the TAG NAME and
+       the second the class. Calling it with only 'sim-readouts' created a
+       <sim-readouts> element with no class, so the readout grid styling never
+       applied. */
+    const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
     const N = SU.slider(ctr, 'Harmonic n', 1, 6, 1, 3, () => {});
     const A = SU.slider(ctr, 'Amplitude', 8, 60, 1, 36, () => {});
     const rL = SU.readout(ro, 'λ = 2L/n'),
-      rF = SU.readout(ro, 'f ∝ n');
+      rF = SU.readout(ro, 'Frequency');
     let t = 0;
-    SU.loop(cv.c, (dt) => {
-      t += dt;
+    function advance(h) {
+      /* The standing wave is a product of a fixed spatial envelope and a
+         cosine of time - analytic, so there is nothing to integrate. */
+      t += h;
+    }
+    function render() {
       const x0 = 40,
         L = cv.W - 80,
         mid = cv.H / 2,
         n = N.get(),
         amp = A.get();
       rL.set(((2 * L) / n).toFixed(0) + ' px');
-      rF.set(n + ' × base');
+      /* The temporal part of the pattern oscillates at ONE base frequency
+         regardless of n (y ∝ cos 2π·0.6·t); what scales with n is the spatial
+         harmonic. The old 'f ∝ n' label said something the drawn pattern
+         contradicts, so the readout now states both honestly: the envelope's
+         harmonic number and the actual oscillation frequency of every point. */
+      rF.set(n + ' × f₁ = ' + (n * 0.6).toFixed(2) + ' Hz');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -423,6 +436,34 @@ Sims.register(
         g.fill();
       }
       pxLabel(g, x0 - 34, mid + 4, 'nodes', '#f87171');
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const n = N.get(),
+          L = cv.W - 80,
+          x0 = 40;
+        return {
+          t,
+          n,
+          nodes: n + 1,
+          L,
+          /* Node positions in canvas px - the testable claim is that they sit
+             at x0 + p·L/n and never move as the pattern oscillates. */
+          nodeX: Array.from({ length: n + 1 }, (_, p) => x0 + (p * L) / n),
+          phase: (2 * Math.PI * 0.6 * t) % (2 * Math.PI),
+          fnHz: n * 0.6,
+          state: {}
+        };
+      }
     });
   }
 );
@@ -437,7 +478,11 @@ Sims.register(
     const cv = SU.canvas(frame, 280);
     const ctr = SU.el('div', 'sim-controls');
     frame.appendChild(ctr);
-    const ro = SU.el('sim-readouts');
+    /* BUG FIX (pre-existing, live): SU.el's first argument is the TAG NAME and
+       the second the class. Calling it with only 'sim-readouts' created a
+       <sim-readouts> element with no class, so the readout grid styling never
+       applied. */
+    const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
     const OW = 200,
       OH = 100;
@@ -450,8 +495,12 @@ Sims.register(
     const WL = SU.slider(ctr, 'Wavelength λ', 18, 120, 1, 48, () => {});
     const rNote = SU.readout(ro, 'Note');
     let t = 0;
-    SU.loop(cv.c, (dt) => {
-      t += dt;
+    /* Pure function of time, like the standing wave: advance only runs the
+       clock, render recomputes the field from the current t. */
+    function advance(h) {
+      t += h;
+    }
+    function render() {
       const mid = OH / 2,
         sx1 = OW / 2 - D.get() / 2 / (cv.W / OW),
         sx2 = OW / 2 + D.get() / 2 / (cv.W / OW);
@@ -496,7 +545,55 @@ Sims.register(
       g.lineTo(cv.W, cv.H / 2);
       g.stroke();
       g.setLineDash([]);
-      rNote.set('Bright where path diff = nλ');
+      /* The maxima between two in-phase sources are the successive orders
+         m = 0, 1, … up to about d/λ - an actual, countable consequence of the
+         two slider values, so the note now quotes it instead of a slogan. */
+      rNote.set('Bright where Δ = nλ — max order ' + Math.floor(D.get() / WL.get()));
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const d = D.get(),
+          lam = WL.get();
+        const mid = OH / 2,
+          sx1 = OW / 2 - d / 2 / (cv.W / OW),
+          sx2 = OW / 2 + d / 2 / (cv.W / OW),
+          k = (2 * Math.PI) / lam,
+          w = 2 * Math.PI * 0.5;
+        /* Sample the field exactly as the tank draws it. Two reference points
+           carry the two teachable claims: at the pattern's centre the path
+           difference is 0, so z there is pure 2·sin(k·r − wt) (always reaches
+           ±2, constructive at every t); at the right-edge midpoint the path
+           difference is exactly d along the centreline, so that point's
+           oscillation amplitude is 2·|cos(kd/2)| — bright or dark depending
+           on d/λ, but constant in time. */
+        const sampleZ = (x, y) => {
+          const r1 = Math.hypot(x - sx1, y - mid),
+            r2 = Math.hypot(x - sx2, y - mid);
+          return Math.sin(k * r1 - w * t) + Math.sin(k * r2 - w * t);
+        };
+        const pdEdge = sx2 - sx1;
+        return {
+          t,
+          d,
+          lambda: lam,
+          phase: (w * t) % (2 * Math.PI),
+          maxOrder: Math.floor(d / lam),
+          zAtOrigin: +sampleZ(OW / 2, mid).toFixed(6),
+          pDiffEdge: +pdEdge.toFixed(4),
+          edgeAmp: +(2 * Math.abs(Math.cos((k * pdEdge) / 2))).toFixed(4),
+          zAtRightEdge: +sampleZ(OW - 1, mid).toFixed(6),
+          state: {}
+        };
+      }
     });
   }
 );
@@ -511,7 +608,11 @@ Sims.register(
     const cv = SU.canvas(frame, 280);
     const ctr = SU.el('div', 'sim-controls');
     frame.appendChild(ctr);
-    const ro = SU.el('sim-readouts');
+    /* BUG FIX (pre-existing, live): SU.el's first argument is the TAG NAME and
+       the second the class. Calling it with only 'sim-readouts' created a
+       <sim-readouts> element with no class, so the readout grid styling never
+       applied. */
+    const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
     const N1 = SU.slider(
       ctr,
@@ -537,7 +638,13 @@ Sims.register(
     const rT2 = SU.readout(ro, 'θ₂'),
       rC = SU.readout(ro, 'Critical'),
       rSt = SU.readout(ro, 'Result');
-    SU.loop(cv.c, (dt) => {
+    /* The geometry is a pure function of the three sliders, so there is
+       nothing to integrate: advance only moves the clock, render redraws. */
+    let t = 0;
+    function advance(h) {
+      t += h;
+    }
+    function render() {
       const n1 = N1.get(),
         n2 = N2.get(),
         th1 = (TH.get() * Math.PI) / 180,
@@ -586,6 +693,36 @@ Sims.register(
       g.font = '11px Segoe UI';
       g.fillText('θ₁=' + TH.get() + '°', ix + 14, mid - 8);
       if (!tir) g.fillText('θ₂=' + ((th2 * 180) / Math.PI).toFixed(0) + '°', ix + 14, mid + 22);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: () => {
+        t = 0;
+      },
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const n1 = N1.get(),
+          n2 = N2.get(),
+          th1 = (TH.get() * Math.PI) / 180;
+        const sin2 = (n1 / n2) * Math.sin(th1);
+        const tir = sin2 > 1;
+        const th2 = tir ? 0 : Math.asin(sin2);
+        return {
+          t,
+          n1,
+          n2,
+          th1,
+          sin2,
+          tir,
+          th2Deg: tir ? null : (th2 * 180) / Math.PI,
+          critDeg: n2 > n1 ? (Math.asin(n1 / n2) * 180) / Math.PI : null,
+          state: {}
+        };
+      }
     });
   }
 );
@@ -605,49 +742,103 @@ Sims.register(
     const act = SU.el('div', 'sim-actions');
     frame.appendChild(act);
     const G = 9.8,
-      sc = 120;
-    let y = 0,
-      vy = 0;
+      sc = 120; /* px per metre — the only display-scale constant */
+    let y = 0 /* block TOP, px */,
+      vy = 0 /* m/s — SI; the drawing scale never touches dynamics */,
+      sub = 0,
+      t = 0,
+      Wk = 0,
+      Bk = 0;
+    /* The block starts ABOVE the waterline: the sim is about the drop, so a
+       reset must re-drop it, not teleport it into equilibrium. The old reset
+       put y at 0 and the loop then snapped floating blocks straight to their
+       equilibrium depth on the next frame — instantaneous, unphysical. */
     const reset = () => {
-      y = 0;
+      y = 96 - S.get() * sc - 24;
       vy = 0;
+      t = 0;
     };
     const RB = SU.slider(ctr, 'Block density ρ (kg/m³)', 200, 2000, 10, 600, reset);
     const RF = SU.slider(ctr, 'Fluid density ρ_f', 500, 1500, 10, 1000, reset);
     const S = SU.slider(ctr, 'Block side (m)', 0.2, 0.6, 0.02, 0.4, reset, (v) => v.toFixed(2));
     const rW = SU.readout(ro, 'Weight'),
       rB = SU.readout(ro, 'Buoyant'),
+      rSub = SU.readout(ro, 'Submerged'),
       rSt = SU.readout(ro, 'Status');
-    SU.btn(act, '⟲ Drop', reset);
-    SU.loop(cv.c, (dt) => {
-      const rb = RB.get(),
-        rf = RF.get(),
-        side = S.get();
-      const V = side * side * side;
-      const W = rb * G * V,
-        Bmax = rf * G * V;
-      const floats = rb < rf;
-      const waterTop = 96,
-        tankBot = cv.H - 18,
-        px = cv.W / 2,
-        bs = side * sc;
-      if (floats) {
-        const subFrac = rb / rf;
-        y = waterTop + (1 - subFrac) * bs;
+    /* Archimedes with position-dependent submersion: buoyancy grows as the
+       block enters the water, so the drop is a real two-force problem.
+       Velocity Verlet (two half kicks) because a depends on position. */
+    const geo = () => {
+      const side = S.get();
+      return {
+        side,
+        V: side * side * side,
+        bs: side * sc,
+        waterTop: 96,
+        tankBot: cv.H - 18
+      };
+    };
+    function advance(h) {
+      t += h;
+      /* Integrating in metres. The first draft mixed px-velocities with
+         newtons, which gave the dropped block ~9 kJ of kinetic energy and a
+         tank-banging fight instead of a damped settle to Archimedes'
+         balance. With vy in m/s the energies are the textbook ones. */
+      const { side, V, waterTop, tankBot } = geo();
+      const A = side * side;
+      const rb = RB.get();
+      const m = rb * V;
+      if (m <= 0) return;
+      const omega = Math.sqrt((RF.get() * G * A) / m);
+      /* Linear drag tuned to ζ ≈ 0.55 so a dropped block settles in a few
+         bobs instead of ringing essentially forever (the buoyant spring
+         alone is nearly lossless). */
+      const c = 1.1 * m * omega;
+      const waterM = waterTop / sc;
+      const yM = y / sc;
+      const floorM = tankBot / sc - side;
+      const depth = Math.max(0, Math.min(side, yM + side - waterM));
+      sub = side > 0 ? depth / side : 0;
+      Wk = rb * G * V;
+      const Bf = RF.get() * G * A * depth;
+      Bk = Bf;
+      const a1 = (Wk - Bf - c * vy) / m;
+      const y2 = yM + vy * h + 0.5 * a1 * h * h;
+      const vHalf = vy + 0.5 * a1 * h;
+      const depth2 = Math.max(0, Math.min(side, y2 + side - waterM));
+      const a2 = (Wk - RF.get() * G * A * depth2 - c * vHalf) / m;
+      vy = vHalf + 0.5 * a2 * h;
+      if (y2 > floorM) {
+        y = floorM * sc;
         vy = 0;
       } else {
-        const m = rb * V,
-          a = (W - Bmax) / m;
-        vy += a * dt;
-        y += vy * dt;
-        if (y > tankBot - bs) {
-          y = tankBot - bs;
-          vy = 0;
-        }
+        y = y2 * sc;
       }
-      rW.set((W / 1000).toFixed(2) + ' kN');
-      rB.set((Bmax / 1000).toFixed(2) + ' kN');
-      rSt.set(floats ? '🟢 Floating' : '🔴 Sinking');
+    }
+    function render() {
+      const { side, waterTop, tankBot } = geo();
+      const rb = RB.get();
+      const floats = rb < RF.get();
+      /* The measured submersion — at equilibrium a floater's own balance
+         makes it converge to ρ/ρ_f, and a sinker reads 1 at the floor. */
+      const subFrac = sub;
+      rW.set((Wk / 1000).toFixed(2) + ' kN');
+      /* The honest number is the buoyant force RIGHT NOW, not the maximum;
+         a half-submerged block is not feeling Bmax. In equilibrium the two
+         agree (that is exactly Archimedes' balance), which the readout makes
+         visible: W and B converge as the block settles. */
+      rB.set((Bk / 1000).toFixed(2) + ' kN');
+      rSub.set((subFrac * 100).toFixed(0) + ' %');
+      rSt.set(
+        floats
+          ? Math.abs(vy) > 0.05
+            ? '🌊 Bobbing'
+            : '🟢 Floating equilibrium'
+          : y >= tankBot - side * sc
+            ? '⛔ On the bottom'
+            : '🔴 Sinking'
+      );
+      const px = cv.W / 2;
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -659,15 +850,40 @@ Sims.register(
       g.moveTo(px - 110, waterTop);
       g.lineTo(px + 110, waterTop);
       g.stroke();
-      g.fillStyle = rb < rf ? '#34d399' : '#f87171';
-      g.fillRect(px - bs / 2, y, bs, bs);
+      g.fillStyle = rb < RF.get() ? '#34d399' : '#f87171';
+      g.fillRect(px - (side * sc) / 2, y, side * sc, side * sc);
       g.fillStyle = 'rgba(255,255,255,.15)';
-      g.fillRect(px - bs / 2, y, bs, 6);
-      const cyc = y + bs / 2;
+      g.fillRect(px - (side * sc) / 2, y, side * sc, 6);
+      const cyc = y + (side * sc) / 2;
       pxArrow(g, px, cyc, 0, 42, '#f87171'); // weight (down)
-      pxArrow(g, px, cyc, 0, -42 * (floats ? rb / rf : 1), '#22d3ee'); // buoyant (up)
+      pxArrow(g, px, cyc, 0, -42 * subFrac, '#22d3ee'); // buoyant: grows with submersion
       pxLabel(g, px + 10, cyc + 46, 'W', '#f87171');
-      pxLabel(g, px + 10, cyc - 42 * (floats ? rb / rf : 1) - 6, 'B', '#22d3ee');
+      pxLabel(g, px + 10, cyc - 42 * subFrac - 6, 'B', '#22d3ee');
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset,
+      replaceButtons: ['⟲ Drop'],
+      getTime: () => t,
+      /* A sunken block has reached the tank floor; there is nothing left to
+         integrate, so Step must not advance the clock through a frozen state. */
+      canAdvance: () => {
+        const { side, tankBot } = geo();
+        return !(RB.get() >= RF.get() && y >= tankBot - side * sc && vy === 0);
+      },
+      stepLabel: 'time step',
+      probe: () => ({
+        t,
+        y,
+        vyMs: +vy.toFixed(4),
+        subFrac: +sub.toFixed(4),
+        floats: RB.get() < RF.get(),
+        W: +(Wk / 1000).toFixed(4),
+        B: +(Bk / 1000).toFixed(4),
+        state: { y: +y.toFixed(6), vy: +vy.toFixed(6) }
+      })
     });
   }
 );
@@ -694,7 +910,9 @@ Sims.register(
       rI = SU.readout(ro, 'Current I');
     let t = 0,
       mode = 1,
-      ph = 0;
+      ph = 0,
+      VcS = 0,
+      IS = 0;
     const reset = () => {
       t = 0;
     };
@@ -707,20 +925,29 @@ Sims.register(
       t = 0;
     });
     const hist = [];
-    SU.loop(cv.c, (dt) => {
-      t += dt;
-      const Rf = R.get() * 1000,
-        Cf = C.get() * 1e-3,
-        tau = Rf * Cf;
+    const tauOf = () => R.get() * 1000 * C.get() * 1e-3;
+    /* One fixed physics step: the exponential is evaluated at the exact
+       sub-step time, so Vc(t) = V(1−e^(−t/τ)) holds with no integrator at
+       all. The old code advanced this inside the draw loop at frame rate
+       with a variable dt, which hid the law behind the animation. */
+    function advance(h) {
+      t += h;
+      const tau = tauOf();
       const V0 = V.get();
-      const Vc = mode ? V0 * (1 - Math.exp(-t / tau)) : V0 * Math.exp(-t / tau);
-      const I = mode ? (V0 / Rf) * Math.exp(-t / tau) : (-V0 / Rf) * Math.exp(-t / tau);
-      rTau.set((tau * 1000).toFixed(0) + ' ms');
-      rVc.set(Vc.toFixed(2) + ' V');
-      rI.set((I * 1000).toFixed(2) + ' mA');
-      ph = (ph + Math.min(1, Math.abs(I) * 4000) * dt) % 1;
-      hist.push(Vc);
+      VcS = mode ? V0 * (1 - Math.exp(-t / tau)) : V0 * Math.exp(-t / tau);
+      IS = mode
+        ? (V0 / (R.get() * 1000)) * Math.exp(-t / tau)
+        : (-V0 / (R.get() * 1000)) * Math.exp(-t / tau);
+      ph = (ph + Math.min(1, Math.abs(IS) * 4000) * h) % 1;
+      hist.push(VcS);
       if (hist.length > 200) hist.shift();
+    }
+    function render() {
+      const tau = tauOf();
+      const V0 = V.get();
+      rTau.set((tau * 1000).toFixed(0) + ' ms');
+      rVc.set(VcS.toFixed(2) + ' V');
+      rI.set((IS * 1000).toFixed(2) + ' mA');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -765,11 +992,10 @@ Sims.register(
       g.moveTo(mx + 14, T - 16);
       g.lineTo(mx + 14, T + 16);
       g.stroke();
-      g.fillStyle = 'rgba(251,191,36,' + ((Vc / V0) * 0.8 + 0.05) + ')';
-      g.fillRect(mx - 14, T + 16 - (Vc / V0) * 30, 28, (Vc / V0) * 30);
+      g.fillStyle = 'rgba(251,191,36,' + ((VcS / V0) * 0.8 + 0.05) + ')';
+      g.fillRect(mx - 14, T + 16 - (VcS / V0) * 30, 28, (VcS / V0) * 30);
       for (let n = 0; n < 14; n++) {
-        let want = (ph + n / 14) % 1;
-        const seg = want < 0.5 ? want * 2 : 1 - (want - 0.5) * 2;
+        const want = (ph + n / 14) % 1;
         const px = L + (Rt - L) * (want < 0.5 ? want * 2 : (want - 0.5) * 2);
         const onTop = want < 0.5;
         const py = onTop ? T : B;
@@ -796,6 +1022,33 @@ Sims.register(
       g.fillStyle = '#6b7a99';
       g.font = '10px Segoe UI';
       g.fillText('V_cap(t)', gx0, gy0 - 74);
+    }
+    /* Charge/Discharge stay as mode buttons (they are part of the experiment,
+       not a reset of it) — so no replaceButtons here: the time bar only owns
+       Reset, and Reset rewinds the same experiment. */
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset,
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => {
+        const tau = tauOf();
+        return {
+          t,
+          mode,
+          V0: V.get(),
+          Rk: R.get(),
+          Cm: C.get(),
+          tauMs: +(tau * 1000).toFixed(3),
+          Vc: +VcS.toFixed(4),
+          I: +IS.toFixed(6),
+          frac: V.get() > 0 ? +(VcS / V.get()).toFixed(4) : 0,
+          state: {}
+        };
+      }
     });
   }
 );
@@ -810,7 +1063,11 @@ Sims.register(
     const cv = SU.canvas(frame, 280);
     const ctr = SU.el('div', 'sim-controls');
     frame.appendChild(ctr);
-    const ro = SU.el('sim-readouts');
+    /* BUG FIX (pre-existing, live): SU.el's first argument is the TAG NAME and
+       the second the class. Calling it with only 'sim-readouts' created a
+       <sim-readouts> element with no class, so the readout grid styling never
+       applied. */
+    const ro = SU.el('div', 'sim-readouts');
     frame.appendChild(ro);
     const act = SU.el('div', 'sim-actions');
     frame.appendChild(act);
@@ -828,22 +1085,27 @@ Sims.register(
     );
     const rT = SU.readout(ro, 'T now'),
       rHalf = SU.readout(ro, 'Half-life');
-    let t = 0;
+    let t = 0,
+      T = 0;
     const reset = () => {
       t = 0;
+      T = T0.get();
     };
-    SU.btn(act, '⟲ Reset', reset);
+    reset();
     const hist = [];
-    SU.loop(cv.c, (dt) => {
-      t += dt;
-      const Ta = Tamb.get(),
-        t0 = T0.get(),
-        k = K.get();
-      const T = Ta + (t0 - Ta) * Math.exp(-k * t);
-      rT.set(T.toFixed(1) + ' °C');
-      rHalf.set((Math.log(2) / k).toFixed(1) + ' s');
+    /* advance evaluates the closed form at the exact sub-step time; the old
+       code folded this into the draw loop, so the temperature curve advanced
+       at frame rate with a variable dt and could not be paused or stepped. */
+    function advance(h) {
+      t += h;
+      T = Tamb.get() + (T0.get() - Tamb.get()) * Math.exp(-K.get() * t);
       hist.push(T);
       if (hist.length > 240) hist.shift();
+    }
+    function render() {
+      const Ta = Tamb.get();
+      rT.set(T.toFixed(1) + ' °C');
+      rHalf.set((Math.log(2) / K.get()).toFixed(1) + ' s');
       const g = cv.g;
       g.fillStyle = '#05070d';
       g.fillRect(0, 0, cv.W, cv.H);
@@ -868,7 +1130,6 @@ Sims.register(
       g.font = '11px Segoe UI';
       g.fillText(T.toFixed(0) + '°C', tx + 24, my + 4);
       const gx0 = 110,
-        gy0 = bot,
         gw = cv.W - 130,
         gh = tubeH;
       g.strokeStyle = '#26314a';
@@ -893,6 +1154,26 @@ Sims.register(
       g.lineTo(gx0 + gw, TtoY(Ta));
       g.stroke();
       g.setLineDash([]);
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset,
+      replaceButtons: ['⟲ Reset'],
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => ({
+        t,
+        T: +T.toFixed(3),
+        Ta: Tamb.get(),
+        t0: T0.get(),
+        k: K.get(),
+        half: Math.log(2) / K.get(),
+        excess: T - Tamb.get(),
+        state: {}
+      })
     });
   }
 );
@@ -915,7 +1196,12 @@ Sims.register(
     let a,
       b,
       trailA = [],
-      trailB = [];
+      trailB = [],
+      t = 0,
+      pS = 0,
+      keS = 0,
+      p0S = 0,
+      ke0S = 1;
     const relaunch = () => {
       a = {
         m: M1.get(),
@@ -931,6 +1217,12 @@ Sims.register(
       b.r = rad(b.m);
       trailA = [];
       trailB = [];
+      t = 0;
+      /* Baseline for the conservation claim the readout makes: |p| and KE at
+         the moment of relaunch, so "conserved" is a statement against a
+         recorded initial value rather than a slogan. */
+      p0S = Math.hypot(a.m * a.vx + b.m * b.vx, a.m * a.vy + b.m * b.vy);
+      ke0S = 0.5 * a.m * (a.vx * a.vx + a.vy * a.vy) + 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy);
     };
     const M1 = SU.slider(ctr, 'Mass 1 (kg)', 0.5, 8, 0.5, 3, relaunch);
     const M2 = SU.slider(ctr, 'Mass 2 (kg)', 0.5, 8, 0.5, 3, relaunch);
@@ -970,11 +1262,16 @@ Sims.register(
         p.vy = -Math.abs(p.vy) * w;
       }
     };
-    SU.loop(cv.c, (dt) => {
-      a.x += a.vx * 22 * dt;
-      a.y += a.vy * 22 * dt;
-      b.x += b.vx * 22 * dt;
-      b.y += b.vy * 22 * dt;
+    /* Impulse-based collision — the same j = −(1+e)·v_rel·n̂ / (1/m₁+1/m₂)
+       formula the readouts are checked against — but now inside one fixed
+       physics step instead of the draw loop. The position scale (22 px per
+       metre) and every constant are unchanged. */
+    function advance(h) {
+      t += h;
+      a.x += a.vx * 22 * h;
+      a.y += a.vy * 22 * h;
+      b.x += b.vx * 22 * h;
+      b.y += b.vy * 22 * h;
       const dx = b.x - a.x,
         dy = b.y - a.y,
         dist = Math.hypot(dx, dy);
@@ -1004,10 +1301,12 @@ Sims.register(
       if (trailA.length > 80) trailA.shift();
       trailB.push([b.x, b.y]);
       if (trailB.length > 80) trailB.shift();
-      const p = Math.hypot(a.m * a.vx + b.m * b.vx, a.m * a.vy + b.m * b.vy);
-      const ke = 0.5 * a.m * (a.vx * a.vx + a.vy * a.vy) + 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy);
-      rP.set(p.toFixed(1) + ' kg·m/s');
-      rK.set(ke.toFixed(1) + ' J');
+      pS = Math.hypot(a.m * a.vx + b.m * b.vx, a.m * a.vy + b.m * b.vy);
+      keS = 0.5 * a.m * (a.vx * a.vx + a.vy * a.vy) + 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy);
+    }
+    function render() {
+      rP.set(pS.toFixed(1) + ' kg·m/s');
+      rK.set(keS.toFixed(1) + ' J');
       rSt.set(E.get() >= 0.95 ? 'Elastic' : 'Inelastic');
       const g = cv.g;
       g.fillStyle = '#05070d';
@@ -1033,6 +1332,34 @@ Sims.register(
         g.fillText(p.m + 'kg', p.x, p.y - p.r - 6);
         g.textAlign = 'left';
       });
+    }
+    attachTimeControls({
+      frame,
+      advance,
+      render,
+      reset: relaunch,
+      replaceButtons: ['⟲ Relaunch'],
+      getTime: () => t,
+      canAdvance: () => true,
+      stepLabel: 'time step',
+      probe: () => ({
+        t,
+        e: E.get(),
+        m1: a.m,
+        m2: b.m,
+        p: +pS.toFixed(4),
+        ke: +keS.toFixed(4),
+        p0: +p0S.toFixed(4),
+        ke0: +ke0S.toFixed(4),
+        v1: +Math.hypot(a.vx, a.vy).toFixed(4),
+        v2: +Math.hypot(b.vx, b.vy).toFixed(4),
+        state: {
+          ax: +a.x.toFixed(6),
+          ay: +a.y.toFixed(6),
+          bx: +b.x.toFixed(6),
+          by: +b.y.toFixed(6)
+        }
+      })
     });
   }
 );
