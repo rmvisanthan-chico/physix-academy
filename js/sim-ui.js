@@ -53,7 +53,7 @@ import { Graph } from './graph-engine.js';
    ============================================================ */
 export const SimApps = {
   newton: { app: 'EV acceleration test track', icon: '⚡', mode: 'hybrid' },
-  energy: { app: 'Roller-coaster track engineering', icon: '🎢', mode: '3d' },
+  energy: { app: 'Swing-ride & coaster energy rig', icon: '🎢', mode: 'hybrid' },
   collision: { app: 'Highway crash-test barrier', icon: '🚗', mode: '2d' },
   orbit: { app: 'ISS & satellite operations', icon: '🛰️', mode: '3d' },
 
@@ -501,19 +501,55 @@ export const Workstation = {
     }
 
     /* ---------- main pump ----------
-       Draw every frame (cheap 2D repaints; sliders/layers update live),
-       integrate only while playing. dt is already clamped to 33ms by SU.loop
-       and the tab-hidden pause is handled there too. */
-    SU.loop(cv, (dt) => {
-      if (scene) {
-        if (playing) {
-          const d = dt * speed;
+       The workstation owns the wall clock. SU.loop clamps dt to 33 ms (it was
+       written for short animation frames), which makes a simulation advance
+       several times slower than real time whenever the browser throttles rAF.
+       The shared time-control layer accepts frame deltas up to 250 ms, so the
+       pump measures its own delta and applies the same 0.25 s ceiling. SU.loop
+       is still used for its lifecycle: tab-hidden pause and self-stop when the
+       canvas leaves the document. */
+    let lastNow = null;
+    let advanceCalls = 0;
+    SU.loop(cv, () => {
+      if (!scene) return;
+      const now = performance.now();
+      const real = lastNow == null ? 0 : (now - lastNow) / 1000;
+      lastNow = now;
+      if (playing) {
+        const d = Math.min(real, 0.25) * speed;
+        if (d > 0) {
           t += d;
+          advanceCalls++;
           if (scene.update) scene.update(d, t);
         }
-        if (scene.draw) scene.draw();
       }
+      if (scene.draw) scene.draw();
     });
+
+    /* ---------- probe ----------
+       tools/verify-physics.mjs reads window.__tcProbe. A converted simulation
+       hands Workstation its raw measurements via spec.probe(); the workstation
+       adds the clock bookkeeping the shared time controls used to provide
+       (calls / paused) and owns the lifetime, clearing the slot on unmount. */
+    let probeFn = null;
+    if (typeof spec.probe === 'function') {
+      probeFn = () => {
+        let p;
+        try {
+          p = spec.probe(api) || {};
+        } catch (e) {
+          p = {};
+        }
+        p.calls = advanceCalls;
+        p.paused = !playing;
+        return p;
+      };
+      /* only claim the slot if it is free, matching attachTimeControls */
+      if (!window.__tcProbe || !window.__tcOwner || !window.__tcOwner.isConnected) {
+        window.__tcProbe = probeFn;
+        window.__tcOwner = host;
+      }
+    }
 
     /* ---------- teardown ----------
        SU.loop self-stops when the canvas leaves the DOM (route change). The
@@ -524,6 +560,10 @@ export const Workstation = {
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      if (probeFn && window.__tcProbe === probeFn) {
+        window.__tcProbe = null;
+        window.__tcOwner = null;
+      }
       graphs.forEach((G) => G.destroy());
       if (scene && scene.destroy) scene.destroy();
       if (mo) mo.disconnect();

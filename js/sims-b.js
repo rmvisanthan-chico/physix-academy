@@ -4,6 +4,7 @@ import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
 import { createSimControls } from './sim-controls.js';
 import { attachTimeControls } from './sim-controls-helper.js';
+import { Workstation } from './sim-ui.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 ('use strict');
 
@@ -11,316 +12,852 @@ import { attachTimeControls } from './sim-controls-helper.js';
 Sims.register(
   'wave',
   'Travelling Wave',
-  'v = fλ — tune frequency and wavelength.',
+  'Watch a wave crest travel: v = f × λ, live.',
   '🌊',
-  (frame) => {
-    const cv = SU.canvas(frame, 240);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    let vRead;
-    const upd = () => {
-      if (vRead) vRead.set((FR.get() * WL.get()).toFixed(0) + ' px/s (= f × λ)');
-    };
-    const FR = SU.slider(ctr, 'Frequency f (Hz)', 0.2, 3, 0.05, 1, upd);
-    const WL = SU.slider(ctr, 'Wavelength λ (px)', 60, 400, 5, 180, upd);
-    const AM = SU.slider(ctr, 'Amplitude (px)', 10, 80, 2, 45, () => {});
-    vRead = SU.readout(ro, 'Wave speed');
-    const rPer = SU.readout(ro, 'Period T');
-    upd();
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'wave',
+      title: 'Travelling Wave',
+      desc: 'A ripple-tank wave generator drives a surface wave. Track one crest and the relation v = f × λ falls out of the measurement.',
+      icon: '🌊',
+      topic: 'Waves',
+      level: 'Grade 9–11',
+      appKey: 'wave',
+      height: 300,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Ripple tank' },
+        { id: 'science', label: 'Wave trace' }
+      ],
+      presets: [
+        { label: 'Default 1 Hz', apply: (s) => { s.f = 1; s.lambda = 180; s.A = 45; } },
+        { label: 'Slow swell', apply: (s) => { s.f = 0.4; s.lambda = 260; s.A = 60; } },
+        { label: 'Choppy water', apply: (s) => { s.f = 2.4; s.lambda = 90; s.A = 30; } },
+        { label: 'Long swell', apply: (s) => { s.f = 0.6; s.lambda = 380; s.A = 70; } }
+      ],
+      graphs: [
+        {
+          title: 'Surface Displacement at x = x₀',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Displacement',
+          yUnit: 'px',
+          height: 132,
+          series: [{ id: 'y', label: 'y', unit: 'px', color: '#22d3ee' }]
+        },
+        {
+          title: 'Crest Travel (unwrapped)',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Distance',
+          yUnit: 'px',
+          height: 132,
+          series: [{ id: 'crest', label: 'crest', unit: 'px', color: '#fbbf24' }]
+        }
+      ],
+      setup(api) {
+        const { g, W, H, state } = api;
+        const FIXED = 1 / 60;
+        const MAX_SUB = 10;
 
-    /* A travelling wave is an analytic function of time: y(x) = A·sin(kx − ωt).
-       There is nothing to integrate, so advance() only walks the clock and the
-       shape is drawn exactly — Step stays trustworthy at any step size. The
-       replacement for the old bare SU.loop is the shared time-control bar,
-       which also gives the probe used by the physics tests. */
-    let t = 0;
+        state.f = 1; /* Hz */
+        state.lambda = 180; /* px */
+        state.A = 45; /* px */
+        state.t = 0;
 
-    function advance(h) {
-      t += h;
-    }
+        let acc = 0;
 
-    function render() {
-      const g = cv.g,
-        A = AM.get(),
-        k = (2 * Math.PI) / WL.get(),
-        w = 2 * Math.PI * FR.get();
-      rPer.set((1 / FR.get()).toFixed(2) + ' s');
-      const mid = cv.H / 2;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      g.strokeStyle = '#26314a';
-      g.lineWidth = 1;
-      g.setLineDash([4, 4]);
-      g.beginPath();
-      g.moveTo(0, mid);
-      g.lineTo(cv.W, mid);
-      g.stroke();
-      g.setLineDash([]);
-      g.strokeStyle = '#22d3ee';
-      g.lineWidth = 3;
-      g.beginPath();
-      for (let x = 0; x <= cv.W; x += 3) {
-        const y = mid - A * Math.sin(k * x - w * t);
-        if (x === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
-      }
-      g.stroke();
-      const lam = WL.get();
-      const crest = ((((w * t) / k) % lam) + lam) % lam;
-      g.fillStyle = '#fbbf24';
-      g.beginPath();
-      g.arc(crest, mid - A, 5, 0, 7);
-      g.fill();
-      if (crest + lam < cv.W) {
-        const c2 = crest + lam;
-        g.strokeStyle = '#fbbf24';
-        g.setLineDash([3, 3]);
-        g.lineWidth = 1.5;
-        g.beginPath();
-        g.moveTo(crest, mid + A + 18);
-        g.lineTo(c2, mid + A + 18);
-        g.stroke();
-        g.setLineDash([]);
-        g.fillStyle = '#fbbf24';
-        g.font = '12px Segoe UI';
-        g.fillText('λ', (crest + c2) / 2 - 4, mid + A + 34);
-      }
-    }
+        const k = () => (2 * Math.PI) / state.lambda;
+        const omega = () => 2 * Math.PI * state.f;
+        const speed = () => state.f * state.lambda;
+        /* Crest position measured modulo one wavelength (probe contract). */
+        const crestX = () => ((omega() * state.t) / k()) % state.lambda;
+        /* Unwrapped distance the crest has travelled — monotonic, graphable. */
+        const crestTravel = () => speed() * state.t;
 
-    /* crestX is the x of the tracked crest. It is what probe physics uses:
-       d(crestX)/dt must equal f·λ, so "v = fλ" stops being a label and
-       becomes a measurement. */
-    const crestX = () => {
-      const k = (2 * Math.PI) / WL.get(),
-        w = 2 * Math.PI * FR.get();
-      return ((((w * t) / k) % WL.get()) + WL.get()) % WL.get();
-    };
-    attachTimeControls({
-      frame,
-      advance,
-      render,
-      reset: () => {
-        t = 0;
+        const mid = () => H * 0.52;
+        const x0 = () => W * 0.52;
+
+        function reset() {
+          state.t = 0;
+          acc = 0;
+        }
+
+        /* The wave is analytic: y(x,t) = −A sin(kx − ωt). Time just advances. */
+        function advance(h) {
+          state.t += h;
+        }
+
+        /* --- controls --- */
+        const sF = api.SU.slider(api.panel, 'Frequency f', 0.2, 3, 0.05, 1, (v) => {
+          state.f = v;
+          sync();
+        }, (v) => v.toFixed(2) + ' Hz');
+        const sL = api.SU.slider(api.panel, 'Wavelength λ', 60, 400, 5, 180, (v) => {
+          state.lambda = v;
+          sync();
+        }, (v) => v.toFixed(0) + ' px');
+        const sA = api.SU.slider(api.panel, 'Amplitude A', 10, 80, 2, 45, (v) => {
+          state.A = v;
+        }, (v) => v.toFixed(0) + ' px');
+
+        /* --- measurements --- */
+        const rV = api.SU.readout(api.readouts, 'Wave speed v = f λ', '180 px/s');
+        const rT = api.SU.readout(api.readouts, 'Period T = 1/f', '1.00 s');
+        const rF = api.SU.readout(api.readouts, 'Frequency', '1.00 Hz');
+        const rLam = api.SU.readout(api.readouts, 'Wavelength', '180 px');
+        const rCr = api.SU.readout(api.readouts, 'Crest position', '0 px');
+
+        function sync() {
+          rV.set(speed().toFixed(0) + ' px/s');
+          rT.set((1 / state.f).toFixed(2) + ' s');
+          rF.set(state.f.toFixed(2) + ' Hz');
+          rLam.set(state.lambda.toFixed(0) + ' px');
+          rCr.set(crestX().toFixed(0) + ' px');
+        }
+        sync();
+
+        const yAt = (x) => -state.A * Math.sin(k() * x - omega() * state.t);
+
+        /* --- drawing --- */
+        function drawTank() {
+          const m = mid();
+          /* water body */
+          const water = g.createLinearGradient(0, m - state.A, 0, H);
+          water.addColorStop(0, 'rgba(34,211,238,0.20)');
+          water.addColorStop(1, 'rgba(14,116,144,0.05)');
+          g.fillStyle = water;
+          g.beginPath();
+          g.moveTo(0, m);
+          for (let x = 0; x <= W; x += 4) g.lineTo(x, m + yAt(x));
+          g.lineTo(W, H);
+          g.lineTo(0, H);
+          g.closePath();
+          g.fill();
+
+          /* surface */
+          g.strokeStyle = '#22d3ee';
+          g.lineWidth = 2.5;
+          if (api.cfg.shadows) {
+            g.save();
+            g.shadowColor = 'rgba(34,211,238,0.7)';
+            g.shadowBlur = 12;
+          }
+          g.beginPath();
+          for (let x = 0; x <= W; x += 3) {
+            const y = m + yAt(x);
+            if (x === 0) g.moveTo(x, y);
+            else g.lineTo(x, y);
+          }
+          g.stroke();
+          if (api.cfg.shadows) g.restore();
+
+          /* tank walls + floor */
+          g.strokeStyle = 'rgba(154,168,195,0.55)';
+          g.lineWidth = 4;
+          g.beginPath();
+          g.moveTo(0, 24);
+          g.lineTo(0, H - 22);
+          g.lineTo(W, H - 22);
+          g.lineTo(W, 24);
+          g.stroke();
+          g.fillStyle = 'rgba(154,168,195,0.8)';
+          g.font = '9px "DM Mono", monospace';
+          g.textAlign = 'left';
+          g.fillText('PHYSIX RIPPLE BASIN', 10, 18);
+
+          /* wave-maker paddle at the left wall */
+          const pad = 6;
+          const py = m + yAt(pad);
+          g.fillStyle = 'rgba(232,237,247,0.85)';
+          g.fillRect(0, py - 22, 8, 44);
+          g.fillStyle = 'rgba(34,211,238,0.8)';
+          g.fillRect(8, py - 3, 3, 6);
+
+          /* crest marker riding the wave */
+          const cx = crestX();
+          for (let n = 0; n < 3; n++) {
+            const px = cx + n * state.lambda;
+            if (px < 0 || px > W) continue;
+            const cy2 = m + yAt(px);
+            g.fillStyle = '#fbbf24';
+            g.beginPath();
+            g.arc(px, cy2, n === 0 ? 5 : 3, 0, Math.PI * 2);
+            g.fill();
+          }
+          /* buoy at x0 — bobs vertically */
+          const bx = x0();
+          const by = m + yAt(bx);
+          g.strokeStyle = 'rgba(232,237,247,0.5)';
+          g.lineWidth = 1;
+          g.setLineDash([3, 4]);
+          g.beginPath();
+          g.moveTo(bx, by);
+          g.lineTo(bx, H - 24);
+          g.stroke();
+          g.setLineDash([]);
+          g.fillStyle = '#f87171';
+          g.beginPath();
+          g.arc(bx, by - 10, 6, 0, Math.PI * 2);
+          g.fill();
+        }
+
+        function drawTrace() {
+          const m = mid();
+          /* grid + axes */
+          g.strokeStyle = 'rgba(255,255,255,0.06)';
+          g.lineWidth = 1;
+          for (let gx = 0; gx < W; gx += 40) {
+            g.beginPath();
+            g.moveTo(gx, 0);
+            g.lineTo(gx, H);
+            g.stroke();
+          }
+          g.strokeStyle = 'rgba(154,168,195,0.5)';
+          g.setLineDash([5, 6]);
+          g.beginPath();
+          g.moveTo(0, m);
+          g.lineTo(W, m);
+          g.stroke();
+          g.setLineDash([]);
+
+          /* wave */
+          g.strokeStyle = '#22d3ee';
+          g.lineWidth = 2.5;
+          g.beginPath();
+          for (let x = 0; x <= W; x += 3) {
+            const y = m + yAt(x);
+            if (x === 0) g.moveTo(x, y);
+            else g.lineTo(x, y);
+          }
+          g.stroke();
+
+          /* λ bracket between two adjacent crests */
+          const cx = crestX();
+          const c2 = cx + state.lambda;
+          const yb = m + state.A + 26;
+          if (c2 <= W - 10) {
+            g.strokeStyle = 'rgba(251,191,36,0.8)';
+            g.lineWidth = 1.5;
+            g.beginPath();
+            g.moveTo(cx, yb - 8);
+            g.lineTo(cx, yb + 6);
+            g.moveTo(c2, yb - 8);
+            g.lineTo(c2, yb + 6);
+            g.moveTo(cx, yb);
+            g.lineTo(c2, yb);
+            g.stroke();
+            g.fillStyle = '#fbbf24';
+            g.font = '11px "DM Mono", monospace';
+            g.textAlign = 'center';
+            g.fillText('λ = ' + state.lambda.toFixed(0) + ' px', (cx + c2) / 2, yb + 20);
+          }
+          /* crest + moving marker */
+          g.fillStyle = '#fbbf24';
+          g.beginPath();
+          g.arc(cx, m + yAt(cx), 5, 0, Math.PI * 2);
+          g.fill();
+          g.font = '11px "DM Mono", monospace';
+          g.textAlign = 'left';
+          g.fillStyle = 'rgba(232,237,247,0.85)';
+          g.fillText(
+            'v = f λ = ' + speed().toFixed(0) + ' px/s   ·   T = ' + (1 / state.f).toFixed(2) + ' s',
+            14,
+            H - 14
+          );
+        }
+
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#081020');
+          bg.addColorStop(1, '#05070d');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawTrace();
+          else drawTank();
+          api.pxLabel(g, W - 118, 18, 't = ' + state.t.toFixed(2) + ' s', 'rgba(232,237,247,0.75)');
+        }
+
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < MAX_SUB) {
+            advance(FIXED);
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          if (n > 0) {
+            api.graphs[0].push({ t: state.t, y: yAt(x0()) });
+            api.graphs[1].push({ t: state.t, crest: crestTravel() });
+          }
+          sync();
+        }
+
+        function stopWatching() {
+          if (state._watchTimer) {
+            clearInterval(state._watchTimer);
+            state._watchTimer = 0;
+          }
+        }
+
+        return {
+          update,
+          draw,
+          reset() {
+            reset();
+            sync();
+          },
+          onPreset() {
+            sF.set(state.f);
+            sL.set(state.lambda);
+            sA.set(state.A);
+            reset();
+            sync();
+          },
+          destroy: stopWatching
+        };
       },
-      /* A wave runs forever - nothing to gate Step on. */
-      canAdvance: () => true,
-      getTime: () => t,
-      stepLabel: 'time step',
-      probe: () => ({
-        t,
-        phase: 2 * Math.PI * FR.get() * t,
-        f: FR.get(),
-        lambda: WL.get(),
-        amp: AM.get(),
-        crest: crestX(),
-        T: 1 / FR.get(),
-        v: FR.get() * WL.get(),
-        state: { crest: +crestX().toFixed(6) }
-      })
-    });
-  }
+      predict(api) {
+        const TARGET = 2.0;
+        let pendingReveal = null;
+
+        function stopWatching() {
+          if (api.state._watchTimer) {
+            clearInterval(api.state._watchTimer);
+            api.state._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          api.state._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[1].timeRange('crest');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[1],
+          series: 'crest',
+          unit: 'px',
+          quantity: 'crest travel',
+          absFloor: 20,
+          context() {
+            return {
+              f: api.state.f,
+              lambda: api.state.lambda,
+              paramsText: 'f = ' + api.state.f.toFixed(2) + ' Hz · λ = ' + api.state.lambda.toFixed(0) + ' px'
+            };
+          },
+          targetTime: () => TARGET,
+          question() {
+            return 'Predict first: how far has one crest travelled after ' + TARGET.toFixed(1) + ' s?';
+          },
+          observe() {
+            const hit = api.graphs[1].valueAt('crest', TARGET);
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            const v = ctx.f * ctx.lambda;
+            return (
+              'Every crest moves at the wave speed v = f λ = ' +
+              ctx.f.toFixed(2) +
+              ' × ' +
+              ctx.lambda.toFixed(0) +
+              ' = ' +
+              v.toFixed(0) +
+              ' px/s. After ' +
+              TARGET.toFixed(1) +
+              ' s that is ' +
+              (v * TARGET).toFixed(0) +
+              ' px. The graph records the crest\'s actual position each step, so its slope is the speed.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = TARGET;
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        pred.refresh();
+        return pred;
+      },
+      probe(api) {
+        const s = api.state;
+        return {
+          t: s.t,
+          phase: 2 * Math.PI * s.f * s.t,
+          f: s.f,
+          lambda: s.lambda,
+          crest: ((2 * Math.PI * s.f * s.t) / ((2 * Math.PI) / s.lambda)) % s.lambda,
+          T: 1 / s.f,
+          v: s.f * s.lambda,
+          state: { crest: +(((2 * Math.PI * s.f * s.t) / ((2 * Math.PI) / s.lambda)) % s.lambda).toFixed(6) }
+        };
+      }
+    }),
+  { chrome: 'workstation' }
 );
 
 /* ---------------- Ohm's law circuit ---------------- */
 Sims.register(
   'circuit',
   "Ohm's Law Circuit",
-  'Voltage pushes; resistance resists.',
+  'V = IR: current, power and charge in a real circuit.',
   '🔌',
-  (frame) => {
-    const cv = SU.canvas(frame, 250);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    const V = SU.slider(ctr, 'Battery V (volts)', 1.5, 24, 0.5, 12, () => {});
-    const R = SU.slider(ctr, 'Resistance R (Ω)', 2, 100, 1, 24, () => {});
-    const rI = SU.readout(ro, 'Current I'),
-      rP = SU.readout(ro, 'Power P'),
-      rQ = SU.readout(ro, 'Charge moved');
-
-    /* q–t graph. The physics claim of a simple circuit is that I = V/R is
-       CONSTANT, so the charge passing any point grows linearly and the line's
-       slope IS the current the readout quotes. The graph turns that into
-       visible evidence instead of a number to take on trust. */
-    const graph = createGraph(
-      frame,
-      {
-        xLabel: 'Time',
-        xUnit: 's',
-        xKey: 't',
-        yLabel: 'Charge',
-        yUnit: 'C',
-        title: 'Charge through the cell — slope = I = V/R',
-        height: 170,
-        capacity: 900
-      },
-      [{ id: 'q', label: 'Charge q', unit: 'C', color: GC.a }]
-    );
-
-    let t = 0,
-      q = 0,
-      phase = 0;
-
-    function advance(h) {
-      const I = V.get() / R.get();
-      q += I * h;
-      t += h;
-      /* Electron-drift animation phase - visual only, same law as before. */
-      phase = (phase + Math.min(220, I * 30) * h) % 1;
-    }
-
-    function sample() {
-      graph.push({ t, q });
-    }
-
-    function reset() {
-      t = 0;
-      q = 0;
-      phase = 0;
-      graph.clear();
-    }
-
-    function render() {
-      const v = V.get(),
-        r = R.get(),
-        I = v / r,
-        P = I * I * r;
-      rI.set(I.toFixed(2) + ' A');
-      rP.set(P.toFixed(1) + ' W');
-      rQ.set(q.toFixed(2) + ' C');
-      const g = cv.g;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      const L = 80,
-        T = 55,
-        Rt = cv.W - 90,
-        B = cv.H - 55,
-        mx = (L + Rt) / 2;
-      const pts = [
-        [L, T],
-        [mx - 34, T],
-        [mx + 34, T],
-        [Rt, T],
-        [Rt, B],
-        [L, B],
-        [L, T]
-      ];
-      let total = 0;
-      const lens = [];
-      for (let i = 1; i < pts.length; i++) {
-        const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-        lens.push(d);
-        total += d;
-      }
-      g.strokeStyle = '#4a5878';
-      g.lineWidth = 3;
-      g.beginPath();
-      pts.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
-      g.stroke();
-      for (let n = 0; n < 16; n++) {
-        let want = ((phase + n / 16) % 1) * total,
-          seg = 0;
-        while (want > lens[seg]) {
-          want -= lens[seg];
-          seg++;
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'circuit',
+      title: "Ohm's Law Circuit",
+      desc: 'A cell drives current through a resistive load. Watch the electron flow, the load heat up and the charge accumulate.',
+      icon: '🔌',
+      topic: 'Electricity',
+      level: 'Grade 10–11',
+      appKey: 'circuit',
+      height: 300,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Substation bench' },
+        { id: 'science', label: 'Schematic' }
+      ],
+      presets: [
+        { label: 'Bench cell 12 V', apply: (s) => { s.V = 12; s.R = 24; } },
+        { label: 'Heavy load', apply: (s) => { s.V = 24; s.R = 8; } },
+        { label: 'Low current', apply: (s) => { s.V = 3; s.R = 100; } },
+        { label: 'Dim bulb', apply: (s) => { s.V = 6; s.R = 60; } }
+      ],
+      graphs: [
+        {
+          title: 'Charge Through the Cell — slope = I',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Charge',
+          yUnit: 'C',
+          height: 132,
+          series: [{ id: 'q', label: 'q', unit: 'C', color: '#22d3ee' }]
+        },
+        {
+          title: 'Power Dissipated in the Load',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Power',
+          yUnit: 'W',
+          height: 132,
+          series: [{ id: 'p', label: 'P', unit: 'W', color: '#fbbf24' }]
         }
-        const p1 = pts[seg],
-          p2 = pts[seg + 1],
-          f = want / lens[seg];
-        g.fillStyle = '#22d3ee';
-        g.beginPath();
-        g.arc(p1[0] + (p2[0] - p1[0]) * f, p1[1] + (p2[1] - p1[1]) * f, 3, 0, 7);
-        g.fill();
-      }
-      g.strokeStyle = '#e8edf7';
-      g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(L - 14, (T + B) / 2 - 14);
-      g.lineTo(L + 14, (T + B) / 2 - 14);
-      g.stroke();
-      g.lineWidth = 7;
-      g.beginPath();
-      g.moveTo(L - 8, (T + B) / 2 + 6);
-      g.lineTo(L + 8, (T + B) / 2 + 6);
-      g.stroke();
-      g.strokeStyle = '#9aa8c3';
-      g.lineWidth = 3;
-      g.beginPath();
-      let zx = mx - 34;
-      g.moveTo(zx, T);
-      for (let i = 0; i < 6; i++) {
-        g.lineTo(zx + 5.5, T + (i % 2 ? 10 : -10));
-        zx += 5.5;
-      }
-      g.lineTo(mx + 34, T);
-      g.stroke();
-      const bx = Rt + 45,
-        by = (T + B) / 2,
-        glow = Math.min(1, P / 28);
-      const grd = g.createRadialGradient(bx, by, 2, bx, by, 40 * glow + 8);
-      grd.addColorStop(0, 'rgba(251,191,36,' + glow + ')');
-      grd.addColorStop(1, 'rgba(251,191,36,0)');
-      g.fillStyle = grd;
-      g.beginPath();
-      g.arc(bx, by, 40 * glow + 8, 0, 7);
-      g.fill();
-      g.strokeStyle = '#9aa8c3';
-      g.lineWidth = 2;
-      g.beginPath();
-      g.arc(bx, by, 13, 0, 7);
-      g.stroke();
-      g.fillStyle = 'rgba(251,191,36,' + (0.25 + glow * 0.75) + ')';
-      g.beginPath();
-      g.arc(bx, by, 11, 0, 7);
-      g.fill();
-      g.fillStyle = '#9aa8c3';
-      g.font = '11px Segoe UI';
-      g.fillText(v.toFixed(1) + ' V', L - 22, B + 18);
-      g.textAlign = 'center';
-      g.fillText('R = ' + r + ' Ω', mx, T - 20);
-      g.textAlign = 'left';
-    }
+      ],
+      setup(api) {
+        const { g, W, H, state } = api;
+        const FIXED = 1 / 60;
+        const MAX_SUB = 10;
 
-    attachTimeControls({
-      frame,
-      advance,
-      sample,
-      render,
-      reset,
-      /* A resistor never saturates - current keeps flowing, so Step always has
-         something to integrate. */
-      canAdvance: () => true,
-      getTime: () => t,
-      stepLabel: 'time step',
-      probe: () => {
-        const v = V.get(),
-          r = R.get(),
-          I = v / r;
+        state.V = 12; /* volts */
+        state.R = 24; /* ohms */
+        state.q = 0; /* coulombs */
+        state.t = 0;
+        state.phase = 0;
+
+        let acc = 0;
+
+        const current = () => state.V / state.R;
+        const power = () => current() * current() * state.R;
+
+        function reset() {
+          state.q = 0;
+          state.t = 0;
+          state.phase = 0;
+          acc = 0;
+        }
+
+        /* Ohm's law and charge integration — unchanged physics. */
+        function advance(h) {
+          const I = state.V / state.R;
+          state.q += I * h;
+          state.t += h;
+          state.phase = (state.phase + Math.min(220, I * 30) * h) % 1;
+        }
+
+        /* --- controls --- */
+        const sV = api.SU.slider(api.panel, 'Battery V', 1.5, 24, 0.5, 12, (v) => {
+          state.V = v;
+          sync();
+        }, (v) => v.toFixed(1) + ' V');
+        const sR = api.SU.slider(api.panel, 'Resistance R', 2, 100, 1, 24, (v) => {
+          state.R = v;
+          sync();
+        }, (v) => v.toFixed(0) + ' Ω');
+        api.SU.btn(api.panel, 'Reset charge', () => { reset(); sync(); }, true);
+
+        /* --- measurements --- */
+        const rI = api.SU.readout(api.readouts, 'Current I = V/R', '0.00 A');
+        const rP = api.SU.readout(api.readouts, 'Power P = I²R', '0.0 W');
+        const rQ = api.SU.readout(api.readouts, 'Charge moved', '0.00 C');
+        const rV = api.SU.readout(api.readouts, 'Battery', '12.0 V');
+        const rR = api.SU.readout(api.readouts, 'Load', '24 Ω');
+
+        function sync() {
+          rI.set(current().toFixed(2) + ' A');
+          rP.set(power().toFixed(1) + ' W');
+          rQ.set(state.q.toFixed(2) + ' C');
+          rV.set(state.V.toFixed(1) + ' V');
+          rR.set(state.R.toFixed(0) + ' Ω');
+        }
+        sync();
+
+        /* --- geometry --- */
+        const L = 86,
+          T = 64,
+          Rr = W - 96,
+          B = H - 66;
+
+        /* Position along the rectangular loop, 0..1 clockwise from the cell. */
+        function onLoop(u) {
+          const wTop = Rr - L,
+            hSide = B - T,
+            per = 2 * (wTop + hSide);
+          let d = (((u % 1) + 1) % 1) * per;
+          if (d < wTop) return [L + d, T];
+          d -= wTop;
+          if (d < hSide) return [Rr, T + d];
+          d -= hSide;
+          if (d < wTop) return [Rr - d, B];
+          d -= wTop;
+          return [L, B - d];
+        }
+
+        function drawBench() {
+          /* board */
+          g.fillStyle = 'rgba(255,255,255,0.035)';
+          g.fillRect(16, 16, W - 32, H - 32);
+          g.strokeStyle = 'rgba(154,168,195,0.35)';
+          g.lineWidth = 1;
+          g.strokeRect(16, 16, W - 32, H - 32);
+
+          /* wires */
+          g.strokeStyle = '#8b98b8';
+          g.lineWidth = 4;
+          g.beginPath();
+          g.moveTo(L, T);
+          g.lineTo(Rr, T);
+          g.lineTo(Rr, B);
+          g.lineTo(L, B);
+          g.closePath();
+          g.stroke();
+
+          /* electron flow — dots spaced by the integrated phase */
+          const I = current();
+          if (I > 1e-6) {
+            for (let i = 0; i < 16; i++) {
+              const p = onLoop(state.phase + i / 16);
+              g.fillStyle = 'rgba(34,211,238,0.9)';
+              g.beginPath();
+              g.arc(p[0], p[1], 3, 0, Math.PI * 2);
+              g.fill();
+            }
+          }
+
+          /* battery block on the left leg */
+          const my = (T + B) / 2;
+          g.fillStyle = '#131c31';
+          g.strokeStyle = '#22d3ee';
+          g.lineWidth = 1.5;
+          g.fillRect(L - 22, my - 26, 44, 52);
+          g.strokeRect(L - 22, my - 26, 44, 52);
+          g.fillStyle = '#e8edf7';
+          g.font = '10px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText('+', L, my - 10);
+          g.fillText('−', L, my + 14);
+          g.fillStyle = '#22d3ee';
+          g.font = '11px "DM Mono", monospace';
+          g.fillText(state.V.toFixed(1) + ' V', L - 44, my + 4);
+
+          /* resistor bank on the top run — heat glow follows P */
+          const P = power();
+          const heat = Math.min(1, P / 40);
+          const rx = (L + Rr) / 2;
+          g.save();
+          if (api.cfg.shadows && heat > 0.02) {
+            g.shadowColor = 'rgba(251,191,36,' + (0.35 + 0.55 * heat).toFixed(2) + ')';
+            g.shadowBlur = 10 + 22 * heat;
+          }
+          g.fillStyle = 'rgba(251,191,36,' + (0.25 + 0.65 * heat).toFixed(2) + ')';
+          g.fillRect(rx - 34, T - 12, 68, 24);
+          g.restore();
+          g.strokeStyle = 'rgba(7,11,22,0.7)';
+          g.lineWidth = 1.5;
+          for (let i = -2; i <= 2; i++) {
+            g.beginPath();
+            g.moveTo(rx + i * 12, T - 10);
+            g.lineTo(rx + i * 12, T + 10);
+            g.stroke();
+          }
+          g.fillStyle = '#fbbf24';
+          g.font = '11px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText(state.R.toFixed(0) + ' Ω', rx, T - 20);
+
+          /* instrument lamp on the right leg */
+          const ly = (T + B) / 2;
+          const glow = Math.min(1, P / 28);
+          if (glow > 0.01) {
+            const gr = g.createRadialGradient(Rr + 30, ly, 2, Rr + 30, ly, 46 * glow + 10);
+            gr.addColorStop(0, 'rgba(251,191,36,' + (0.5 * glow).toFixed(2) + ')');
+            gr.addColorStop(1, 'rgba(251,191,36,0)');
+            g.fillStyle = gr;
+            g.beginPath();
+            g.arc(Rr + 30, ly, 46 * glow + 12, 0, Math.PI * 2);
+            g.fill();
+          }
+          g.fillStyle = glow > 0.02 ? '#ffd977' : 'rgba(232,237,247,0.25)';
+          g.beginPath();
+          g.arc(Rr + 30, ly, 12, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = 'rgba(232,237,247,0.85)';
+          g.font = '10px "DM Mono", monospace';
+          g.textAlign = 'left';
+          g.fillText('I = ' + I.toFixed(2) + ' A', Rr + 44, ly - 16);
+          g.fillText('P = ' + P.toFixed(1) + ' W', Rr + 44, ly + 4);
+
+          api.pxLabel(g, 24, 30, 'PHYSIX CIRCUIT BENCH · ideal cell, no internal resistance', 'rgba(154,168,195,0.75)');
+        }
+
+        function drawSchematic() {
+          g.strokeStyle = 'rgba(255,255,255,0.055)';
+          g.lineWidth = 1;
+          for (let gx = 0; gx < W; gx += 40) {
+            g.beginPath();
+            g.moveTo(gx, 0);
+            g.lineTo(gx, H);
+            g.stroke();
+          }
+          const mx = W / 2,
+            my = H / 2;
+          const w2 = Math.min(240, W * 0.34);
+          const h2 = 82;
+
+          g.strokeStyle = '#9aa8c3';
+          g.lineWidth = 2.5;
+          g.strokeRect(mx - w2, my - h2, 2 * w2, 2 * h2);
+
+          /* cell (left edge) */
+          const cy = my;
+          g.strokeStyle = '#22d3ee';
+          g.lineWidth = 2.5;
+          g.beginPath();
+          g.moveTo(mx - w2, cy - 18);
+          g.lineTo(mx - w2, cy + 18);
+          g.stroke();
+          g.lineWidth = 5;
+          g.beginPath();
+          g.moveTo(mx - w2 - 8, cy - 11);
+          g.lineTo(mx - w2 - 8, cy + 11);
+          g.stroke();
+          g.fillStyle = '#22d3ee';
+          g.font = '11px "DM Mono", monospace';
+          g.textAlign = 'right';
+          g.fillText(state.V.toFixed(1) + ' V', mx - w2 - 14, cy + 4);
+
+          /* resistor zigzag (top edge) */
+          const rx0 = mx - 60,
+            rx1 = mx + 60;
+          g.strokeStyle = '#fbbf24';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(rx0, my - h2);
+          const steps = 6;
+          for (let i = 1; i <= steps; i++) {
+            const xx = rx0 + ((rx1 - rx0) * i) / steps;
+            g.lineTo(xx, my - h2 + (i % 2 ? -9 : 9));
+          }
+          g.stroke();
+          g.fillStyle = '#fbbf24';
+          g.textAlign = 'center';
+          g.fillText(state.R.toFixed(0) + ' Ω', mx, my - h2 - 20);
+
+          /* current arrow on the top run */
+          g.fillStyle = '#34d399';
+          const I = current();
+          api.pxArrow(g, mx + 90, my - h2, 34, 0, '#34d399', 2.5);
+          api.pxLabel(g, mx + 128, my - h2 - 8, 'I = ' + I.toFixed(2) + ' A', '#34d399');
+
+          /* load (bottom edge) */
+          g.strokeStyle = '#e8edf7';
+          g.fillStyle = 'rgba(251,191,36,0.18)';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.arc(mx, my + h2, 16, 0, Math.PI * 2);
+          g.fill();
+          g.stroke();
+
+          g.textAlign = 'center';
+          g.fillStyle = 'rgba(232,237,247,0.8)';
+          g.font = '11px "DM Mono", monospace';
+          g.fillText('I = V / R', mx, my + 44);
+          g.fillText('P = I² R = ' + power().toFixed(1) + ' W', mx, my + 62);
+          g.fillStyle = 'rgba(232,237,247,0.5)';
+          g.fillText('ideal cell (no internal resistance)', mx, H - 16);
+        }
+
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#0a1020');
+          bg.addColorStop(1, '#05070d');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawSchematic();
+          else drawBench();
+          api.pxLabel(g, W - 118, 20, 't = ' + state.t.toFixed(2) + ' s', 'rgba(232,237,247,0.75)');
+        }
+
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < MAX_SUB) {
+            advance(FIXED);
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          if (n > 0) {
+            api.graphs[0].push({ t: state.t, q: state.q });
+            api.graphs[1].push({ t: state.t, p: power() });
+          }
+          sync();
+        }
+
+        function stopWatching() {
+          if (state._watchTimer) {
+            clearInterval(state._watchTimer);
+            state._watchTimer = 0;
+          }
+        }
+
         return {
-          t,
-          V: v,
-          R: r,
+          update,
+          draw,
+          reset() {
+            reset();
+            sync();
+          },
+          onPreset() {
+            sV.set(state.V);
+            sR.set(state.R);
+            reset();
+            sync();
+          },
+          destroy: stopWatching
+        };
+      },
+      predict(api) {
+        const TARGET = 2.0;
+        let pendingReveal = null;
+
+        function stopWatching() {
+          if (api.state._watchTimer) {
+            clearInterval(api.state._watchTimer);
+            api.state._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          api.state._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[0].timeRange('q');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'q',
+          unit: 'C',
+          quantity: 'charge',
+          absFloor: 0.2,
+          context() {
+            return {
+              V: api.state.V,
+              R: api.state.R,
+              I: api.state.V / api.state.R,
+              paramsText: 'V = ' + api.state.V.toFixed(1) + ' V · R = ' + api.state.R.toFixed(0) + ' Ω'
+            };
+          },
+          targetTime: () => TARGET,
+          question() {
+            return 'Predict first: how much charge has passed the cell after ' + TARGET.toFixed(1) + ' s?';
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('q', TARGET);
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            return (
+              'Ohm\'s law gives I = V/R = ' +
+              ctx.V.toFixed(1) +
+              '/' +
+              ctx.R.toFixed(0) +
+              ' = ' +
+              ctx.I.toFixed(2) +
+              ' A. Charge is the integral of current, q = I t = ' +
+              (ctx.I * TARGET).toFixed(2) +
+              ' C after ' +
+              TARGET.toFixed(1) +
+              ' s. The recorded graph slope is exactly that current.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = TARGET;
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        pred.refresh();
+        return pred;
+      },
+      probe(api) {
+        const s = api.state;
+        const I = s.V / s.R;
+        return {
+          t: s.t,
+          V: s.V,
+          R: s.R,
           I,
-          P: I * I * r,
-          q,
-          state: { q: +q.toFixed(6) }
+          P: I * I * s.R,
+          q: s.q,
+          state: { q: +s.q.toFixed(6) }
         };
       }
-    });
-
-    if (window.MutationObserver) {
-      const mo = new MutationObserver(() => {
-        if (!frame.isConnected) {
-          graph.destroy();
-          mo.disconnect();
-        }
-      });
-      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
-  }
+    }),
+  { chrome: 'workstation' }
 );
 
 /* ---------------- Charge in magnetic field ---------------- */
