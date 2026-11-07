@@ -17,8 +17,12 @@ async function ensureSim(id) {
 
 export const Sims = {
   reg: {},
-  register(id, title, desc, icon, run) {
-    this.reg[id] = { id, title, desc, icon, run };
+  /* meta (optional): per-simulation flags consumed by the platform, e.g.
+     { hidden: true } keeps the simulation routable but out of the catalogue,
+     { chrome: 'workstation' } opts out of the generic sim-head so the
+     Workstation design system (js/sim-ui.js) owns the header. */
+  register(id, title, desc, icon, run, meta) {
+    this.reg[id] = Object.assign({ id, title, desc, icon, run }, meta || {});
   },
   async mount(id, host) {
     host.innerHTML = '';
@@ -38,22 +42,29 @@ export const Sims = {
         return;
       }
     }
-    const frame = SU.el('div', 'sim-frame');
-    frame.innerHTML =
-      '<div class="sim-head">' +
-      '<span class="sim-icon" aria-hidden="true">' +
-      esc(def.icon || '🧪') +
-      '</span>' +
-      '<div class="sim-head-text">' +
-      '<b class="sim-title">' +
-      esc(def.title) +
-      '</b>' +
-      '<span class="sim-desc">' +
-      esc(def.desc) +
-      '</span>' +
-      '</div>' +
-      '<span class="sim-badge">Interactive</span>' +
-      '</div>';
+    const frame = SU.el(
+      'div',
+      'sim-frame' + (def.chrome === 'workstation' ? ' sim-frame-ws' : '')
+    );
+    /* Workstation sims (chrome: 'workstation') build their own header via
+       js/sim-ui.js; the generic head would duplicate the title. */
+    if (def.chrome !== 'workstation') {
+      frame.innerHTML =
+        '<div class="sim-head">' +
+        '<span class="sim-icon" aria-hidden="true">' +
+        esc(def.icon || '🧪') +
+        '</span>' +
+        '<div class="sim-head-text">' +
+        '<b class="sim-title">' +
+        esc(def.title) +
+        '</b>' +
+        '<span class="sim-desc">' +
+        esc(def.desc) +
+        '</span>' +
+        '</div>' +
+        '<span class="sim-badge">Interactive</span>' +
+        '</div>';
+    }
     host.appendChild(frame);
     /* The per-simulation page passes a .sim-slot-lg that lives INSIDE #main,
          so observing that host is not enough: the router replaces #main's

@@ -127,15 +127,11 @@ import { Sims } from './sims-a.js';
     ]
   ];
 
-  PHET.forEach((p) => {
-    const url = 'https://phet.colorado.edu/sims/html/' + p[4] + '/latest/' + p[4] + '_en.html';
-    Sims.register(
-      p[0],
-      p[1] + ' (PhET)',
-      p[2] + ' Official PhET sim — works with an internet connection.',
-      '🚀',
-      phetRun(url, p[1], p[3])
-    );
-    Sims.reg[p[0]].phet = true;
-  });
+  /* DEPRECATED-CATALOGUE (sim-transform, Phase B): the 10 PhET embeds were
+     removed from the catalogue per the approved transformation scope — the
+     site now lists only PhysiX-built simulations. The PHET data table and
+     phetRun() are kept, dormant, so re-enabling is a one-line revert:
+       PHET.forEach((p) => Sims.register(p[0], p[1] + ' (PhET)',
+         p[2] + ' Official PhET sim — works with an internet connection.',
+         '🚀', phetRun(url(p[4]), p[1], p[3]))); */
 })();

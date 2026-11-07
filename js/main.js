@@ -29,6 +29,10 @@ import './data-quiz-b.js';
 import './data-quiz-c.js';
 /* sims-a.js imported for Sims registry + mount() — sims-b/c/d/e/ncert/phet/more/3d-a/3d-b/3d-pages/realism removed */
 import './sims-a.js';
+/* sim-transform Phase B: workstation design system + its hidden demo sim.
+   Kept eager (like sims-a) so the demo is routable without a loader entry. */
+import './sim-ui.js';
+import './sims-workstation.js';
 import './blocks.js';
 import './tutor.js';
 import './views.js';

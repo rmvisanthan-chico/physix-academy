@@ -193,7 +193,11 @@ export async function viewSimsPage(id) {
   }
   /* Ensure all sim modules are loaded for the catalogue view */
   await ensureAll();
-  const all = Object.values(Sims.reg).sort((a, b) => a.title.localeCompare(b.title));
+  /* hidden: true keeps a simulation routable (#/sims/<id>) but out of the
+     catalogue — used by platform demo simulations (sim-transform Phase B). */
+  const all = Object.values(Sims.reg)
+    .filter((d) => !d.hidden)
+    .sort((a, b) => a.title.localeCompare(b.title));
   /* Standalone pages under /html5-sims/. These are whole documents rather
        than Sims.register() modules, so they open as normal navigations. */
   const threeD = window.Sims3D || [];
