@@ -271,7 +271,10 @@ export const Workstation = {
       return b;
     };
     const presetsEl = addSec('Presets', 'ws-presets');
-    const panel = addSec('Controls', 'ws-controls');
+    /* `sim-controls` is kept alongside `ws-controls` so tools that drive the
+       legacy `.sim-controls input[type=range]` selector (verify-physics.mjs
+       setRange) keep working on converted simulations. */
+    const panel = addSec('Controls', 'ws-controls sim-controls');
     const readouts = addSec('Measurements', 'ws-readouts');
 
     /* rendering section */

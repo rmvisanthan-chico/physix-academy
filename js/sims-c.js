@@ -4,6 +4,7 @@ import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
 import { createSimControls } from './sim-controls.js';
 import { attachTimeControls } from './sim-controls-helper.js';
+import { Workstation } from './sim-ui.js';
 /* PhysiX Academy — Simulations Part C: projectile, SHM, doppler */
 ('use strict');
 
@@ -11,926 +12,1391 @@ import { attachTimeControls } from './sim-controls-helper.js';
 Sims.register(
   'projectile',
   'Projectile Motion',
-  'Launch a ball — v splits into vₓ (constant) and v_y (gravity). Air drag optional.',
+  'Launch a shell under gravity and quadratic drag; angle, speed and air resistance decide the range.',
   '🎯',
-  (frame) => {
-    const cv = SU.canvas(frame, 300);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-
-    /* Phase 3A graph. Fed from the same st the simulation already integrates -
-     no physics was rewritten and no new state was introduced. y and vx are the
-     two curves that make the textbook picture: a parabola, and a horizontal
-     line proving horizontal velocity really is constant. vy (a straight ramp
-     under no drag) is available via the legend toggle below. */
-    const graph = createGraph(
-      frame,
-      {
-        xLabel: 'Time',
-        xUnit: 's',
-        yLabel: 'y, vₓ, v_y',
-        yUnit: 'm and m/s',
-        title: 'Height vs Time — the parabola is the trajectory',
-        height: 190,
-        capacity: 900
-      },
-      [
-        { id: 'y', label: 'Height y', unit: 'm', color: GC.b },
-        { id: 'vx', label: 'vₓ', unit: 'm/s', color: GC.c },
-        { id: 'vy', label: 'v_y', unit: 'm/s', color: GC.e }
-      ]
-    );
-    const gToggle = SU.el('div', 'sim-actions');
-    frame.appendChild(gToggle);
-    const mkToggle = (id, label) => {
-      const b = document.createElement('button');
-      b.className = 'btn btn-sm';
-      b.type = 'button';
-      b.textContent = label;
-      let on = true;
-      b.addEventListener('click', () => {
-        on = !on;
-        graph.setVisible(id, on);
-        b.setAttribute('aria-pressed', String(on));
-        b.style.opacity = on ? '' : '.55';
-      });
-      b.setAttribute('aria-pressed', 'true');
-      gToggle.appendChild(b);
-      return b;
-    };
-    mkToggle('y', 'Height');
-    mkToggle('vx', 'vₓ');
-    mkToggle('vy', 'v_y');
-
-    /* Prediction is built at the very END of this simulation, after the sliders,
-     launch() and the animation loop exist. See the block below. */
-    /* destroy on unmount. SU.loop already stops on disconnect, but the graph
-     owns its own rAF loop and a ResizeObserver, so it must be told. */
-    if (window.MutationObserver) {
-      const mo = new MutationObserver(() => {
-        if (!frame.isConnected) {
-          graph.destroy();
-          mo.disconnect();
-        }
-      });
-      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
-
-    let st,
-      trail = [];
-    const G = 9.8;
-    /* Phase 3C: a slider move has to invalidate any pending prediction. The
-     question names a target instant derived from these sliders, so moving one
-     after the question was built leaves the student answering "how high at
-     t = 1.44 s" while the screen now asks something else - and the reveal poller
-     would keep waiting for a target belonging to the previous launch.
-     The handler is a mutable binding rather than a direct call because `pred` is
-     declared much further down (see the Phase 3B note); it starts as a plain
-     relaunch and is upgraded once the prediction exists. */
-    let predApi = null;
-    let onParamsChanged = () => launch();
-    const SP = SU.slider(ctr, 'Speed u (m/s)', 5, 45, 1, 25, () => onParamsChanged());
-    const AN = SU.slider(ctr, 'Angle θ (°)', 10, 80, 1, 45, () => onParamsChanged());
-    const H0 = SU.slider(ctr, 'Launch height (m)', 0, 30, 1, 0, () => onParamsChanged());
-    const DR = SU.slider(
-      ctr,
-      'Air drag k',
-      0,
-      0.4,
-      0.01,
-      0,
-      () => onParamsChanged(),
-      (v) => v.toFixed(2)
-    );
-    const rR = SU.readout(ro, 'Range'),
-      rH = SU.readout(ro, 'Max height'),
-      rT = SU.readout(ro, 'Flight');
-    function ideal() {
-      const u = SP.get(),
-        th = (AN.get() * Math.PI) / 180,
-        h = H0.get();
-      const R =
-        ((u * Math.cos(th)) / G) *
-        (u * Math.sin(th) + Math.sqrt((u * Math.sin(th)) ** 2 + 2 * G * h));
-      const Hmax = h + (u * u * Math.sin(th) ** 2) / (2 * G);
-      return { R, Hmax };
-    }
-    /* Reset clears the graph too, so the plot cannot keep showing the previous
-     launch's curve while a new ball is in flight. */
-    function launch() {
-      const u = SP.get(),
-        th = (AN.get() * Math.PI) / 180;
-      st = { x: 0, y: H0.get(), vx: u * Math.cos(th), vy: u * Math.sin(th), t: 0, hmax: H0.get() };
-      trail = [];
-      graph.clear();
-    }
-    launch();
-
-    /* Phase 3C: the physics, the sampling and the drawing are now three separate
-     functions instead of one fused closure. That separation is the whole point:
-     Pause has to skip integration while still drawing, and Step has to integrate
-     exactly once and then draw - which is impossible if integration, sampling and
-     rendering share a body and nobody can say which half runs when.
-     advance() integrates one fixed sub-step and never touches the canvas or the
-     graph; sample() records one graph point; render() draws and never integrates. */
-
-    /* One fixed sub-step of physics. Semantics unchanged from the old code - the
-     same semi-implicit Euler update, just handed a constant h instead of a
-     frame-dependent dt, so the answer no longer depends on the display's
-     refresh rate. */
-    function advance(h) {
-      if (!st || st.done) return;
-      const k = DR.get();
-      st.t += h;
-      const sp = Math.hypot(st.vx, st.vy);
-      st.vx += -k * st.vx * sp * h;
-      st.vy += (-G - k * st.vy * sp) * h;
-      st.x += st.vx * h;
-      st.y += st.vy * h;
-      if (st.y > st.hmax) st.hmax = st.y;
-      if (st.y <= 0 && st.t > 0.05) {
-        st.y = 0;
-        st.done = true;
-      }
-      trail.push([st.x, st.y]);
-      if (trail.length > 400) trail.shift();
-    }
-
-    /* Exactly one graph point per completed step. Called once per sub-step batch
-     by the controls, never by render() - so pausing genuinely stops the graph
-     growing rather than just stopping it being drawn. */
-    function sample() {
-      if (!st) return;
-      graph.push({ x: st.t, y: st.y, vx: st.vx, vy: st.vy });
-    }
-
-    /* Draws only. Runs on every frame including while paused, which is what keeps
-     the frozen ball and the existing curve on screen when the student hits
-     Pause to inspect them. */
-    function render() {
-      const k = DR.get(),
-        id = ideal();
-      const scale =
-        Math.min((cv.W - 70) / Math.max(5, id.R), (cv.H - 50) / Math.max(5, id.Hmax)) * 0.9;
-      const g = cv.g,
-        groundY = cv.H - 30,
-        x0 = 34;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      g.strokeStyle = '#33415c';
-      g.lineWidth = 2.5;
-      g.beginPath();
-      g.moveTo(20, groundY);
-      g.lineTo(cv.W - 10, groundY);
-      g.stroke();
-      g.strokeStyle = 'rgba(107,122,153,.3)';
-      g.setLineDash([4, 4]);
-      g.lineWidth = 1;
-      g.beginPath();
-      g.moveTo(x0, groundY);
-      g.lineTo(x0, groundY - id.Hmax * scale);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(x0, groundY);
-      g.lineTo(x0 + id.R * scale, groundY);
-      g.stroke();
-      g.setLineDash([]);
-      if (st) {
-        const px = x0 + st.x * scale,
-          py = groundY - st.y * scale;
-        g.fillStyle = 'rgba(34,211,238,.4)';
-        trail.forEach((p) => {
-          g.beginPath();
-          g.arc(x0 + p[0] * scale, groundY - p[1] * scale, 2.5, 0, 7);
-          g.fill();
-        });
-        g.fillStyle = '#fbbf24';
-        g.beginPath();
-        g.arc(px, py, 7, 0, 7);
-        g.fill();
-        if (!st.done) {
-          pxArrow(g, px, py, st.vx * scale * 0.5, -st.vy * scale * 0.5, '#34d399');
-          pxArrow(g, px, py, st.vx * scale * 0.5, 0, '#22d3ee');
-          pxArrow(g, px, py, 0, -st.vy * scale * 0.5, 'rgba(248,113,113,.9)');
-          pxLabel(g, px + st.vx * scale * 0.5 + 6, py - st.vy * scale * 0.5 - 4, 'v', '#34d399');
-        }
-        rR.set(st.x.toFixed(1) + ' m' + (k > 0 ? '  (ideal ' + id.R.toFixed(1) + ')' : ''));
-        rH.set(st.hmax.toFixed(1) + ' m');
-        rT.set(st.t.toFixed(2) + ' s' + (st.done ? ' ✔' : ''));
-      }
-    }
-
-    /* ---------- Phase 3C time controls ----------
-     One control bar owns one animation loop for this simulation. It is created
-     here - after advance/sample/render exist, and after the sliders, because
-     reset() re-reads the sliders and launch() re-seeds the state from them. */
-    const controls = createSimControls({
-      parent: frame,
-      advance,
-      sample,
-      render,
-      reset: launch,
-      getTime: () => (st ? st.t : 0),
-      timeUnit: 's',
-      /* Once the ball has landed there is nothing left to integrate, so Step must
-       not keep advancing the clock into empty air - canAdvance stops the
-       sub-step loop and leaves the run honestly finished. */
-      canAdvance: () => !!(st && !st.done),
-      stepLabel: 'flight time step'
-    });
-
-    /* Phase 3C test probe: reads the simulation's real state and the graph's real
-     sample count. Exposed so tools/verify-timecontrols.mjs can assert on physics
-     rather than on repainted pixels - "the loop stopped integrating" and "the
-     canvas was not repainted" are different failures and a DOM check cannot tell
-     them apart. */
-    const probe = () => ({
-      t: st ? st.t : 0,
-      x: st ? st.x : 0,
-      y: st ? st.y : 0,
-      vy: st ? st.vy : 0,
-      y0: H0.get(),
-      done: !!(st && st.done),
-      paused: controls.isPaused(),
-      /* Counted on ONE named series, not summed across all three. Summing would
-       triple every sample, which would quietly turn a test for "exactly one
-       sample per step" into a test for "exactly three" and stop meaning
-       anything. */
-      samples: graph.sampleCount('y'),
-      calls: controls.advanceCalls()
-    });
-    window.__tcProbe = probe;
-    /* Only clear the global if it is still ours. A later simulation may already
-     have mounted and claimed it, and blanking that one's probe would break it. */
-    const clearProbe = () => {
-      if (window.__tcProbe === probe) window.__tcProbe = null;
-    };
-
-    /* ---------- Phase 3B prediction ----------
-     Built HERE, after the sliders, launch() and the loop exist. Placed earlier
-     it threw "Cannot access 'SP' before initialization" and the whole
-     simulation failed to start: the prediction reads the slider values to build
-     its question, and they are `const`s declared further down.
-
-     The observed value is read from the graph's own record of what the
-     simulation integrated - never recomputed from theory - so the comparison
-     and the curve on screen cannot disagree. */
-    const targetFor = () => {
-      const u = SP.get(),
-        th = (AN.get() * Math.PI) / 180,
-        h = H0.get();
-      const vy0 = u * Math.sin(th);
-      /* Ideal flight time; drag has no closed form, so this only PROPOSES an
-       instant. The reveal waits for the real recorded range and reports
-       honestly if the target turns out to be unreachable. */
-      const tFly = (vy0 + Math.sqrt(vy0 * vy0 + 2 * G * h)) / G;
-      /* 40% of the flight, not 60%. Apex sits at 50% of the flight, so 60% asked
-       "how high is it on the way DOWN" - measurably true, but it throws away
-       the teaching moment, because the interesting prediction is the one made
-       while the ball is still climbing. Clamped to at least 0.3s so a slow,
-       low-angle launch still gets a readable question, and to 92% of flight so
-       a very fast one stays inside the run. */
-      return Math.min(Math.max(0.3, tFly * 0.4), tFly * 0.92);
-    };
-
-    let pendingReveal = null;
-    let revealTimer = 0;
-    function stopWatching() {
-      if (revealTimer) {
-        clearInterval(revealTimer);
-        revealTimer = 0;
-      }
-    }
-    function watchForTarget() {
-      stopWatching();
-      revealTimer = setInterval(() => {
-        if (!pendingReveal || pred.prediction === null || pred.result) return;
-        const range = graph.timeRange('y');
-        if (range && range.to >= pendingReveal) {
-          if (pred.reveal()) {
-            pendingReveal = null;
-            stopWatching();
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'projectile',
+      title: 'Projectile Motion',
+      desc: 'A ballistics bench: launch a shell over instrumented ground and watch height, range and the velocity components evolve under gravity and quadratic drag.',
+      icon: '🎯',
+      topic: 'Mechanics',
+      level: 'Grade 11–12',
+      appKey: 'projectile',
+      height: 300,
+      layers: [
+        { id: 'real', label: 'Test range' },
+        { id: 'science', label: 'Trajectory analysis' }
+      ],
+      presets: [
+        {
+          label: '45° standard',
+          apply: (s) => {
+            s.u = 25;
+            s.ang = 45;
+            s.h0 = 0;
+            s.drag = 0;
+          }
+        },
+        {
+          label: 'Low direct',
+          apply: (s) => {
+            s.u = 25;
+            s.ang = 20;
+            s.h0 = 0;
+            s.drag = 0;
+          }
+        },
+        {
+          label: 'High lob',
+          apply: (s) => {
+            s.u = 30;
+            s.ang = 70;
+            s.h0 = 0;
+            s.drag = 0;
+          }
+        },
+        {
+          label: 'Drag + elevation',
+          apply: (s) => {
+            s.u = 35;
+            s.ang = 40;
+            s.h0 = 5;
+            s.drag = 0.2;
           }
         }
-      }, 120);
-    }
+      ],
+      graphs: [
+        {
+          title: 'Height vs time',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Height',
+          yUnit: 'm',
+          height: 128,
+          series: [{ id: 'y', label: 'y', unit: 'm', color: '#22d3ee' }]
+        },
+        {
+          title: 'Velocity components',
+          xLabel: 'Time',
+          xUnit: 's',
+          yLabel: 'Velocity',
+          yUnit: 'm/s',
+          height: 128,
+          series: [
+            { id: 'vx', label: 'vx', unit: 'm/s', color: '#a78bfa' },
+            { id: 'vy', label: 'vy', unit: 'm/s', color: '#fbbf24' }
+          ]
+        }
+      ],
+      setup(api) {
+        const { g, W, H, state } = api;
+        const G = 9.8;
+        const FIXED = 1 / 60;
 
-    const pred = createPrediction(frame, {
-      graph,
-      series: 'y',
-      unit: 'm',
-      quantity: 'height',
-      absFloor: 0.2 /* metres; 20% of a small height would be silly */,
-      context() {
-        const u = SP.get(),
-          th = (AN.get() * Math.PI) / 180,
-          h = H0.get(),
-          k = DR.get();
+        state.u = 25;
+        state.ang = 45;
+        state.h0 = 0;
+        state.drag = 0;
+        state.st = null;
+        state.trail = [];
+        state.samples = 0;
+        state.onParam = () => {};
+        let acc = 0;
+
+        /* --- controls (DOM order: speed, angle, height, drag) --- */
+        const sU = api.SU.slider(api.panel, 'Launch speed u', 5, 45, 1, 25, (v) => {
+          state.u = v;
+          reset();
+        });
+        const sA = api.SU.slider(api.panel, 'Launch angle θ', 10, 80, 1, 45, (v) => {
+          state.ang = v;
+          reset();
+        });
+        const sH = api.SU.slider(api.panel, 'Launch height', 0, 30, 1, 0, (v) => {
+          state.h0 = v;
+          reset();
+        });
+        const sD = api.SU.slider(api.panel, 'Drag coefficient', 0, 0.4, 0.01, 0, (v) => {
+          state.drag = v;
+          reset();
+        }, (v) => v.toFixed(2));
+        api.SU.btn(api.panel, 'Launch', () => api.transport.reset(), true);
+
+        /* --- readouts --- */
+        const rR = api.SU.readout(api.readouts, 'Range', '—');
+        const rHm = api.SU.readout(api.readouts, 'Max height', '—');
+        const rT = api.SU.readout(api.readouts, 'Flight time', '—');
+        const rV = api.SU.readout(api.readouts, 'Speed', '—');
+
+        function ideal() {
+          const th = (state.ang * Math.PI) / 180;
+          const u = state.u,
+            h = state.h0;
+          const R = ((u * Math.cos(th)) / G) * (u * Math.sin(th) + Math.sqrt((u * Math.sin(th)) ** 2 + 2 * G * h));
+          const Hmax = h + (u * u * Math.sin(th) ** 2) / (2 * G);
+          return { R, Hmax };
+        }
+
+        /* --- physics (verbatim from the original sim) --- */
+        function launch() {
+          const th = (state.ang * Math.PI) / 180;
+          state.st = {
+            x: 0,
+            y: state.h0,
+            vx: state.u * Math.cos(th),
+            vy: state.u * Math.sin(th),
+            t: 0,
+            hmax: state.h0
+          };
+          state.trail = [];
+          state.done = false;
+          state.samples = 0;
+          acc = 0;
+          api.graphs.forEach((G2) => G2.clear());
+          sync();
+        }
+        function reset() {
+          launch();
+          if (state.onParam) state.onParam();
+        }
+
+        function advance(h) {
+          const st = state.st;
+          if (!st || state.done) return;
+          const k = state.drag;
+          st.t += h;
+          const sp = Math.hypot(st.vx, st.vy);
+          st.vx += -k * st.vx * sp * h;
+          st.vy += (-G - k * st.vy * sp) * h;
+          st.x += st.vx * h;
+          st.y += st.vy * h;
+          if (st.y > st.hmax) st.hmax = st.y;
+          state.trail.push([st.x, st.y]);
+          if (state.trail.length > 400) state.trail.shift();
+          if (st.y <= 0 && st.t > 0.05) {
+            st.y = 0;
+            state.done = true;
+          }
+        }
+
+        function sample() {
+          const st = state.st;
+          if (!st) return;
+          api.graphs[0].push({ t: st.t, y: st.y });
+          api.graphs[1].push({ t: st.t, vx: st.vx, vy: st.vy });
+        }
+
+        function sync() {
+          const st = state.st,
+            id = ideal();
+          if (!st) return;
+          rR.set(state.done ? st.x.toFixed(1) + ' m' : id.R.toFixed(1) + ' m (ideal)');
+          rHm.set(st.hmax.toFixed(1) + ' m');
+          rT.set(st.t.toFixed(2) + ' s' + (state.done ? ' ✔' : ''));
+          rV.set(Math.hypot(st.vx, st.vy).toFixed(1) + ' m/s');
+        }
+
+        /* --- drawing --- */
+        const pad = 34;
+        function view() {
+          const id = ideal();
+          const rMax = Math.max(5, id.R);
+          const hMax = Math.max(5, id.Hmax);
+          const scale = Math.min((W - 70) / rMax, (H - 50) / hMax) * 0.9;
+          return { scale, groundY: H - 30, x0: pad };
+        }
+
+        function drawReal(glow) {
+          const { scale, groundY, x0 } = view();
+          /* ground */
+          g.fillStyle = 'rgba(255,255,255,0.04)';
+          g.fillRect(0, groundY, W, H - groundY);
+          g.strokeStyle = 'rgba(154,168,195,0.7)';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(0, groundY);
+          g.lineTo(W, groundY);
+          g.stroke();
+          /* range ticks */
+          g.font = '9px "DM Mono", monospace';
+          g.textAlign = 'center';
+          const step = Math.max(5, Math.round(ideal().R / 6 / 5) * 5);
+          for (let m = 0; m <= ideal().R + step; m += step) {
+            const px = x0 + m * scale;
+            if (px > W - 8) break;
+            g.strokeStyle = 'rgba(255,255,255,0.2)';
+            g.beginPath();
+            g.moveTo(px, groundY);
+            g.lineTo(px, groundY + 6);
+            g.stroke();
+            g.fillStyle = 'rgba(232,237,247,0.45)';
+            g.fillText(m + ' m', px, groundY + 18);
+          }
+          /* launcher */
+          const th = (state.ang * Math.PI) / 180;
+          const lx = x0,
+            ly = groundY - state.h0 * scale;
+          g.strokeStyle = 'rgba(232,237,247,0.75)';
+          g.lineWidth = 4;
+          g.beginPath();
+          g.moveTo(lx, groundY);
+          g.lineTo(lx, ly);
+          g.moveTo(lx, ly);
+          g.lineTo(lx + Math.cos(th) * 26, ly - Math.sin(th) * 26);
+          g.stroke();
+          /* trail */
+          g.fillStyle = 'rgba(34,211,238,0.55)';
+          state.trail.forEach((p, i) => {
+            if (i % 3) return;
+            g.beginPath();
+            g.arc(x0 + p[0] * scale, groundY - p[1] * scale, 1.6, 0, 7);
+            g.fill();
+          });
+          /* shell */
+          const st = state.st;
+          if (st) {
+            const bx = x0 + st.x * scale,
+              by = groundY - st.y * scale;
+            g.save();
+            if (glow) {
+              g.shadowColor = 'rgba(251,191,36,0.9)';
+              g.shadowBlur = 16;
+            }
+            g.fillStyle = '#fbbf24';
+            g.beginPath();
+            g.arc(bx, by, 7, 0, 7);
+            g.fill();
+            g.restore();
+            api.pxArrow(g, bx, by, st.vx * scale * 0.06, -st.vy * scale * 0.06, '#34d399', 2);
+            api.pxLabel(g, bx + 10, by - 12, 'v', '#34d399');
+          }
+          api.pxLabel(g, 12, 20, 'PHYSIX BALLISTICS RANGE', 'rgba(232,237,247,0.55)');
+        }
+
+        function drawScience(glow) {
+          const { scale, groundY, x0 } = view();
+          /* grid */
+          g.strokeStyle = 'rgba(255,255,255,0.05)';
+          g.lineWidth = 1;
+          for (let gx = 0; gx < W; gx += 40) {
+            g.beginPath();
+            g.moveTo(gx, 0);
+            g.lineTo(gx, H);
+            g.stroke();
+          }
+          for (let gy = 0; gy < H; gy += 40) {
+            g.beginPath();
+            g.moveTo(0, gy);
+            g.lineTo(W, gy);
+            g.stroke();
+          }
+          /* ideal parabola (no drag) */
+          const id = ideal();
+          const th = (state.ang * Math.PI) / 180;
+          g.strokeStyle = 'rgba(167,139,250,0.55)';
+          g.lineWidth = 1.5;
+          g.setLineDash([7, 6]);
+          g.beginPath();
+          for (let i = 0; i <= 60; i++) {
+            const x = (id.R * i) / 60;
+            const y =
+              state.h0 + Math.tan(th) * x - (G * x * x) / (2 * state.u * state.u * Math.cos(th) ** 2);
+            if (y < 0) break;
+            const px = x0 + x * scale,
+              py = groundY - y * scale;
+            if (i === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          }
+          g.stroke();
+          g.setLineDash([]);
+          /* actual trail */
+          g.strokeStyle = 'rgba(34,211,238,0.9)';
+          g.lineWidth = 2;
+          g.beginPath();
+          state.trail.forEach((p, i) => {
+            const px = x0 + p[0] * scale,
+              py = groundY - p[1] * scale;
+            if (i === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          });
+          g.stroke();
+          /* max-height reference */
+          const st = state.st;
+          if (st) {
+            const hy = groundY - st.hmax * scale;
+            g.strokeStyle = 'rgba(251,191,36,0.35)';
+            g.setLineDash([4, 5]);
+            g.beginPath();
+            g.moveTo(x0, hy);
+            g.lineTo(W - 20, hy);
+            g.stroke();
+            g.setLineDash([]);
+            api.pxLabel(g, W - 120, hy - 6, 'h_max = ' + st.hmax.toFixed(1) + ' m', '#fbbf24');
+            /* velocity arrows at the shell */
+            const bx = x0 + st.x * scale,
+              by = groundY - st.y * scale;
+            g.save();
+            if (glow) {
+              g.shadowColor = 'rgba(251,191,36,0.8)';
+              g.shadowBlur = 12;
+            }
+            g.fillStyle = '#fbbf24';
+            g.beginPath();
+            g.arc(bx, by, 5, 0, 7);
+            g.fill();
+            g.restore();
+            const kx = 0.06 * scale * 2;
+            api.pxArrow(g, bx, by, st.vx * kx, 0, '#22d3ee', 2);
+            api.pxArrow(g, bx, by, 0, -st.vy * kx, '#f87171', 2);
+            api.pxArrow(g, bx, by, st.vx * kx, -st.vy * kx, '#34d399', 2);
+          }
+          api.pxLabel(g, 12, 20, 'v = (vx, vy)   g = 9.8 m/s²', 'rgba(232,237,247,0.6)');
+        }
+
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#0a1020');
+          bg.addColorStop(1, '#070b16');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawScience(api.cfg.shadows);
+          else drawReal(api.cfg.shadows);
+        }
+
+        function update(dt, t) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            state.samples++;
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          sync();
+        }
+
+        function targetFor() {
+          const th = (state.ang * Math.PI) / 180;
+          const vy0 = state.u * Math.sin(th);
+          const tFly = (vy0 + Math.sqrt(vy0 * vy0 + 2 * G * state.h0)) / G;
+          return Math.min(Math.max(0.3, 0.4 * tFly), 0.92 * tFly);
+        }
+
+        state.targetFor = targetFor;
+        launch();
         return {
-          u,
-          th,
-          h,
-          k,
-          paramsText: `u = ${u} m/s, θ = ${Math.round((th * 180) / Math.PI)}°, h₀ = ${h} m, drag k = ${k}`
+          update,
+          draw,
+          reset,
+          destroy() {
+            if (state._watchTimer) {
+              clearInterval(state._watchTimer);
+              state._watchTimer = 0;
+            }
+          },
+          targetFor
         };
       },
-      targetTime: targetFor,
-      question() {
-        return `Predict before you launch: how high is the ball at t = ${targetFor().toFixed(2)} s?`;
-      },
-      /* The measured value. Same instant the question named, because both call
-       targetFor() - so the number asked about and the number measured can
-       never drift apart. */
-      observe() {
-        const hit = graph.valueAt('y', targetFor());
-        return hit ? { value: hit.y, exact: hit.exact } : null;
-      },
-      explain(r, ctx) {
-        const t = targetFor();
-        const ideal = ctx.h + ctx.u * Math.sin(ctx.th) * t - 0.5 * G * t * t;
-        if (ctx.k > 0) {
-          return `With drag on, the ball bleeds vertical speed as it climbs, so it sits a little below the
-          ${ideal.toFixed(1)} m the drag-free formula gives. Drag only ever removes energy.`;
-        }
-        return `Height follows <b>y = h₀ + (u·sin θ)t − ½gt²</b>. Here that is
-        ${ctx.h} + ${(ctx.u * Math.sin(ctx.th) * t).toFixed(1)} − ${(0.5 * G * t * t).toFixed(1)}
-        = ${ideal.toFixed(1)} m. The launch term lifts the ball, gravity subtracts, and the subtraction grows
-        with t² — which is exactly why the height curve bends over instead of rising forever.`;
-      },
-      onLock() {
-        /* A new estimate means a new run, so the measured height belongs to the
-         parameters the student was actually shown. */
-        launch();
-        pendingReveal = targetFor();
-        /* Phase 3C: locking a prediction must RESUME the run. Before the time
-         controls existed, the simulation always ran, so the target was always
-         reached on its own. With Pause available, a student who paused, read the
-         question, typed an estimate and locked it would then sit watching a
-         frozen ball forever with the reveal never firing - the poller waits on
-         the graph's recorded time range, and a paused graph does not grow. The
-         student asked a question that requires the run, so the run starts. */
-        controls.play();
-        pred.refresh();
-        watchForTarget();
-      },
-      onReset() {
-        pendingReveal = null;
-        stopWatching();
-        launch();
-        pred.refresh();
-      }
-    });
-    /* Now that the prediction exists, a slider move can refresh the question and
-     cancel a stale reveal as well as relaunching. Assigned once, here. */
-    predApi = pred;
-    onParamsChanged = () => {
-      launch();
-      pendingReveal = null;
-      stopWatching();
-      predApi.refresh();
-    };
-    pred.refresh();
+      predict(api) {
+        let pendingReveal = null;
 
-    /* Lifecycle: the poller must die with the frame. Without this it keeps
-     firing against a detached graph after every route change. The time controls
-     are torn down here too - they own their own rAF loop, and unlike SU.loop's
-     chain it has to be cancelled explicitly or it keeps calling render() on a
-     detached canvas. */
-    if (window.MutationObserver) {
-      const mo2 = new MutationObserver(() => {
-        if (!frame.isConnected) {
+        function stopWatching() {
+          if (api.state._watchTimer) {
+            clearInterval(api.state._watchTimer);
+            api.state._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
           stopWatching();
-          controls.destroy();
-          clearProbe();
-          mo2.disconnect();
+          api.state._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[0].timeRange('y');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
         }
-      });
-      mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
-    return { controls, graph, getTime: () => (st ? st.t : 0) };
-  }
-);
 
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'y',
+          unit: 'm',
+          quantity: 'height',
+          absFloor: 0.2,
+          context() {
+            return { u: api.state.u, ang: api.state.ang, h0: api.state.h0, drag: api.state.drag };
+          },
+          targetTime: () => api.state.targetFor(),
+          question() {
+            return 'Predict first: what height is the shell at t = ' + api.state.targetFor().toFixed(2) + ' s?';
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('y', api.state.targetFor());
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            const t = api.state.targetFor();
+            const th = (ctx.ang * Math.PI) / 180;
+            const y = ctx.h0 + ctx.u * Math.sin(th) * t - 0.5 * 9.8 * t * t;
+            return (
+              'With gravity alone, y = h + u sinθ·t − ½gt² = ' +
+              ctx.h0 +
+              ' + ' +
+              (ctx.u * Math.sin(th)).toFixed(1) +
+              '·' +
+              t.toFixed(2) +
+              ' − 4.9·' +
+              t.toFixed(2) +
+              '² ≈ ' +
+              y.toFixed(1) +
+              ' m. Drag ' +
+              (ctx.drag > 0 ? 'lowers the real path slightly' : 'is off, so the ideal parabola is exact') +
+              '.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = api.state.targetFor();
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        api.state.onParam = () => {
+          pendingReveal = null;
+          stopWatching();
+          pred.refresh();
+        };
+        pred.refresh();
+        return pred;
+      },
+      probe(api) {
+        const st = api.state.st;
+        return {
+          t: st ? st.t : 0,
+          x: st ? st.x : 0,
+          y: st ? st.y : 0,
+          vy: st ? st.vy : 0,
+          y0: api.state.h0,
+          done: !!api.state.done,
+          samples: api.state.samples
+        };
+      }
+    }),
+  { chrome: 'workstation' }
+);
 /* ---------------- Spring-mass SHM ---------------- */
 Sims.register(
   'shm',
   'Spring-Mass SHM',
   'x(t) = A cos ωt — the heartbeat of physics.',
   '⏱️',
-  (frame) => {
-    const cv = SU.canvas(frame, 260);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    /* Phase 3A graph. x and v are already integrated below; time is accumulated
-     here rather than inside the sim, so no physics was changed. */
-    const graph = createGraph(
-      frame,
-      {
-        xLabel: 'Time',
-        xUnit: 's',
-        xKey: 'gt' /* this sim's own x is displacement, not time */,
-        yLabel: 'x, v',
-        yUnit: 'm, m/s',
-        title: 'Displacement and velocity — velocity leads by a quarter period',
-        height: 190,
-        capacity: 900
-      },
-      [
-        { id: 'x', label: 'Displacement x', unit: 'm', color: GC.a },
-        { id: 'v', label: 'Velocity v', unit: 'm/s', color: GC.b }
-      ]
-    );
-    const gTog = SU.el('div', 'sim-actions');
-    frame.appendChild(gTog);
-    const tog = (id, label) => {
-      const b = document.createElement('button');
-      b.className = 'btn btn-sm';
-      b.type = 'button';
-      b.textContent = label;
-      let on = true;
-      b.setAttribute('aria-pressed', 'true');
-      b.addEventListener('click', () => {
-        on = !on;
-        graph.setVisible(id, on);
-        b.setAttribute('aria-pressed', String(on));
-        b.style.opacity = on ? '' : '.55';
-      });
-      gTog.appendChild(b);
-    };
-    tog('x', 'Displacement');
-    tog('v', 'Velocity');
-    if (window.MutationObserver) {
-      const mo = new MutationObserver(() => {
-        if (!frame.isConnected) {
-          graph.destroy();
-          mo.disconnect();
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'shm',
+      title: 'Spring-Mass SHM',
+      desc: 'A mass on a spring oscillates about equilibrium. Add damping and watch the amplitude decay while the period barely moves — exactly the trade a suspension engineer tunes.',
+      icon: '⏱️',
+      topic: 'Oscillations',
+      level: 'Grade 11–12',
+      appKey: 'shm',
+      height: 300,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Suspension rig' },
+        { id: 'science', label: 'Oscillation analysis' }
+      ],
+      presets: [
+        { label: 'Stock suspension', apply: (s) => { s.m = 1.5; s.k = 25; s.d = 0; s.am = 80; } },
+        { label: 'Stiff track spring', apply: (s) => { s.m = 1.5; s.k = 60; s.d = 0; s.am = 80; } },
+        { label: 'Heavy load', apply: (s) => { s.m = 4; s.k = 25; s.d = 0; s.am = 80; } },
+        { label: 'Worn damper', apply: (s) => { s.m = 1.5; s.k = 25; s.d = 3; s.am = 80; } }
+      ],
+      graphs: [
+        {
+          title: 'Displacement x(t)',
+          xLabel: 'Time',
+          xUnit: 's',
+          height: 128,
+          yLabel: 'x',
+          yUnit: 'm',
+          series: [{ id: 'x', label: 'x', unit: 'm', color: '#22d3ee' }]
+        },
+        {
+          title: 'Velocity v(t) — leads by a quarter period',
+          xLabel: 'Time',
+          xUnit: 's',
+          height: 128,
+          yLabel: 'v',
+          yUnit: 'm/s',
+          series: [{ id: 'v', label: 'v', unit: 'm/s', color: '#fbbf24' }]
         }
-      });
-      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
+      ],
+      setup(api) {
+        const { g, W, H, state: S } = api;
 
-    /* vPix is the sim's pixel displacement (what the canvas draws); xMetres is
-     that displacement converted to metres, which is what the readout and the
-     graph both use. They must not share a name: the series id 'x' is the
-     displacement, while opts.xKey ('gt') is time, and overloading one name for
-     two roles is how the first version plotted velocity against time's key. */
-    let xPix,
-      v,
-      trace = [],
-      gt = 0;
-    /* PhysiX Academy — Virtual Physics Lab display scale.
-     *
-     * PX_PER_M is CHOSEN, not derived: it only scales how the pixel-space state
-     * is PRINTED. The SHM integrator is scale-invariant
-     * (dv_SI/dt = -(k/m)x_SI - dmp*v_SI holds for any value here), so changing
-     * PX_PER_M changes no period, frequency, damping rate or shape.
-     *
-     * Do not confuse it with FIXED_DT (= 1/60 s, sim-controls.js), which is the
-     * physics timestep. Chosen so the amplitude range 30-110 px reads as a
-     * plausible 0.50-1.83 m bench-top demo — plausibility, not derivation: any
-     * other value reads just as well and changes nothing physical.
-     */
-    const PX_PER_M = 60;
-    const M = SU.slider(ctr, 'Mass m (kg)', 0.5, 5, 0.25, 1.5, () => reset());
-    const K = SU.slider(ctr, 'Spring k', 5, 80, 1, 25, () => reset());
-    let AM;
-    /* Range spans ζ ≈ 0 → 1.5 at the default m/k, so the damping-ratio readout
-       can actually demonstrate underdamped, critical and overdamped motion.
-       The old 0–0.6 ceiling could never reach ζ = 1: the label would have had
-       only one value to show, which teaches nothing. */
-    const D = SU.slider(
-      ctr,
-      'Damping',
-      0,
-      12,
-      0.1,
-      0,
-      () => {},
-      (v) => v.toFixed(1)
-    );
-    const rT = SU.readout(ro, 'Period T (theory)'),
-      rTM = SU.readout(ro, 'T measured'),
-      rZ = SU.readout(ro, 'Damping ζ'),
-      rX = SU.readout(ro, 'x'),
-      rV = SU.readout(ro, 'v');
-    AM = SU.slider(ctr, 'Amplitude A (px)', 30, 110, 5, 80, () => reset());
+        /* ---- physics state ------------------------------------------------
+           The integrator is scale-invariant: PX_PER_M only converts the
+           pixel-space state for the readouts/graph (x_SI = xPix / 60).
+           It changes no period, frequency or damping rate. */
+        const PX_PER_M = 60;
+        const FIXED = 1 / 60;
+        let acc = 0;
 
-    /* Two successive downward equilibrium crossings are exactly one period
-       apart, so the run measures its own period instead of only quoting the
-       undamped ideal. With damping the measured value is slightly longer than
-       2π√(m/k), which is the physically correct behaviour and worth seeing. */
-    let prevX = 0,
-      lastCross = null,
-      measuredT = 0;
+        S.m = 1.5; /* kg */
+        S.k = 25; /* N/m */
+        S.d = 0; /* N·s/m damping coefficient */
+        S.am = 80; /* px release amplitude */
+        S.xPix = S.am;
+        S.v = 0;
+        S.gt = 0;
+        S.trace = [];
+        S.prevX = S.xPix;
+        S.lastCross = null;
+        S.measuredT = 0;
 
-    function reset() {
-      xPix = AM ? AM.get() : 80;
-      v = 0;
-      trace = [];
-      gt = 0;
-      prevX = xPix;
-      lastCross = null;
-      measuredT = 0;
-      graph.clear();
-    }
-    reset();
+        const omegaN = () => Math.sqrt(S.k / S.m);
+        const zetaOf = () => S.d / (2 * omegaN());
+        function regimeOf(z) {
+          if (z < 0.001) return 'undamped';
+          if (z < 0.99) return 'underdamped';
+          if (z < 1.01) return 'critical';
+          return 'overdamped';
+        }
 
-    /* ω_n = √(k/m); the equation is x'' = -(k/m)x - dmp·v, so dmp = 2ζω_n. */
-    const naturalOmega = () => Math.sqrt(K.get() / M.get());
-    const dampingRatio = () => D.get() / (2 * naturalOmega());
-    function regimeOf(z) {
-      if (z < 0.001) return 'undamped';
-      if (z < 0.99) return 'underdamped';
-      if (z < 1.01) return 'critical';
-      return 'overdamped';
-    }
+        /* ---- controls (DOM order M, K, D, AM is the legacy contract) ---- */
+        const sM = api.SU.slider(api.panel, 'Mass m (kg)', 0.5, 5, 0.25, 1.5, (v) => {
+          S.m = v;
+          reset();
+        }, (v) => v.toFixed(2) + ' kg');
+        const sK = api.SU.slider(api.panel, 'Spring k (N/m)', 5, 80, 1, 25, (v) => {
+          S.k = v;
+          reset();
+        }, (v) => v + ' N/m');
+        const sD = api.SU.slider(api.panel, 'Damping c (N·s/m)', 0, 12, 0.1, 0, (v) => {
+          S.d = v;
+        }, (v) => v.toFixed(1));
+        const sA = api.SU.slider(api.panel, 'Amplitude A (px)', 30, 110, 5, 80, (v) => {
+          S.am = v;
+          reset();
+        }, (v) => v + ' px');
+        api.SU.btn(api.panel, 'Restart run', () => api.transport.reset(), true);
 
-    /* Phase 3C: same three-way split as the projectile - advance integrates one
-     fixed sub-step, sample records one graph point, render draws only.
-     Semi-implicit Euler drifted here exactly as it did in the pendulum: at
-     k=80 N/m the amplitude grew run after run. Velocity Verlet keeps the
-     second-order accuracy that makes an "energy is conserved" claim honest. */
-    function accel(x, vel) {
-      const m = M.get(),
-        k = K.get(),
-        dmp = D.get();
-      return (-k / m) * x - dmp * vel;
-    }
+        /* ---- readouts ---- */
+        const rT = api.SU.readout(api.readouts, 'Period T (theory)', '—');
+        const rTM = api.SU.readout(api.readouts, 'T measured', '—');
+        const rZ = api.SU.readout(api.readouts, 'Damping ζ', '—');
+        const rX = api.SU.readout(api.readouts, 'x', '—');
+        const rV = api.SU.readout(api.readouts, 'v', '—');
 
-    function advance(h) {
-      const a1 = accel(xPix, v);
-      xPix += v * h + 0.5 * a1 * h * h;
-      const vHalf = v + 0.5 * a1 * h;
-      v = vHalf + 0.5 * accel(xPix, vHalf) * h;
-      gt += h;
-      /* Downward equilibrium crossing (x > 0 → x ≤ 0). */
-      if (prevX > 0 && xPix <= 0) {
-        if (lastCross !== null) measuredT = gt - lastCross;
-        lastCross = gt;
-      }
-      prevX = xPix;
-      trace.push(xPix);
-      if (trace.length > 320) trace.shift();
-    }
-
-    function sample() {
-      /* Graph and readout both report displacement in metres (px / PX_PER_M), so the
-       plotted curve and the number beside it agree. Velocity is converted with
-       the same factor - the first version pushed raw px/s and the legend read
-       "-295 m/s", which is not a velocity anything in this sim produces. */
-      graph.push({ gt, x: xPix / PX_PER_M, v: v / PX_PER_M });
-    }
-
-    function render() {
-      const m = M.get(),
-        k = K.get();
-      const tTheory = 2 * Math.PI * Math.sqrt(m / k);
-      const z = dampingRatio();
-      rT.set(tTheory.toFixed(2) + ' s');
-      rTM.set(measuredT ? measuredT.toFixed(2) + ' s' : '—');
-      rZ.set(z.toFixed(2) + ' · ' + regimeOf(z));
-      rX.set((xPix / PX_PER_M).toFixed(2) + ' m');
-      rV.set((v / PX_PER_M).toFixed(2) + ' m/s');
-      const g = cv.g,
-        midY = cv.H * 0.42;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      const wallX = cv.W * 0.12,
-        eqX = cv.W / 2,
-        bw = 44;
-      g.fillStyle = '#33415c';
-      g.fillRect(wallX - 10, midY - 60, 10, 120);
-      const coils = 9,
-        span = eqX + xPix - wallX - 10;
-      g.strokeStyle = '#9aa8c3';
-      g.lineWidth = 2.5;
-      g.beginPath();
-      g.moveTo(wallX, midY);
-      for (let i = 1; i <= coils; i++) {
-        const sx = wallX + (span * i) / coils;
-        g.lineTo(sx - span / coils / 2, midY + (i % 2 ? 16 : -16));
-      }
-      g.lineTo(eqX + xPix, midY);
-      g.stroke();
-      g.strokeStyle = '#26314a';
-      g.lineWidth = 1;
-      g.setLineDash([4, 4]);
-      g.beginPath();
-      g.moveTo(wallX, midY + 52);
-      g.lineTo(cv.W - 20, midY + 52);
-      g.stroke();
-      g.setLineDash([]);
-      g.fillStyle = '#6d5df6';
-      g.fillRect(eqX + xPix - bw / 2, midY - 22, bw, 44);
-      g.fillStyle = '#9aa8c3';
-      g.font = '11px Segoe UI';
-      g.textAlign = 'center';
-      g.fillText(m + ' kg', eqX + xPix, midY + 4);
-      g.fillText('equilibrium', cv.W / 2, midY + 66);
-      g.textAlign = 'left';
-      const gx0 = 30,
-        gy0 = cv.H - 14,
-        gw = cv.W - 50;
-      g.strokeStyle = '#22d3ee';
-      g.lineWidth = 2;
-      g.beginPath();
-      trace.forEach((xx, i) => {
-        const X = gx0 + (i / 320) * gw,
-          Y = gy0 - 8 - (xx / 130) * 36;
-        i ? g.lineTo(X, Y) : g.moveTo(X, Y);
-      });
-      g.stroke();
-      g.fillStyle = '#6b7a99';
-      g.font = '10px Segoe UI';
-      g.fillText('x(t) trace', gx0, gy0 + 2);
-    }
-
-    /* The old "⟲ Restart" button is replaced by the shared control bar's Reset.
-     Left in place it would have been a second, differently-behaved reset - this
-     one would re-run while the bar's would hold the pause state - and a student
-     would have no way to tell which rule applied. */
-    const controls = createSimControls({
-      parent: frame,
-      advance,
-      sample,
-      render,
-      reset,
-      getTime: () => gt,
-      timeUnit: 's',
-      /* The mass never runs out of oscillation - damping can only slow it, and
-       with d = 0 it swings forever - so Step is never blocked here. */
-      canAdvance: () => true,
-      stepLabel: 'oscillation time step'
-    });
-
-    const shmProbe = () => ({
-      t: gt,
-      x: xPix / PX_PER_M,
-      v: v / PX_PER_M,
-      m: M.get(),
-      k: K.get(),
-      y0: (AM ? AM.get() : 80) / PX_PER_M,
-      periodTheory: 2 * Math.PI * Math.sqrt(M.get() / K.get()),
-      periodMeasured: measuredT || null,
-      zeta: dampingRatio(),
-      regime: regimeOf(dampingRatio()),
-      paused: controls.isPaused(),
-      samples: graph.sampleCount('x') /* one series only - see the projectile note */,
-      calls: controls.advanceCalls()
-    });
-    window.__tcProbe = shmProbe;
-    const clearProbe = () => {
-      if (window.__tcProbe === shmProbe) window.__tcProbe = null;
-    };
-
-    /* ---------- Phase 3B prediction ----------
-     SHM's teaching moment is the QUARTER-PERIOD relationship: starting from
-     maximum displacement with zero velocity, the mass reaches equilibrium
-     after T/4. Asking "where is it at T/4" forces the student to work out
-     what a quarter of an oscillation looks like, and the graph shows the
-     crossing rather than a peak - which is the intuition the curve exists to
-     give. Target is one quarter of the period this configuration actually has,
-     so it always lands inside the run. */
-    const periodOf = () => 2 * Math.PI * Math.sqrt(M.get() / K.get());
-    const targetFor = () => periodOf() * 0.25;
-
-    let pendingReveal = null;
-    let revealTimer = 0;
-    function stopWatching() {
-      if (revealTimer) {
-        clearInterval(revealTimer);
-        revealTimer = 0;
-      }
-    }
-    function watchForTarget() {
-      stopWatching();
-      revealTimer = setInterval(() => {
-        if (!pendingReveal || pred.prediction === null || pred.result) return;
-        const range = graph.timeRange('x');
-        if (range && range.to >= pendingReveal) {
-          if (pred.reveal()) {
-            pendingReveal = null;
-            stopWatching();
+        /* ---- integrator: velocity Verlet, unchanged from the original ----
+           Semi-implicit Euler drifted at high k; Verlet keeps the second-order
+           accuracy that makes the energy claim honest. */
+        function accel(x, vel) {
+          return (-S.k / S.m) * x - S.d * vel;
+        }
+        function advance(h) {
+          const a1 = accel(S.xPix, S.v);
+          S.xPix += S.v * h + 0.5 * a1 * h * h;
+          const vHalf = S.v + 0.5 * a1 * h;
+          S.v = vHalf + 0.5 * accel(S.xPix, vHalf) * h;
+          S.gt += h;
+          /* downward equilibrium crossing = one full period apart */
+          if (S.prevX > 0 && S.xPix <= 0) {
+            if (S.lastCross !== null) S.measuredT = S.gt - S.lastCross;
+            S.lastCross = S.gt;
           }
+          S.prevX = S.xPix;
+          S.trace.push(S.xPix);
+          if (S.trace.length > 320) S.trace.shift();
         }
-      }, 120);
-    }
+        function sample() {
+          const gx = api.graphs[0],
+            gv = api.graphs[1];
+          if (gx) gx.push({ t: S.gt, x: S.xPix / PX_PER_M });
+          if (gv) gv.push({ t: S.gt, v: S.v / PX_PER_M });
+        }
 
-    const pred = createPrediction(frame, {
-      graph,
-      series: 'x',
-      unit: 'm',
-      quantity: 'displacement',
-      absFloor: 0.05 /* metres; displacement is small in this sim */,
-      context() {
+        function reset() {
+          S.xPix = S.am;
+          S.v = 0;
+          S.gt = 0;
+          S.trace = [];
+          S.prevX = S.xPix;
+          S.lastCross = null;
+          S.measuredT = 0;
+          acc = 0;
+          api.graphs.forEach((G) => G.clear());
+          sync();
+        }
+
+        const periodOf = () => 2 * Math.PI * Math.sqrt(S.m / S.k);
+
+        function sync() {
+          const z = zetaOf();
+          rT.set(periodOf().toFixed(2) + ' s');
+          rTM.set(S.measuredT ? S.measuredT.toFixed(2) + ' s' : '—');
+          rZ.set(z.toFixed(2) + ' · ' + regimeOf(z));
+          rX.set((S.xPix / PX_PER_M).toFixed(2) + ' m');
+          rV.set((S.v / PX_PER_M).toFixed(2) + ' m/s');
+        }
+
+        /* ---- drawing ---- */
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#0a1020');
+          bg.addColorStop(1, '#070b16');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawScience();
+          else drawRig();
+        }
+
+        function coil(x0, y0, x1, y1, coils, amp) {
+          g.beginPath();
+          g.moveTo(x0, y0);
+          const dx = (x1 - x0) / coils,
+            dy = (y1 - y0) / coils;
+          for (let i = 1; i <= coils; i++) {
+            g.lineTo(x0 + dx * (i - 0.5), y0 + dy * (i - 0.5) + (i % 2 ? amp : -amp));
+          }
+          g.lineTo(x1, y1);
+          g.stroke();
+        }
+
+        function drawRig() {
+          const midX = W * 0.44;
+          const ceil = 40;
+          const eqY = H * 0.5;
+          const y = eqY + S.xPix * 0.55; /* display-only gain */
+          /* gantry */
+          g.fillStyle = 'rgba(255,255,255,0.07)';
+          g.fillRect(midX - 150, ceil - 18, 300, 10);
+          g.strokeStyle = 'rgba(154,168,195,0.7)';
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(midX - 140, ceil - 8);
+          g.lineTo(midX - 140, H - 40);
+          g.moveTo(midX + 140, ceil - 8);
+          g.lineTo(midX + 140, H - 40);
+          g.stroke();
+          /* damper cylinder */
+          g.strokeStyle = 'rgba(34,211,238,0.75)';
+          g.lineWidth = 6;
+          g.beginPath();
+          g.moveTo(midX + 60, ceil);
+          g.lineTo(midX + 60, y - 26);
+          g.stroke();
+          g.strokeStyle = 'rgba(154,168,195,0.8)';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(midX + 60, ceil);
+          g.lineTo(midX + 60, ceil + 26);
+          g.stroke();
+          /* spring */
+          g.strokeStyle = '#9aa8c3';
+          g.lineWidth = 2.5;
+          coil(midX - 60, ceil, midX - 60, y - 26, 10, 14);
+          /* suspended mass (the vehicle body) */
+          g.save();
+          if (api.cfg.shadows) {
+            g.shadowColor = 'rgba(34,211,238,0.7)';
+            g.shadowBlur = 16;
+          }
+          const body = g.createLinearGradient(0, y - 26, 0, y + 26);
+          body.addColorStop(0, '#22d3ee');
+          body.addColorStop(1, '#0e7490');
+          g.fillStyle = body;
+          rr(g, midX - 120, y - 26, 240, 52, 8);
+          g.fill();
+          g.restore();
+          g.fillStyle = '#071018';
+          g.font = 'bold 13px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText(S.m.toFixed(2) + ' kg', midX, y + 5);
+          /* wheel */
+          g.fillStyle = '#0b1220';
+          g.strokeStyle = 'rgba(232,237,247,0.8)';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.arc(midX, H - 40, 15, 0, Math.PI * 2);
+          g.fill();
+          g.stroke();
+          /* equilibrium marker */
+          g.strokeStyle = 'rgba(255,255,255,0.2)';
+          g.setLineDash([4, 4]);
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(midX - 150, eqY);
+          g.lineTo(midX + 150, eqY);
+          g.stroke();
+          g.setLineDash([]);
+          /* ground */
+          g.strokeStyle = '#33415c';
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(20, H - 24);
+          g.lineTo(W - 20, H - 24);
+          g.stroke();
+          api.pxLabel(g, 24, 22, 'PHYSIX SUSPENSION RIG', 'rgba(232,237,247,0.7)');
+          api.pxLabel(g, W - 150, 22, 'T = ' + periodOf().toFixed(2) + ' s', 'rgba(34,211,238,0.9)');
+        }
+
+        function drawScience() {
+          /* grid */
+          g.strokeStyle = 'rgba(255,255,255,0.05)';
+          g.lineWidth = 1;
+          for (let x = 0; x < W; x += 40) {
+            g.beginPath();
+            g.moveTo(x, 0);
+            g.lineTo(x, H);
+            g.stroke();
+          }
+          for (let yy = 0; yy < H; yy += 40) {
+            g.beginPath();
+            g.moveTo(0, yy);
+            g.lineTo(W, yy);
+            g.stroke();
+          }
+          const wallX = W * 0.12,
+            eqX = W / 2,
+            midY = H * 0.42,
+            bw = 46;
+          g.fillStyle = '#33415c';
+          g.fillRect(wallX - 10, midY - 60, 10, 120);
+          g.strokeStyle = '#9aa8c3';
+          g.lineWidth = 2.5;
+          coil(wallX, midY, eqX + S.xPix, midY, 9, 16);
+          g.strokeStyle = '#26314a';
+          g.lineWidth = 1;
+          g.setLineDash([4, 4]);
+          g.beginPath();
+          g.moveTo(wallX, midY + 52);
+          g.lineTo(W - 20, midY + 52);
+          g.stroke();
+          g.setLineDash([]);
+          /* mass */
+          g.fillStyle = '#6d5df6';
+          g.fillRect(eqX + S.xPix - bw / 2, midY - 22, bw, 44);
+          g.fillStyle = '#e8edf7';
+          g.font = '11px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText('m', eqX + S.xPix, midY + 4);
+          /* arrows: spring force and velocity */
+          const Fs = -S.k * (S.xPix / PX_PER_M);
+          api.pxArrow(g, eqX + S.xPix, midY - 40, Math.max(-90, Math.min(90, Fs * 1.2)), 0, '#f87171', 3);
+          api.pxLabel(g, eqX + S.xPix + 14, midY - 48, 'F = −kx', '#f87171');
+          api.pxArrow(g, eqX + S.xPix, midY + 42, Math.max(-90, Math.min(90, (S.v / PX_PER_M) * 30)), 0, '#34d399', 3);
+          api.pxLabel(g, eqX + S.xPix + 14, midY + 58, 'v', '#34d399');
+          /* trace strip */
+          const gx0 = 30,
+            gy0 = H - 16,
+            gw = W - 50;
+          g.strokeStyle = '#22d3ee';
+          g.lineWidth = 2;
+          g.beginPath();
+          S.trace.forEach((xx, i) => {
+            const X = gx0 + (i / 320) * gw,
+              Y = gy0 - 8 - (xx / 130) * 34;
+            i ? g.lineTo(X, Y) : g.moveTo(X, Y);
+          });
+          g.stroke();
+          g.fillStyle = '#6b7a99';
+          g.font = '10px "DM Mono", monospace';
+          g.textAlign = 'left';
+          g.fillText('x(t) trace', gx0, gy0 + 2);
+          api.pxLabel(
+            g,
+            W - 230,
+            20,
+            'ω = ' + omegaN().toFixed(2) + ' rad/s · ζ = ' + zetaOf().toFixed(2),
+            'rgba(232,237,247,0.8)'
+          );
+        }
+
+        function rr(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        }
+
+        /* ---- per-frame pump ---- */
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0; /* drop backlog, same rule as sim-controls */
+          sync();
+        }
+
+        reset();
+
         return {
-          m: M.get(),
-          k: K.get(),
-          d: D.get(),
-          T: periodOf(),
-          paramsText: `m = ${M.get()} kg, k = ${K.get()} N/m, T = ${periodOf().toFixed(2)} s`
+          update,
+          draw,
+          reset,
+          onPreset() {
+            sM.set(S.m);
+            sK.set(S.k);
+            sD.set(S.d);
+            sA.set(S.am);
+            reset();
+          },
+          destroy() {
+            if (S._watchTimer) {
+              clearInterval(S._watchTimer);
+              S._watchTimer = 0;
+            }
+          }
         };
       },
-      targetTime: targetFor,
-      question() {
-        return `Predict first: starting from maximum displacement, what is the displacement at
-        t = ${targetFor().toFixed(2)} s?`;
+      probe(api) {
+        const S = api.state;
+        const z = S.d / (2 * Math.sqrt(S.k / S.m));
+        const regime = z < 0.001 ? 'undamped' : z < 0.99 ? 'underdamped' : z < 1.01 ? 'critical' : 'overdamped';
+        return {
+          t: S.gt,
+          x: S.xPix / 60,
+          v: S.v / 60,
+          m: S.m,
+          k: S.k,
+          y0: S.am / 60,
+          periodTheory: 2 * Math.PI * Math.sqrt(S.m / S.k),
+          periodMeasured: S.measuredT || null,
+          zeta: z,
+          regime,
+          state: { x: +S.xPix.toFixed(6), v: +S.v.toFixed(6) }
+        };
       },
-      observe() {
-        const hit = graph.valueAt('x', targetFor());
-        return hit ? { value: hit.y, exact: hit.exact } : null;
-      },
-      explain(r, ctx) {
-        const t = targetFor();
-        if (ctx.d > 0.02) {
-          return `Damped, so the mass arrives a little before zero and slightly under the ideal amplitude.
-          Remove damping (set it to 0) and this becomes exactly zero: it is the crossing point.`;
+      predict(api) {
+        const S = api.state;
+        const periodOf = () => 2 * Math.PI * Math.sqrt(S.m / S.k);
+        const targetFor = () => periodOf() * 0.25;
+        let pendingReveal = null;
+        function stopWatching() {
+          if (S._watchTimer) {
+            clearInterval(S._watchTimer);
+            S._watchTimer = 0;
+          }
         }
-        return `This is the quarter-period. Starting at maximum displacement with v = 0, simple harmonic motion is
-        <b>x(t) = A·cos(ωt)</b>, and at t = T/4 we have ωt = π/2, so cos(π/2) = 0 and
-        x = 0. A quarter of an oscillation after the start, the mass is passing through
-        equilibrium — and that is where its speed is greatest.`;
-      },
-      onLock() {
-        /* Phase 3C: resume the run, same reason as the projectile - the reveal
-         poller waits on the graph's recorded time range, and a paused graph does
-         not grow, so a student who locked a prediction while paused would wait
-         forever. The question requires the run, so the run starts. */
-        reset();
-        pendingReveal = targetFor();
-        controls.play();
-        pred.refresh();
-        watchForTarget();
-      },
-      onReset() {
-        pendingReveal = null;
-        stopWatching();
-        reset();
-        pred.refresh();
-      }
-    });
-    pred.refresh();
-
-    if (window.MutationObserver) {
-      const mo2 = new MutationObserver(() => {
-        if (!frame.isConnected) {
+        function watchForTarget() {
           stopWatching();
-          controls.destroy();
-          clearProbe();
-          mo2.disconnect();
+          S._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[0].timeRange('x');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
         }
-      });
-      mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
-    return { controls, graph, getTime: () => gt };
-  }
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'x',
+          unit: 'm',
+          quantity: 'displacement',
+          absFloor: 0.05,
+          context() {
+            return {
+              m: S.m,
+              k: S.k,
+              d: S.d,
+              T: periodOf(),
+              paramsText: 'm = ' + S.m + ' kg, k = ' + S.k + ' N/m, T = ' + periodOf().toFixed(2) + ' s'
+            };
+          },
+          targetTime: targetFor,
+          question() {
+            return 'Predict first: starting from maximum displacement, what is the displacement at t = ' + targetFor().toFixed(2) + ' s?';
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('x', targetFor());
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            if (ctx.d > 0.02) {
+              return 'Damped, so the mass arrives a little before zero and slightly under the ideal amplitude. Remove damping and this becomes exactly zero: it is the equilibrium crossing.';
+            }
+            return 'This is the quarter-period. Starting at maximum displacement with v = 0, simple harmonic motion is <b>x(t) = A·cos(ωt)</b>; at t = T/4, ωt = π/2, so cos(π/2) = 0 and x = 0. A quarter of an oscillation after release the mass passes through equilibrium — where its speed is greatest.';
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = targetFor();
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        pred.refresh();
+        return pred;
+      }
+    }),
+  { chrome: 'workstation' }
 );
-
 /* ---------------- Doppler effect ---------------- */
 Sims.register(
   'doppler',
   'Doppler Effect',
   'Wavefronts bunch ahead, stretch behind.',
   '🚑',
-  (frame) => {
-    const cv = SU.canvas(frame, 280);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    const C = 90;
-    let rings = [],
-      srcX = 60,
-      emitAcc = 0,
-      t = 0;
-    const VS = SU.slider(ctr, 'Source velocity', -60, 160, 5, 55, () => {
-      rings = [];
-      srcX = 60;
-      t = 0;
-    });
-    const FR = SU.slider(ctr, 'Emitted frequency f (Hz)', 0.5, 3, 0.1, 1.2, () => {});
-    const rF = SU.readout(ro, "Heard f'"),
-      rGap = SU.readout(ro, 'Wavefront gap λ′'),
-      rSt = SU.readout(ro, 'Status');
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'doppler',
+      title: 'Doppler Effect',
+      desc: 'A siren sweeps past a roadside observer. Each wavefront is emitted from a new position, so the spacing the observer meets is (c − v)/f — the shift an ultrasound probe or a police radar measures.',
+      icon: '🚑',
+      topic: 'Waves',
+      level: 'Grade 11–12',
+      appKey: 'doppler',
+      height: 300,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Roadside radar' },
+        { id: 'science', label: 'Wavefront analysis' }
+      ],
+      presets: [
+        { label: 'Approaching siren', apply: (s) => { s.vs = 55; s.f = 1.2; } },
+        { label: 'Receding siren', apply: (s) => { s.vs = -45; s.f = 1.2; } },
+        { label: 'Stationary source', apply: (s) => { s.vs = 0; s.f = 1.2; } },
+        { label: 'Supersonic', apply: (s) => { s.vs = 150; s.f = 1.2; } }
+      ],
+      graphs: [
+        {
+          title: "Heard frequency f′(t)",
+          xLabel: 'Time',
+          xUnit: 's',
+          height: 128,
+          yLabel: "f′",
+          yUnit: 'Hz',
+          series: [{ id: 'fheard', label: "f′", unit: 'Hz', color: '#22d3ee' }]
+        },
+        {
+          title: 'Wavefront spacing λ′(t) — the measured gap',
+          xLabel: 'Time',
+          xUnit: 's',
+          height: 128,
+          yLabel: 'λ′',
+          yUnit: 'px',
+          series: [{ id: 'gap', label: 'λ′', unit: 'px', color: '#fbbf24' }]
+        }
+      ],
+      setup(api) {
+        const { g, W, H, state: S } = api;
+        const C = 90; /* wave speed, px/s — unchanged */
+        const FIXED = 1 / 60;
+        let acc = 0;
 
-    /* advance() integrates; render() only draws and reports. The rings are
-       SPACED by the emission rhythm: over one period 1/f the source moves
-       vs/f and each wavefront gains C/f, so the spacing between successive
-       right edges is (C − vs)/f. That spacing - not the instantaneous
-       formula - is what a listener actually hears, so the probe exposes it
-       and the tests use it to check f′ = fC/(C − vs). */
-    function advance(h) {
-      t += h;
-      const vs = VS.get(),
-        f = FR.get();
-      srcX += vs * h;
-      if (srcX < 20 || srcX > cv.W * 0.62) {
-        VS.set(-vs);
-        rings = [];
-      }
-      emitAcc += h;
-      if (emitAcc > 1 / f) {
-        emitAcc = 0;
-        rings.push({ x: srcX, y: cv.H * 0.45, r: 2 });
-      }
-      rings.forEach((r) => {
-        r.r += C * h;
-      });
-      rings = rings.filter((r) => r.r < cv.W * 1.2);
-    }
+        S.vs = 55;
+        S.f = 1.2;
+        S.rings = [];
+        S.srcX = 60;
+        S.emitAcc = 0;
+        S.t = 0;
 
-    /* Distance in x between the two most recent wavefronts, measured along
-       the direction the observer looks. Both rings grow at C, both drift with
-       the source, so this gap is a real measurement of (C − vs)/f. Needs two
-       rings; before the second is emitted the readout shows an em dash. */
-    function measureGap() {
-      if (rings.length < 2) return null;
-      const a = rings[rings.length - 2],
-        b = rings[rings.length - 1];
-      return a.x + a.r - (b.x + b.r);
-    }
+        const sV = api.SU.slider(api.panel, 'Source velocity', -60, 160, 5, 55, (v) => {
+          S.vs = v;
+          S.rings = [];
+          S.srcX = 60;
+          S.t = 0;
+        }, (v) => v + ' px/s');
+        const sF = api.SU.slider(api.panel, 'Emitted frequency f (Hz)', 0.5, 3, 0.1, 1.2, (v) => {
+          S.f = v;
+        }, (v) => v.toFixed(1) + ' Hz');
+        api.SU.btn(api.panel, 'Sweep past observer', () => api.transport.reset(), true);
 
-    function render() {
-      const vs = VS.get(),
-        f = FR.get();
-      const obsX = cv.W - 60,
-        obsY = cv.H * 0.45;
-      const vr = vs * Math.sign(obsX - srcX);
-      const fObs = (f * C) / Math.max(20, C - vr);
-      const gap = measureGap();
-      rF.set(fObs.toFixed(2) + ' Hz');
-      rGap.set(gap ? gap.toFixed(1) + ' px' : '—');
-      rSt.set(
-        vr > C
-          ? '💥 Sonic boom!'
-          : vr > 0
-            ? '🔊 Higher pitch'
-            : vr < 0
-              ? '🔉 Lower pitch'
-              : '➖ Same pitch'
-      );
-      const g = cv.g;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      rings.forEach((r) => {
-        const al = Math.max(0, 1 - r.r / cv.W);
-        g.strokeStyle = 'rgba(34,211,238,' + al.toFixed(2) + ')';
-        g.lineWidth = 1.5;
-        g.beginPath();
-        g.arc(r.x, r.y, r.r, 0, 7);
-        g.stroke();
-      });
-      g.fillStyle = '#fbbf24';
-      g.beginPath();
-      g.arc(srcX, cv.H * 0.45, 9, 0, 7);
-      g.fill();
-      g.fillStyle = '#e8edf7';
-      g.font = '11px Segoe UI';
-      g.fillText('source', srcX - 18, cv.H * 0.45 - 16);
-      g.fillStyle = '#34d399';
-      g.beginPath();
-      g.arc(obsX, obsY, 8, 0, 7);
-      g.fill();
-      g.fillStyle = '#e8edf7';
-      g.fillText('observer', obsX - 22, obsY - 16);
-    }
+        const rF = api.SU.readout(api.readouts, "Heard f′", '—');
+        const rGap = api.SU.readout(api.readouts, 'Wavefront gap λ′', '—');
+        const rSt = api.SU.readout(api.readouts, 'Status', '—');
 
-    attachTimeControls({
-      frame,
-      advance,
-      render,
-      reset: () => {
-        rings = [];
-        srcX = 60;
-        t = 0;
-        emitAcc = 0;
-      },
-      /* The source bounces between walls forever, so Step always has work. */
-      canAdvance: () => true,
-      getTime: () => t,
-      stepLabel: 'time step',
-      probe: () => {
-        const vs = VS.get(),
-          f = FR.get();
-        const obsX = cv.W - 60;
-        const vr = vs * Math.sign(obsX - srcX);
-        const gap = measureGap();
+        /* ---- physics: verbatim from the original (emission rhythm is part of
+           the measured contract — every wavefront is emitted on the fixed
+           1/60 s step from the source position at that instant) ---- */
+        function advance(h) {
+          S.t += h;
+          const vs = sV.get(),
+            f = sF.get();
+          S.srcX += vs * h;
+          if (S.srcX < 20 || S.srcX > W * 0.62) {
+            sV.set(-vs);
+            S.rings = [];
+          }
+          S.emitAcc += h;
+          if (S.emitAcc > 1 / f) {
+            S.emitAcc = 0;
+            S.rings.push({ x: S.srcX, y: H * 0.45, r: 2 });
+          }
+          S.rings.forEach((r) => {
+            r.r += C * h;
+          });
+          S.rings = S.rings.filter((r) => r.r < W * 1.2);
+        }
+
+        /* Distance between the two most recent wavefronts along the observer's
+           line of sight: a real measurement of (C − vs)/f. */
+        function measureGap() {
+          if (S.rings.length < 2) return null;
+          const a = S.rings[S.rings.length - 2],
+            b = S.rings[S.rings.length - 1];
+          return a.x + a.r - (b.x + b.r);
+        }
+
+        function observed() {
+          const vs = sV.get(),
+            f = sF.get();
+          const obsX = W - 60;
+          const vr = vs * Math.sign(obsX - S.srcX);
+          const fHeard = (f * C) / Math.max(20, C - vr);
+          return { vs, f, obsX, vr, fHeard, gap: measureGap() };
+        }
+
+        function sample() {
+          const o = observed();
+          const g0 = api.graphs[0],
+            g1 = api.graphs[1];
+          if (g0) g0.push({ t: S.t, fheard: o.fHeard });
+          if (g1 && o.gap != null) g1.push({ t: S.t, gap: o.gap });
+        }
+
+        function reset() {
+          S.rings = [];
+          S.srcX = 60;
+          S.t = 0;
+          S.emitAcc = 0;
+          acc = 0;
+          api.graphs.forEach((G) => G.clear());
+          sync();
+        }
+
+        function sync() {
+          const o = observed();
+          rF.set(o.fHeard.toFixed(2) + ' Hz');
+          rGap.set(o.gap != null ? o.gap.toFixed(1) + ' px' : '—');
+          rSt.set(
+            o.vr > C
+              ? '💥 Sonic boom!'
+              : o.vr > 0
+                ? '🔊 Higher pitch'
+                : o.vr < 0
+                  ? '🔉 Lower pitch'
+                  : '➖ Same pitch'
+          );
+        }
+
+        /* ---- drawing ---- */
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#0a1020');
+          bg.addColorStop(1, '#070b16');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          const o = observed();
+          if (api.getLayer() === 'science') drawScience(o);
+          else drawRoad(o);
+        }
+
+        function drawRoad(o) {
+          const roadY = H * 0.45;
+          /* carriageway */
+          g.fillStyle = 'rgba(255,255,255,0.05)';
+          g.fillRect(0, roadY + 34, W, H - roadY - 34);
+          g.strokeStyle = 'rgba(232,237,247,0.35)';
+          g.lineWidth = 2;
+          g.setLineDash([18, 14]);
+          g.beginPath();
+          g.moveTo(0, roadY + 58);
+          g.lineTo(W, roadY + 58);
+          g.stroke();
+          g.setLineDash([]);
+          /* sound wavefronts (the physics, still visible in the real view) */
+          const reach = W * 0.9;
+          S.rings.forEach((r) => {
+            const al = Math.max(0, 0.45 * (1 - r.r / reach));
+            g.strokeStyle = 'rgba(34,211,238,' + al.toFixed(2) + ')';
+            g.lineWidth = 1.4;
+            g.beginPath();
+            g.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+            g.stroke();
+          });
+          /* vehicle */
+          const vy = roadY - 6;
+          g.save();
+          if (api.cfg.shadows) {
+            g.shadowColor = 'rgba(251,191,36,0.8)';
+            g.shadowBlur = 16;
+          }
+          g.fillStyle = '#fbbf24';
+          rr(g, S.srcX - 26, vy - 16, 52, 22, 5);
+          g.fill();
+          g.restore();
+          g.fillStyle = '#0b1220';
+          g.fillRect(S.srcX - 18, vy - 12, 14, 9);
+          g.fillRect(S.srcX + 2, vy - 12, 14, 9);
+          for (const wx of [S.srcX - 15, S.srcX + 15]) {
+            g.fillStyle = '#0b1220';
+            g.strokeStyle = 'rgba(232,237,247,0.7)';
+            g.lineWidth = 2;
+            g.beginPath();
+            g.arc(wx, vy + 8, 6, 0, Math.PI * 2);
+            g.fill();
+            g.stroke();
+          }
+          /* observer post */
+          g.strokeStyle = 'rgba(154,168,195,0.9)';
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(o.obsX, roadY - 34);
+          g.lineTo(o.obsX, roadY + 34);
+          g.stroke();
+          g.fillStyle = '#34d399';
+          g.beginPath();
+          g.arc(o.obsX, roadY - 38, 8, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = 'rgba(232,237,247,0.85)';
+          g.font = '10px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText('observer', o.obsX, roadY + 50);
+          api.pxLabel(g, 20, 22, 'PHYSIX ROADSIDE DOPPLER', 'rgba(232,237,247,0.7)');
+          api.pxLabel(g, W - 210, 22, "f′ = " + o.fHeard.toFixed(2) + ' Hz', 'rgba(34,211,238,0.95)');
+        }
+
+        function drawScience(o) {
+          g.strokeStyle = 'rgba(255,255,255,0.05)';
+          g.lineWidth = 1;
+          for (let x = 0; x < W; x += 40) {
+            g.beginPath();
+            g.moveTo(x, 0);
+            g.lineTo(x, H);
+            g.stroke();
+          }
+          for (let y = 0; y < H; y += 40) {
+            g.beginPath();
+            g.moveTo(0, y);
+            g.lineTo(W, y);
+            g.stroke();
+          }
+          const cy = H * 0.45;
+          S.rings.forEach((r) => {
+            const al = Math.max(0, 0.55 * (1 - r.r / (W * 0.95)));
+            g.strokeStyle = 'rgba(34,211,238,' + al.toFixed(2) + ')';
+            g.lineWidth = 1.6;
+            g.beginPath();
+            g.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+            g.stroke();
+          });
+          /* source */
+          g.fillStyle = '#fbbf24';
+          g.beginPath();
+          g.arc(S.srcX, cy, 8, 0, Math.PI * 2);
+          g.fill();
+          api.pxLabel(g, S.srcX - 22, cy - 22, 'source', '#fbbf24');
+          /* velocity vector */
+          api.pxArrow(g, S.srcX, cy + 26, o.vs * 0.28, 0, '#fbbf24', 3);
+          /* observer */
+          g.fillStyle = '#34d399';
+          g.beginPath();
+          g.arc(o.obsX, cy, 7, 0, Math.PI * 2);
+          g.fill();
+          api.pxLabel(g, o.obsX - 26, cy - 22, 'observer', '#34d399');
+          /* measured gap bracket between the two newest wavefronts */
+          if (S.rings.length >= 2) {
+            const a = S.rings[S.rings.length - 2],
+              b = S.rings[S.rings.length - 1];
+            const y = cy - 96;
+            const x1 = a.x + a.r,
+              x2 = b.x + b.r;
+            g.strokeStyle = '#fbbf24';
+            g.lineWidth = 1.5;
+            g.beginPath();
+            g.moveTo(x1, y);
+            g.lineTo(x2, y);
+            g.moveTo(x1, y - 5);
+            g.lineTo(x1, y + 5);
+            g.moveTo(x2, y - 5);
+            g.lineTo(x2, y + 5);
+            g.stroke();
+            api.pxLabel(g, (x1 + x2) / 2 - 12, y - 10, "λ′ = " + (x2 - x1).toFixed(1) + ' px', '#fbbf24');
+          }
+          api.pxLabel(g, 20, 22, 'f′ = f · c / (c − v_source)', 'rgba(232,237,247,0.8)');
+          api.pxLabel(g, 20, 40, 'c = ' + C + ' px/s', 'rgba(107,122,153,0.9)');
+          api.pxLabel(
+            g,
+            W - 250,
+            22,
+            (o.vr > 0 ? 'approaching' : o.vr < 0 ? 'receding' : 'stationary') + ' · vr = ' + o.vr.toFixed(0) + ' px/s',
+            o.vr > 0 ? '#34d399' : o.vr < 0 ? '#fbbf24' : 'rgba(232,237,247,0.8)'
+          );
+        }
+
+        function rr(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        }
+
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          sync();
+        }
+
+        reset();
+
         return {
-          t,
-          srcX,
+          update,
+          draw,
+          reset,
+          onPreset() {
+            sV.set(S.vs);
+            sF.set(S.f);
+            reset();
+          },
+          destroy() {
+            if (S._watchTimer) {
+              clearInterval(S._watchTimer);
+              S._watchTimer = 0;
+            }
+          }
+        };
+      },
+      probe(api) {
+        const S = api.state;
+        const vs = S.vs;
+        const f = S.f;
+        const obsX = api.W - 60;
+        const vr = vs * Math.sign(obsX - S.srcX);
+        let gap = null;
+        if (S.rings.length >= 2) {
+          const a = S.rings[S.rings.length - 2],
+            b = S.rings[S.rings.length - 1];
+          gap = a.x + a.r - (b.x + b.r);
+        }
+        return {
+          t: S.t,
+          srcX: S.srcX,
           vs,
           f,
-          nRings: rings.length,
+          nRings: S.rings.length,
           gap: gap == null ? null : gap,
           obsX,
-          fHeard: (f * C) / Math.max(20, C - vr),
-          state: { srcX: +srcX.toFixed(6) }
+          fHeard: (f * 90) / Math.max(20, 90 - vr),
+          state: { srcX: +S.srcX.toFixed(6) }
         };
+      },
+      predict(api) {
+        const S = api.state;
+        const TARGET = 1.5;
+        let pendingReveal = null;
+        function stopWatching() {
+          if (S._watchTimer) {
+            clearInterval(S._watchTimer);
+            S._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          S._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[0].timeRange('fheard');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'fheard',
+          unit: 'Hz',
+          quantity: 'heard frequency',
+          absFloor: 0.2,
+          context() {
+            const vr = S.vs * Math.sign(api.W - 60 - S.srcX);
+            return {
+              vs: S.vs,
+              f: S.f,
+              vr,
+              paramsText: 'v_source = ' + S.vs + ' px/s, f = ' + S.f.toFixed(1) + ' Hz, c = 90 px/s'
+            };
+          },
+          targetTime: () => TARGET,
+          question() {
+            return 'Predict first: what frequency does the observer hear at t = ' + TARGET.toFixed(1) + ' s?';
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('fheard', TARGET);
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            return (
+              'The source moves toward the observer, so each wavefront starts closer than the last: the spacing is ' +
+              '(c − v)/f and the heard frequency is f′ = f·c/(c − v) = ' +
+              ctx.f.toFixed(1) + ' × 90/(90 − ' + ctx.vr.toFixed(0) + ') ≈ ' +
+              (ctx.f * 90 / Math.max(20, 90 - ctx.vr)).toFixed(2) + ' Hz. ' +
+              'Receding, the same algebra gives a lower pitch — this is the shift an ultrasound probe maps to blood velocity.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = TARGET;
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        pred.refresh();
+        return pred;
       }
-    });
-  }
+    }),
+  { chrome: 'workstation' }
 );
