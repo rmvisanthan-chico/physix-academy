@@ -159,8 +159,8 @@ PhysiX Academy/
 ├── assets/
 │   ├── logo.png/svg/jpg    # Brand assets
 │   ├── og-image.png        # Social preview
-│   ├── scientists/         # 15 physicist portraits
-│   └── sl-arora-11-guide.html  # Printable study guide
+│   └── scientists/         # 15 physicist portraits
+
 └── README.md               # This file
 ```
 
