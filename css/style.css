@@ -381,6 +381,12 @@ main {
   border-color: color-mix(in srgb, var(--acc) 55%, var(--card-brd));
   box-shadow: var(--shadow);
 }
+/* Sims catalogue cards appear instantly — no scroll-cinema fade */
+.sim-cat-grid .sim-cat-card.cine {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
 .card h3 {
   margin-top: 0;
 }
