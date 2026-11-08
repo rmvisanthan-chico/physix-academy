@@ -206,10 +206,11 @@ export async function viewSimsPage(id) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input id="sim-search" type="search" placeholder="Search simulations…" autocomplete="off" aria-label="Search simulations">
         </label>
-        <span class="sim-count" id="sim-count">${all.length} simulations</span>
+        <span class="sim-count" id="sim-count">${all.length + threeD.length} simulations</span>
+        <a class="more" href="/html5-sims/index.html">3D set &rarr;</a>
       </div>
       ${
-        all.length
+        all.length + threeD.length
           ? '<div class="grid g3 sim-cat-grid" id="sim-cat-grid">' +
             all
               .map(
@@ -227,32 +228,26 @@ export async function viewSimsPage(id) {
         </article>`
               )
               .join('') +
+            threeD
+              .map(
+                (d) => `
+        <article class="card hover topic-card sim-cat-card" data-search="${esc(
+          ('3D ' + d.t + ' ' + d.d + ' ' + d.f).toLowerCase()
+        )}">
+          <div class="sim-cat-top">
+            <span class="sim-cat-icon" aria-hidden="true">${esc(d.i || '🎲')}</span>
+            <em class="phet-badge">3D</em>
+          </div>
+          <h3>${esc(d.t)}</h3>
+          <p class="muted">${esc(d.d)}</p>
+          <div class="topic-meta"><a class="btn btn-sm btn-primary" href="/html5-sims/${d.f}">Open &rarr;</a></div>
+        </article>`
+              )
+              .join('') +
             '</div>'
           : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
       <p class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></p>
-      ${
-        threeD.length
-          ? `
-      <div class="sec-title" style="margin-top:34px"><h2>Standalone 3D set</h2>
-        <a class="more" href="/html5-sims/index.html">All ${threeD.length} &rarr;</a></div>
-      <div class="grid g3">` +
-            threeD
-              .map(
-                (d) => `
-        <div class="card hover topic-card">
-          <h3>${d.i} ${esc(d.t)}</h3>
-          <p class="muted">${esc(d.d)}</p>
-          <div class="topic-meta">
-            <a class="btn btn-sm btn-primary" href="/html5-sims/${d.f}">Open &rarr;</a>
-          </div>
-          <code style="font-size:10px;opacity:.5">${d.f}</code>
-        </div>`
-              )
-              .join('') +
-            '</div>'
-          : ''
-      }
     </div>`;
 
   /* Catalogue search. Filters in place, so the grid does not re-render and
