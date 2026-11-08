@@ -2215,6 +2215,9 @@ input[type='range'] {
   padding: 2.6rem 1rem;
   color: var(--txt3);
 }
+.empty-state[hidden] {
+  display: none !important;
+}
 .empty-state .big {
   font-size: 2.2rem;
   margin-bottom: 0.4rem;
