@@ -196,6 +196,7 @@ export async function viewSimsPage(id) {
   const all = Object.values(Sims.reg).sort((a, b) => a.title.localeCompare(b.title));
   /* Standalone pages under /html5-sims/. These are whole documents rather
        than Sims.register() modules, so they open as normal navigations. */
+  try { await import('./sims3d-pages.js'); } catch (e) { /* 3D set optional */ }
   const threeD = window.Sims3D || [];
   App.el.innerHTML = `
     <div class="wrap">
@@ -248,6 +249,15 @@ export async function viewSimsPage(id) {
           : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
       <p class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></p>
+      <div class="card hover topic-card" style="margin-top:34px">
+        <div class="sim-cat-top">
+          <span class="sim-cat-icon" aria-hidden="true">🎲</span>
+          <em class="phet-badge">3D</em>
+        </div>
+        <h3>3D Physics Simulations</h3>
+        <p class="muted">Standalone WebGL scenes with real lighting and direct manipulation — grab the probe and the velocity handle instead of only moving sliders. ${threeD.length} simulations in the set.</p>
+        <div class="topic-meta"><a class="btn btn-sm btn-primary" href="/html5-sims/index.html">Open the 3D set &rarr;</a></div>
+      </div>
     </div>`;
 
   /* Catalogue search. Filters in place, so the grid does not re-render and
