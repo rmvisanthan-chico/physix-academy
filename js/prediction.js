@@ -22,8 +22,8 @@
  *   comparison is exactly the kind of thing nobody can audit later.
  */
 
-const DEFAULT_ABS_FLOOR = 0.15;   /* m, or m/s - see toleranceOf() */
-const DEFAULT_REL = 0.10;          /* 10% of the observed value */
+const DEFAULT_ABS_FLOOR = 0.15; /* m, or m/s - see toleranceOf() */
+const DEFAULT_REL = 0.1; /* 10% of the observed value */
 
 /* How close counts as "close enough", relative and absolute combined. */
 export function toleranceOf(observed, opts = {}) {
@@ -44,7 +44,10 @@ export function parseAnswer(raw, unit) {
   const m = s.match(/^(-)?(\d+(?:\.\d+)?)\s*(m\/s|m|s|kg|N|J)?$/i);
   if (!m) {
     if (/[a-zA-Z]/.test(s)) {
-      return { ok: false, error: `That is not a plain number. Type the value only,${unit ? ` in ${unit}` : ''} - for example 12.5` };
+      return {
+        ok: false,
+        error: `That is not a plain number. Type the value only,${unit ? ` in ${unit}` : ''} - for example 12.5`
+      };
     }
     return { ok: false, error: 'That is not a number. Try something like 12.5' };
   }
@@ -54,7 +57,11 @@ export function parseAnswer(raw, unit) {
   if (gotUnit && unit) {
     const want = String(unit).toLowerCase();
     const okUnit = gotUnit === want || (want === 'm/s' && gotUnit === 'ms');
-    if (!okUnit) return { ok: false, error: `Those numbers are in ${gotUnit}, but this question is in ${unit}.` };
+    if (!okUnit)
+      return {
+        ok: false,
+        error: `Those numbers are in ${gotUnit}, but this question is in ${unit}.`
+      };
   }
   return { ok: true, value };
 }
@@ -82,13 +89,17 @@ export class Prediction {
   }
 
   _ctx() {
-    return (typeof this.cfg.context === 'function') ? this.cfg.context() : (this.cfg.context || {});
+    return typeof this.cfg.context === 'function' ? this.cfg.context() : this.cfg.context || {};
   }
 
   /* Public accessors, so a simulation can read the live context and the target
      instant without reaching into privates. */
-  ctx() { return this._ctx(); }
-  target() { return this._targetTime(); }
+  ctx() {
+    return this._ctx();
+  }
+  target() {
+    return this._targetTime();
+  }
   /* Re-read the question and parameters, e.g. after a relaunch changed them. */
   refresh() {
     this.el.querySelector('.predict-q').textContent = this._questionText();
@@ -97,11 +108,13 @@ export class Prediction {
 
   _questionText() {
     return typeof this.cfg.question === 'function'
-      ? this.cfg.question(this._ctx()) : this.cfg.question;
+      ? this.cfg.question(this._ctx())
+      : this.cfg.question;
   }
   _targetTime() {
     return typeof this.cfg.targetTime === 'function'
-      ? this.cfg.targetTime(this._ctx()) : this.cfg.targetTime;
+      ? this.cfg.targetTime(this._ctx())
+      : this.cfg.targetTime;
   }
 
   _build() {
@@ -189,7 +202,10 @@ export class Prediction {
   _bind() {
     this.submitBtn.addEventListener('click', () => this.submit());
     this.input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); this.submit(); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.submit();
+      }
     });
     /* Validate as they type, but never nag before they have finished a number. */
     this.input.addEventListener('input', () => {
@@ -223,7 +239,9 @@ export class Prediction {
        result once the target time has passed. Non-fatal if it does not. */
     try {
       if (typeof this.cfg.onLock === 'function') this.cfg.onLock(this.prediction);
-    } catch (e) { /* never block a prediction on a listener error */ }
+    } catch (e) {
+      /* never block a prediction on a listener error */
+    }
     return true;
   }
 
@@ -239,7 +257,8 @@ export class Prediction {
     }
     /* The whole contract: no real measurement, no result. */
     if (!obs || obs.value == null || !isFinite(obs.value)) {
-      this.err.textContent = 'Not enough of the run has happened yet to answer that. Let the simulation continue.';
+      this.err.textContent =
+        'Not enough of the run has happened yet to answer that. Let the simulation continue.';
       return false;
     }
 
@@ -247,16 +266,25 @@ export class Prediction {
     const diff = obs.value - this.prediction;
     const rel = Math.abs(diff);
     const near = rel <= tol;
-    this.result = { prediction: this.prediction, observed: obs.value, diff, tol, near, exact: !!obs.exact };
+    this.result = {
+      prediction: this.prediction,
+      observed: obs.value,
+      diff,
+      tol,
+      near,
+      exact: !!obs.exact
+    };
     this._render();
-    try { if (typeof this.cfg.onReveal === 'function') this.cfg.onReveal(this.result); } catch (e) { }
+    try {
+      if (typeof this.cfg.onReveal === 'function') this.cfg.onReveal(this.result);
+    } catch (e) {}
     return true;
   }
 
   _render() {
     const r = this.result;
     const c = this._ctx();
-    const q = (this.cfg.quantity || 'value');
+    const q = this.cfg.quantity || 'value';
     const u = this.cfg.unit || '';
 
     const rows = [
@@ -271,7 +299,11 @@ export class Prediction {
     }
 
     let explain = '';
-    try { explain = this.cfg.explain ? this.cfg.explain(r, c) : ''; } catch (e) { explain = ''; }
+    try {
+      explain = this.cfg.explain ? this.cfg.explain(r, c) : '';
+    } catch (e) {
+      explain = '';
+    }
 
     this.out.hidden = false;
     this.out.innerHTML = `
@@ -279,13 +311,17 @@ export class Prediction {
         <span class="predict-mark" aria-hidden="true">${r.near ? '✓' : '✗'}</span>
         <div>
           <div class="predict-verdict-title">
-            ${r.near
-        ? `Close — within ${fmt(r.tol, 2)} ${u} of the measurement`
-        : `Off by ${fmt(Math.abs(r.diff), 2)} ${u}`}
+            ${
+              r.near
+                ? `Close — within ${fmt(r.tol, 2)} ${u} of the measurement`
+                : `Off by ${fmt(Math.abs(r.diff), 2)} ${u}`
+            }
           </div>
-          <div class="small muted">${r.exact
-        ? 'Read straight from a simulation sample.'
-        : 'Linearly interpolated between the two samples either side of that instant.'}</div>
+          <div class="small muted">${
+            r.exact
+              ? 'Read straight from a simulation sample.'
+              : 'Linearly interpolated between the two samples either side of that instant.'
+          }</div>
         </div>
       </div>
       <dl class="predict-rows">
@@ -319,18 +355,26 @@ export class Prediction {
     this.el.classList.remove('is-locked');
     this._syncSubtitle();
     /* Hand control back to the simulation so it can run again for the retry. */
-    try { if (typeof this.cfg.onReset === 'function') this.cfg.onReset(); } catch (e) { }
+    try {
+      if (typeof this.cfg.onReset === 'function') this.cfg.onReset();
+    } catch (e) {}
   }
 }
 
 function escText(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
 }
-function host_append(host, el) { host.appendChild(el); }
+function host_append(host, el) {
+  host.appendChild(el);
+}
 
 /* Convenience wrapper matching the graph engine's style. */
-export function createPrediction(host, cfg) { return new Prediction(host, cfg); }
+export function createPrediction(host, cfg) {
+  return new Prediction(host, cfg);
+}
 
 /* Exposed for the same reason as the graph engine: the bundler rewrites this
    module's path, so there is no stable URL to import it from once built.
@@ -339,7 +383,11 @@ export function createPrediction(host, cfg) { return new Prediction(host, cfg); 
    every module importing this one. */
 if (typeof window !== 'undefined') {
   window.PhysixPrediction = {
-    Prediction, createPrediction, parseAnswer, toleranceOf,
-    DEFAULT_ABS_FLOOR, DEFAULT_REL
+    Prediction,
+    createPrediction,
+    parseAnswer,
+    toleranceOf,
+    DEFAULT_ABS_FLOOR,
+    DEFAULT_REL
   };
 }

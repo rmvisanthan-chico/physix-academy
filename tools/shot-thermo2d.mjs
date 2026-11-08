@@ -3,7 +3,15 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import fs from 'node:fs';
-function lp() { try { return createRequire(import.meta.url)('playwright'); } catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); } }
+function lp() {
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
+}
 const { chromium } = lp();
 const B = process.env.BASE || 'http://127.0.0.1:4321';
 const ROUTE = B + '/#/sims/thermo-engine';
@@ -16,16 +24,27 @@ async function shot(name, vw, vh, th, tc) {
   await pg.goto(ROUTE, { waitUntil: 'networkidle' });
   await pg.waitForTimeout(1800);
   if (th != null) {
-    await pg.evaluate(([a, b]) => {
-      const s = document.querySelectorAll('.sim-controls input[type=range]');
-      s[0].value = String(a); s[0].dispatchEvent(new Event('input', { bubbles: true }));
-      s[1].value = String(b); s[1].dispatchEvent(new Event('input', { bubbles: true }));
-    }, [th, tc]);
+    await pg.evaluate(
+      ([a, b]) => {
+        const s = document.querySelectorAll('.sim-controls input[type=range]');
+        s[0].value = String(a);
+        s[0].dispatchEvent(new Event('input', { bubbles: true }));
+        s[1].value = String(b);
+        s[1].dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      [th, tc]
+    );
     await pg.waitForTimeout(700);
   }
   await pg.screenshot({ path: `tools/.shots/${name}.png` });
-  const ro = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('.sim-readouts .readout')]
-    .map(r => [((r.childNodes[0] || {}).textContent || '').trim(), r.querySelector('b').textContent.trim()])));
+  const ro = await pg.evaluate(() =>
+    Object.fromEntries(
+      [...document.querySelectorAll('.sim-readouts .readout')].map((r) => [
+        ((r.childNodes[0] || {}).textContent || '').trim(),
+        r.querySelector('b').textContent.trim()
+      ])
+    )
+  );
   console.log(`  ${name}  ${vw}x${vh}  ${JSON.stringify(ro)}`);
   await pg.close();
 }

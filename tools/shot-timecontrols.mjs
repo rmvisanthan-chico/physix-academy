@@ -15,8 +15,13 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 
@@ -29,7 +34,7 @@ const CHECKS = {
      default launch speed is 66 - just under it, so the default orbit is bound. */
   orbit: () => {
     const p = window.__tcProbe();
-    const vEsc = Math.sqrt(2 * 420000 / p.r);
+    const vEsc = Math.sqrt((2 * 420000) / p.r);
     return p.r > 0 && Math.abs(p.speed - vEsc) / vEsc < 0.02;
   },
   newton: () => Math.abs(window.__tcProbe().a - (20 - 0.1 * 6 * 9.8) / 6) < 0.05,
@@ -38,10 +43,14 @@ const CHECKS = {
     return Math.abs(p.total - p.pe - p.ke) < 1e-6;
   },
   collision: () => Math.abs(window.__tcProbe().p - window.__tcProbe().p0) < 0.35,
-  incline: () => Math.abs(window.__tcProbe().a -
-    9.8 * (Math.sin(32 * Math.PI / 180) - 0.12 * Math.cos(32 * Math.PI / 180))) < 0.05,
-  atwood: () => Math.abs(window.__tcProbe().a - 4.2) < 0.02 && Math.abs(window.__tcProbe().T - 28) < 0.2,
-  bfield: () => Math.abs(window.__tcProbe().T - 2 * Math.PI / 0.3) < 0.02,
+  incline: () =>
+    Math.abs(
+      window.__tcProbe().a -
+        9.8 * (Math.sin((32 * Math.PI) / 180) - 0.12 * Math.cos((32 * Math.PI) / 180))
+    ) < 0.05,
+  atwood: () =>
+    Math.abs(window.__tcProbe().a - 4.2) < 0.02 && Math.abs(window.__tcProbe().T - 28) < 0.2,
+  bfield: () => Math.abs(window.__tcProbe().T - (2 * Math.PI) / 0.3) < 0.02,
   /* Read AFTER reset here, so these two report on a freshly started run. Both
      reset their graph, so the sample count is legitimately 0 at that instant;
      what matters is that the probe and the readouts are live, which the closed
@@ -49,7 +58,7 @@ const CHECKS = {
   projectile: () => {
     const p = window.__tcProbe();
     /* v_y = u sin(th) - g t, with drag k = 0 at the default slider values. */
-    return Math.abs(p.vy - (25 * Math.sin(45 * Math.PI / 180) - 9.8 * p.t)) < 0.01;
+    return Math.abs(p.vy - (25 * Math.sin((45 * Math.PI) / 180) - 9.8 * p.t)) < 0.01;
   },
   /* SHM: x = A cos(omega t) from rest, omega = sqrt(k/m) = sqrt(25/1.5). */
   shm: () => {
@@ -57,22 +66,27 @@ const CHECKS = {
     const w = Math.sqrt(25 / 1.5);
     return Math.abs(p.x - (80 / 60) * Math.cos(w * p.t)) < 1e-6;
   },
-  kin1d: () => Math.abs(window.__tcProbe().x -
-    (4 * window.__tcProbe().t + 0.5 * window.__tcProbe().t ** 2)) < 0.02
+  kin1d: () =>
+    Math.abs(window.__tcProbe().x - (4 * window.__tcProbe().t + 0.5 * window.__tcProbe().t ** 2)) <
+    0.02
 };
 
-const IDS = Object.keys(CHECKS).filter(id => !ONLY || id === ONLY);
+const IDS = Object.keys(CHECKS).filter((id) => !ONLY || id === ONLY);
 
 const browser = await chromium.launch({ channel: 'chrome' });
 
 async function setRunning(page, want) {
-  const is = await page.evaluate(() =>
-    !document.querySelector('.sim-time').classList.contains('is-paused'));
+  const is = await page.evaluate(
+    () => !document.querySelector('.sim-time').classList.contains('is-paused')
+  );
   if (is !== want) await page.click('.sim-time-play');
 }
 
 for (const id of IDS) {
-  for (const [tag, vp] of [['desktop', { width: 1280, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
+  for (const [tag, vp] of [
+    ['desktop', { width: 1280, height: 1000 }],
+    ['mobile', { width: 390, height: 844 }]
+  ]) {
     const p = await browser.newPage({ viewport: vp });
     await p.goto(`${BASE}/#/sims/${id}`, { waitUntil: 'networkidle' });
     await p.waitForSelector('.sim-time');
@@ -82,7 +96,8 @@ for (const id of IDS) {
     await p.evaluate(() => {
       /* coarse step so a single click is visible at 390px */
       const s = document.querySelector('.sim-time-stepsize');
-      s.selectedIndex = 1; s.dispatchEvent(new Event('change'));
+      s.selectedIndex = 1;
+      s.dispatchEvent(new Event('change'));
     });
     await setRunning(p, true);
     await p.waitForTimeout(600);
@@ -97,7 +112,13 @@ for (const id of IDS) {
     const stepped = await p.evaluate(() => ({
       t: window.__tcProbe().t,
       calls: window.__tcProbe().calls,
-      physicsOk: (() => { try { return window.__PHYSCHK; } catch (e) { return null; } })()
+      physicsOk: (() => {
+        try {
+          return window.__PHYSCHK;
+        } catch (e) {
+          return null;
+        }
+      })()
     }));
     await p.click('.sim-time-reset');
     const reset = await p.evaluate(() => window.__tcProbe().t);
@@ -105,16 +126,24 @@ for (const id of IDS) {
     /* Physics checked in-page against closed form. */
     const physOk = await p.evaluate((src) => {
       const f = new Function('window', 'return (' + src + ')');
-      try { return !!f(window)(); } catch (e) { return 'err: ' + e.message; }
+      try {
+        return !!f(window)();
+      } catch (e) {
+        return 'err: ' + e.message;
+      }
     }, CHECKS[id].toString());
     const readouts = await p.evaluate(() =>
-      [...document.querySelectorAll('.readout')].map(r => r.innerText.replace(/\n/g, ' ').trim()));
-    const adv = (stepped.t - paused.t);
+      [...document.querySelectorAll('.readout')].map((r) => r.innerText.replace(/\n/g, ' ').trim())
+    );
+    const adv = stepped.t - paused.t;
 
-    console.log(`  ${id.padEnd(11)} ${tag.padEnd(8)} paused@${paused.t.toFixed(3)}s -> ` +
-      `2 steps -> ${stepped.t.toFixed(3)}s (dt=${adv.toFixed(4)}s) -> reset@${reset.toFixed(3)}s  ` +
-      `physics=${physOk}`);
-    if (tag === 'desktop') console.log(`  ${''.padEnd(11)} ${''.padEnd(8)} readouts: ${readouts.join(' | ')}`);
+    console.log(
+      `  ${id.padEnd(11)} ${tag.padEnd(8)} paused@${paused.t.toFixed(3)}s -> ` +
+        `2 steps -> ${stepped.t.toFixed(3)}s (dt=${adv.toFixed(4)}s) -> reset@${reset.toFixed(3)}s  ` +
+        `physics=${physOk}`
+    );
+    if (tag === 'desktop')
+      console.log(`  ${''.padEnd(11)} ${''.padEnd(8)} readouts: ${readouts.join(' | ')}`);
 
     /* Screenshot the panel: sliders, readouts, control bar, canvas. */
     await p.evaluate(() => {

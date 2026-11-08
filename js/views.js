@@ -2,11 +2,21 @@ import { $, $$, debounce, esc, Store, Tex, toast } from './utils.js';
 import { speechifyText, texToSpeech } from './tex-speech.js';
 import { QUIZ_BANK } from './data-quiz-a.js';
 import { viewGames } from './games.js';
-import { findLesson, flatLessons, levelDoneCount, levelPct, levelTotalCount, mdInline, Quiz, renderBlocks } from './blocks.js';
+import {
+  findLesson,
+  flatLessons,
+  levelDoneCount,
+  levelPct,
+  levelTotalCount,
+  mdInline,
+  Quiz,
+  renderBlocks
+} from './blocks.js';
 import { Sims } from './sims-a.js';
 import { viewGraph } from './graph.js';
 import { chFirstLesson, SCIENTISTS, viewScientists } from './scientists.js';
-import { viewPractice, viewSimsPage, viewTutorPage } from './pages.js';
+/* viewPractice, viewSimsPage, viewTutorPage from pages.js — loaded lazily on first navigation */
+/* viewLab from lab.js — loaded lazily on first navigation */
 import { viewFormulas } from './formulas.js';
 import { App, renderHooks } from './core.js';
 import { viewProgress } from './progress.js';
@@ -14,13 +24,69 @@ import { viewMistakes } from './mistakes.js';
 import { viewDashboard } from './dashboard.js';
 import { viewCalculators } from './calculators.js';
 import { CURRICULUM } from './data-core.js';
+import {
+  loadPath,
+  getPathSummary,
+  getCurrentStep,
+  getChapterStatus,
+  refreshPath,
+  onLessonComplete,
+  onQuizAnswer,
+  onMistakeChange,
+  getChapter,
+  getLessons
+} from './path-engine.js';
+import {
+  getAllAchievements,
+  getAchievementsByCategory,
+  getXPInfo,
+  getUnlockedCount,
+  onLessonComplete as onAchievementLessonComplete,
+  onQuizAnswer as onAchievementQuizAnswer,
+  onMistakeFixed,
+  onSimulationOpen,
+  onStreakUpdated,
+  onPathChapterMastered,
+  onReviewQueueCleared
+} from './achievements.js';
+import { ACHIEVEMENTS, TOTAL_XP, ACHIEVEMENT_CATEGORIES } from './data-achievements.js';
+import {
+  startAssessment,
+  getCurrentSession,
+  submitAnswer,
+  finishAssessment,
+  getAssessmentState,
+  getAssessmentHistory,
+  getSessionReport,
+  getTopicDiagnosis,
+  getRecommendations
+} from './assessment-engine.js';
+import {
+  getQuestionMeta,
+  getAllMetadata,
+  ASSESSMENT_SKILLS,
+  DIFFICULTY_CALIBRATION
+} from './data-quiz-meta.js';
 /* PhysiX Academy — Router + Home/Learn/Lesson/Topics views */
-'use strict';
+('use strict');
 
+let _pagesPromise = null;
+async function loadPages() {
+  if (!_pagesPromise) {
+    console.log('[loadPages] Importing pages.js...');
+    _pagesPromise = import('./pages.js');
+  }
+  return _pagesPromise;
+}
 
+let _labPromise = null;
+async function loadLab() {
+  if (!_labPromise) _labPromise = import('./lab.js');
+  return _labPromise;
+}
 
 function navActive(name) {
-  $$('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
+  $$('#mainnav a').forEach((a) => a.classList.toggle('active', a.dataset.nav === name));
 }
 
 export function afterRender(root) {
@@ -31,52 +97,154 @@ export function afterRender(root) {
      Tex.render, leaving a page that rendered text but no maths and no canvas.
      Isolating is what makes one bad slot cost one slot. */
   const step = (name, fn) => {
-    try { fn(); }
-    catch (e) { console.error('[afterRender:' + name + ']', e); }
+    try {
+      fn();
+    } catch (e) {
+      console.error('[afterRender:' + name + ']', e);
+    }
   };
-  step('sims', () => $$('.sim-slot', host).forEach(slot => Sims.mount(slot.dataset.sim, slot)));
-  step('quiz', () => $$('.quiz-slot', host).forEach(slot => Quiz.renderList(slot, slot.dataset.quiz.split(','))));
-  step('accordion', () => $$('.acc-head', host).forEach(h =>
-    h.addEventListener('click', () => h.parentElement.classList.toggle('open'))));
-  step('reveal', () => $$('.reveal', host).forEach(el => io.observe(el)));
+  /* Sims.mount is now async — wait for all to settle */
+  step('sims', async () => {
+    await Promise.all($$('.sim-slot', host).map((slot) => Sims.mount(slot.dataset.sim, slot)));
+  });
+  step('quiz', () =>
+    $$('.quiz-slot', host).forEach((slot) => Quiz.renderList(slot, slot.dataset.quiz.split(',')))
+  );
+  step('accordion', () =>
+    $$('.acc-head', host).forEach((h) =>
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open'))
+    )
+  );
+  step('reveal', () => $$('.reveal', host).forEach((el) => io.observe(el)));
   step('tex', () => Tex.render(host));
   for (const hook of renderHooks) {
-    try { hook(root); }
-    catch (e) { console.error('[afterRender]', e); }
+    try {
+      hook(root);
+    } catch (e) {
+      console.error('[afterRender]', e);
+    }
   }
 }
 
-export const io = ('IntersectionObserver' in window)
-  ? new IntersectionObserver(es => es.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-    }), { threshold: 0.06 })
-  : { observe(el) { el.classList.add('in'); } };
-export function route() {
-  const doRoute = () => {
+export const io =
+  'IntersectionObserver' in window
+    ? new IntersectionObserver(
+        (es) =>
+          es.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add('in');
+              io.unobserve(e.target);
+            }
+          }),
+        { threshold: 0.06 }
+      )
+    : {
+        observe(el) {
+          el.classList.add('in');
+        }
+      };
+export async function route() {
+  const doRoute = async () => {
     const parts = (location.hash || '#/').slice(1).split('/').filter(Boolean);
     window.scrollTo(0, 0);
     Store.touchToday();
     let nav = 'home';
-    if (parts[0] === 'lesson') { viewLesson(decodeURIComponent(parts[1] || '')); nav = 'learn'; }
-    else {
+    if (parts[0] === 'lesson') {
+      viewLesson(decodeURIComponent(parts[1] || ''));
+      nav = 'learn';
+    } else {
       switch (parts[0]) {
-        case undefined: viewHome(); break;
-        case 'learn': viewLearn(); nav = 'learn'; break;
-        case 'topics': viewTopics(); nav = 'topics'; break;
-        case 'sims': viewSimsPage(parts[1]); nav = 'sims'; break;
-        case 'games': viewGames(parts[1]); nav = 'games'; break;
-        case 'practice': viewPractice(); nav = 'practice'; break;
-        case 'tutor': viewTutorPage(); nav = 'tutor'; break;
-        case 'formulas': viewFormulas(parts[1]); nav = 'formulas'; break;
-        case 'calculators': viewCalculators(); nav = 'calculators'; break;
-        case 'graph': viewGraph(); nav = 'graph'; break;
-        case 'scientists': viewScientists(); nav = 'scientists'; break;
-        case 'dashboard': viewDashboard(); nav = 'dashboard'; break;
-        case 'progress': viewProgress(); nav = 'progress'; break;
-        case 'mistakes': viewMistakes(); nav = 'mistakes'; break;
-        case 'support': viewSupport(); nav = ''; break;
-        case 'about': viewAbout(); nav = ''; break;
-        default: viewHome();
+        case undefined:
+          viewHome();
+          break;
+        case 'learn':
+          viewLearn();
+          nav = 'learn';
+          break;
+        case 'topics':
+          viewTopics();
+          nav = 'topics';
+          break;
+        case 'sims': {
+          const { viewSimsPage } = await loadPages();
+          /* Wait for all sim modules to be loaded */
+          await window.__SimsReady;
+          await viewSimsPage(parts[1]);
+          nav = 'sims';
+          break;
+        }
+        case 'games':
+          viewGames(parts[1]);
+          nav = 'games';
+          break;
+        case 'practice': {
+          const { viewPractice } = await loadPages();
+          viewPractice();
+          nav = 'practice';
+          break;
+        }
+        case 'tutor': {
+          const { viewTutorPage } = await loadPages();
+          viewTutorPage();
+          nav = 'tutor';
+          break;
+        }
+        case 'formulas':
+          viewFormulas(parts[1]);
+          nav = 'formulas';
+          break;
+        case 'calculators':
+          viewCalculators();
+          nav = 'calculators';
+          break;
+        case 'graph':
+          viewGraph();
+          nav = 'graph';
+          break;
+        case 'scientists':
+          viewScientists();
+          nav = 'scientists';
+          break;
+        case 'dashboard':
+          viewDashboard();
+          nav = 'dashboard';
+          break;
+        case 'path':
+          viewPath();
+          nav = 'path';
+          break;
+        case 'achievements':
+          viewAchievements();
+          nav = 'achievements';
+          break;
+        case 'assessment':
+          viewAssessment(parts[1], parts[2]);
+          nav = 'assessment';
+          break;
+        case 'progress':
+          viewProgress();
+          nav = 'progress';
+          break;
+        case 'mistakes':
+          viewMistakes();
+          nav = 'mistakes';
+          break;
+        case 'support':
+          viewSupport();
+          nav = '';
+          break;
+        case 'lab': {
+          const { viewLab } = await loadLab();
+          viewLab(parts[1]);
+          nav = 'lab';
+          break;
+        }
+        case 'about':
+          viewAbout();
+          nav = '';
+          break;
+        default:
+          viewHome();
       }
     }
 
@@ -88,15 +256,17 @@ export function route() {
      swallowed by the transition's own rejected promise, so it looked like a
      mysteriously blank screen. Either way the visitor had no way forward, so
      the boundary renders a panel with Try again and Back to home. */
-  const guarded = () => {
+  const guarded = async () => {
     try {
-      doRoute();
+      await doRoute();
       return true;
     } catch (e) {
       console.error('[route]', e);
       const detail = (e && (e.stack || e.message)) || String(e);
       if (window.physixRenderFailed) window.physixRenderFailed(detail);
-      else { App.el.innerHTML = ''; }        /* guard absent: at least drop the corpse */
+      else {
+        App.el.innerHTML = '';
+      } /* guard absent: at least drop the corpse */
       navActive('');
       return false;
     }
@@ -109,10 +279,14 @@ export function route() {
        hidden, another transition starting). Unhandled, that surfaces as an
        uncaught error in the console on almost every route change. */
     const vt = document.startViewTransition(guarded);
-    if (vt && vt.ready && vt.ready.catch) { vt.ready.catch(() => { }); }
-    if (vt && vt.finished && vt.finished.catch) { vt.finished.catch(() => { }); }
+    if (vt && vt.ready && vt.ready.catch) {
+      vt.ready.catch(() => {});
+    }
+    if (vt && vt.finished && vt.finished.catch) {
+      vt.finished.catch(() => {});
+    }
   } else {
-    guarded();
+    await guarded();
   }
 }
 
@@ -120,9 +294,33 @@ export function route() {
 function viewHome() {
   const simsN = Object.keys(Sims.reg).length;
   const studies = [
-    { id: '01', title: 'Field / Lines', type: 'Electric fields, drawn in space', mins: '18 MIN LESSON', cls: 'art-a', img: 'assets/studies/field.jpg', ch: 'l3.charges' },
-    { id: '02', title: 'Gravity / Well', type: 'Orbits you can tilt and warp', mins: '12 MIN LESSON', cls: 'art-b', img: 'assets/studies/gravity.jpg', ch: 'l2.gravity' },
-    { id: '03', title: 'Light / Matter', type: 'Where waves become particles', mins: '16 MIN LESSON', cls: 'art-c', img: 'assets/studies/light.jpg', ch: 'l3.dual' }
+    {
+      id: '01',
+      title: 'Field / Lines',
+      type: 'Electric fields, drawn in space',
+      mins: '18 MIN LESSON',
+      cls: 'art-a',
+      img: 'assets/studies/field.jpg',
+      ch: 'l3.charges'
+    },
+    {
+      id: '02',
+      title: 'Gravity / Well',
+      type: 'Orbits you can tilt and warp',
+      mins: '12 MIN LESSON',
+      cls: 'art-b',
+      img: 'assets/studies/gravity.jpg',
+      ch: 'l2.gravity'
+    },
+    {
+      id: '03',
+      title: 'Light / Matter',
+      type: 'Where waves become particles',
+      mins: '16 MIN LESSON',
+      cls: 'art-c',
+      img: 'assets/studies/light.jpg',
+      ch: 'l3.dual'
+    }
   ];
   App.el.innerHTML = `
   <div id="home-cine">
@@ -186,7 +384,9 @@ function viewHome() {
     <section class="sec">
       <div class="sec-title"><h2>Selected studies</h2><a class="more" href="#/topics">All topics →</a></div>
       <div class="st-grid">
-        ${studies.map(s => `
+        ${studies
+          .map(
+            (s) => `
         <article class="study" data-href="${chFirstLesson(s.ch)}">
           <div class="study-art ${s.cls}">
             <img class="study-img" src="${s.img}" alt="" loading="lazy" onerror="this.style.display='none'">
@@ -198,14 +398,17 @@ function viewHome() {
             <div><h3>${esc(s.title)}</h3><p>${esc(s.type)}</p></div>
             <time>${s.mins}</time>
           </div>
-        </article>`).join('')}
+        </article>`
+          )
+          .join('')}
       </div>
     </section>
 
     <section class="sec" id="home-path">
       <div class="sec-title"><h2>Your path</h2><a class="more" href="#/learn">Full curriculum →</a></div>
       <div class="grid g2">
-        ${CURRICULUM.map(l => `
+        ${CURRICULUM.map(
+          (l) => `
         <a class="card hover level-card ${l.id}" href="#/learn">
           <div class="lv-num">${esc(l.tag)}</div>
           <h3>${l.icon} ${esc(l.name)}</h3>
@@ -213,7 +416,8 @@ function viewHome() {
           <div class="topic-meta"><span class="chip plain">${levelTotalCount(l)} lessons</span>
           <span class="chip ${levelPct(l) ? 'cyan' : 'plain'}">${levelPct(l)}% done</span></div>
           <div class="progress-track"><div class="progress-fill" style="width:${levelPct(l)}%"></div></div>
-        </a>`).join('')}
+        </a>`
+        ).join('')}
       </div>
     </section>
 
@@ -229,9 +433,14 @@ function viewHome() {
     <section class="sec">
       <div class="sec-title"><h2>Meet the minds</h2><a class="more" href="#/scientists">All ${SCIENTISTS.length} physicists →</a></div>
       <div class="sci-strip">
-        ${['einstein','curie','raman','newton','snbose','hawking'].map(k =>
-          '<a class="sci-mini" href="#/scientists" title="Open the Hall of Physicists"><img loading="lazy" src="assets/scientists/' +
-          (SCIENTISTS.find(s => s.img === k + '.jpg') || {}).img + '" alt=""></a>').join('')}
+        ${['einstein', 'curie', 'raman', 'newton', 'snbose', 'hawking']
+          .map(
+            (k) =>
+              '<a class="sci-mini" href="#/scientists" title="Open the Hall of Physicists"><img loading="lazy" src="assets/scientists/' +
+              (SCIENTISTS.find((s) => s.img === k + '.jpg') || {}).img +
+              '" alt=""></a>'
+          )
+          .join('')}
         <a class="sci-mini sci-more" href="#/scientists">+${SCIENTISTS.length - 6} more →</a>
       </div>
     </section>
@@ -246,35 +455,49 @@ function viewHome() {
   </div>
   </div>`;
 
-  $$('.study', App.el).forEach(card =>
-    card.addEventListener('click', () => location.hash = card.dataset.href));
-  $$('.px-topic-card, .px-featured-card', App.el).forEach(c =>
-    c.addEventListener('click', () => location.hash = c.dataset.href));
+  $$('.study', App.el).forEach((card) =>
+    card.addEventListener('click', () => (location.hash = card.dataset.href))
+  );
+  $$('.px-topic-card, .px-featured-card', App.el).forEach((c) =>
+    c.addEventListener('click', () => (location.hash = c.dataset.href))
+  );
   afterRender();
 }
 
 /* ---------------- Learn ---------------- */
 function viewLearn() {
-  const pills = ['all', ...CURRICULUM.map(l => l.id)];
+  const pills = ['all', ...CURRICULUM.map((l) => l.id)];
   const chosen = App.levelFilter;
-  const levels = chosen === 'all' ? CURRICULUM : CURRICULUM.filter(l => l.id === chosen);
+  const levels = chosen === 'all' ? CURRICULUM : CURRICULUM.filter((l) => l.id === chosen);
 
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>Learn</h1>
     <p class="sub">Four levels, ${CURRICULUM.reduce((n, l) => n + l.chapters.length, 0)} chapters. Open any chapter below — ticked lessons are ones you've completed.</p></div>
-    <div class="pills">${pills.map(p => {
-      const l = CURRICULUM.find(x => x.id === p);
-      return '<button class="pill' + (chosen === p ? ' active' : '') + '" data-lvl="' + p + '">' +
-        (l ? l.icon + ' ' + esc(l.name) : 'All levels') + '</button>';
-    }).join('')}</div>
-    ${levels.map(l => `
+    <div class="pills">${pills
+      .map((p) => {
+        const l = CURRICULUM.find((x) => x.id === p);
+        return (
+          '<button class="pill' +
+          (chosen === p ? ' active' : '') +
+          '" data-lvl="' +
+          p +
+          '">' +
+          (l ? l.icon + ' ' + esc(l.name) : 'All levels') +
+          '</button>'
+        );
+      })
+      .join('')}</div>
+    ${levels
+      .map(
+        (l) => `
       <section class="sec">
         <div class="sec-title"><h2>${l.icon} ${esc(l.name)}</h2>
         <span class="chip ${levelDoneCount(l) ? 'green' : 'plain'}">${levelDoneCount(l)}/${levelTotalCount(l)} done</span></div>
-        ${l.chapters.map(ch => {
-          const done = ch.lessons.filter(ls => Store.isComplete(ls.id)).length;
-          return `
+        ${l.chapters
+          .map((ch) => {
+            const done = ch.lessons.filter((ls) => Store.isComplete(ls.id)).length;
+            return `
           <div class="acc">
             <button class="acc-head"><span style="font-size:1.3rem">${ch.icon}</span>
               <span><span class="t">${esc(ch.title)}</span><span class="s">${esc(ch.tagline)}</span></span>
@@ -282,21 +505,31 @@ function viewLearn() {
               <span class="acc-caret">▾</span>
             </button>
             <div class="acc-body">
-              ${ch.lessons.map(ls => `
+              ${ch.lessons
+                .map(
+                  (ls) => `
                 <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}" href="#/lesson/${ls.id}">
                   <span class="ln">${Store.isComplete(ls.id) ? '✓' : ch.lessons.indexOf(ls) + 1}</span>
                   <span class="lt">${esc(ls.title)}</span>
                   <span class="lm">${ls.mins} min</span>
-                </a>`).join('')}
+                </a>`
+                )
+                .join('')}
             </div>
           </div>`;
-        }).join('')}
-      </section>`).join('')}
+          })
+          .join('')}
+      </section>`
+      )
+      .join('')}
   </div>`;
 
-  $$('.pill[data-lvl]', App.el).forEach(p => p.addEventListener('click', () => {
-    App.levelFilter = p.dataset.lvl; viewLearn();
-  }));
+  $$('.pill[data-lvl]', App.el).forEach((p) =>
+    p.addEventListener('click', () => {
+      App.levelFilter = p.dataset.lvl;
+      viewLearn();
+    })
+  );
   afterRender();
 }
 
@@ -304,7 +537,8 @@ function viewLearn() {
 function viewLesson(id) {
   const entry = findLesson(id);
   if (!entry) {
-    App.el.innerHTML = '<div class="wrap"><div class="empty-state"><div class="big" style="font-family:var(--ff-head)">404<sup>physics</sup></div><h2>This lesson doesn\'t exist — yet</h2><p>Either the link is wrong, or this lesson hasn\'t been written. It\'s not you.</p><p><a href="#/learn">Back to the curriculum</a></p></div></div>';
+    App.el.innerHTML =
+      '<div class="wrap"><div class="empty-state"><div class="big" style="font-family:var(--ff-head)">404<sup>physics</sup></div><h2>This lesson doesn\'t exist — yet</h2><p>Either the link is wrong, or this lesson hasn\'t been written. It\'s not you.</p><p><a href="#/learn">Back to the curriculum</a></p></div></div>';
     return;
   }
   const { level, chapter, lesson } = entry;
@@ -312,12 +546,16 @@ function viewLesson(id) {
   Store.save();
   const flat = flatLessons();
   const idx = flat.indexOf(entry);
-  const prev = flat[idx - 1], next = flat[idx + 1];
+  const prev = flat[idx - 1],
+    next = flat[idx + 1];
   const formulas = [];
-  lesson.content.forEach(b => {
+  lesson.content.forEach((b) => {
     if (!b) return;
     if (b.formula && b.formula.tex) formulas.push(b.formula);
-    if (b.formulas) b.formulas.forEach(f => { if (f.tex) formulas.push(f); });
+    if (b.formulas)
+      b.formulas.forEach((f) => {
+        if (f.tex) formulas.push(f);
+      });
   });
   const posInChapter = chapter.lessons.indexOf(lesson) + 1;
 
@@ -325,17 +563,25 @@ function viewLesson(id) {
   <div class="lesson-shell">
     <nav class="lesson-nav" aria-label="Curriculum">
       <a class="btn btn-sm btn-ghost" href="#/learn">‹ All levels</a>
-      ${level.chapters.map(ch => `
+      ${level.chapters
+        .map(
+          (ch) => `
         <div class="acc${ch.id === chapter.id ? ' open' : ''}">
           <button class="acc-head"><span>${ch.icon}</span><span class="t" style="font-size:.86rem">${esc(ch.title.replace(' ⭐', ''))}</span><span class="acc-caret">▾</span></button>
           <div class="acc-body">
-            ${ch.lessons.map(ls => `
+            ${ch.lessons
+              .map(
+                (ls) => `
               <a class="lesson-row${Store.isComplete(ls.id) ? ' done' : ''}${ls.id === id ? '' : ''}" href="#/lesson/${ls.id}" ${ls.id === id ? 'style="background:var(--acc-soft)"' : ''}>
                 <span class="ln">${Store.isComplete(ls.id) ? '✓' : ch.lessons.indexOf(ls) + 1}</span>
                 <span class="lt" style="font-size:.84rem">${esc(ls.title)}</span>
-              </a>`).join('')}
+              </a>`
+              )
+              .join('')}
           </div>
-        </div>`).join('')}
+        </div>`
+        )
+        .join('')}
     </nav>
 
     <article class="lesson-content">
@@ -357,10 +603,10 @@ function viewLesson(id) {
 
     <aside class="lesson-aside">
       <div class="side-card"><h4>Key formulas</h4>
-        ${formulas.length ? formulas.map(f => '<div class="kf">' + esc(f.name || '') + '</div>').join('') : '<p class="muted small mb0">This lesson focuses on concepts — no new formulas.</p>'}
+        ${formulas.length ? formulas.map((f) => '<div class="kf">' + esc(f.name || '') + '</div>').join('') : '<p class="muted small mb0">This lesson focuses on concepts — no new formulas.</p>'}
       </div>
       <div class="side-card"><h4>Quick revision</h4>
-        ${(lesson.content.filter(b => b.revise).flatMap(b => b.revise) || []).map(r => '<div class="kf small">• ' + mdInline(r) + '</div>').join('') || '<p class="muted small">—</p>'}
+        ${(lesson.content.filter((b) => b.revise).flatMap((b) => b.revise) || []).map((r) => '<div class="kf small">• ' + mdInline(r) + '</div>').join('') || '<p class="muted small">—</p>'}
       </div>
       <div class="side-card"><h4>My notes</h4>
         <textarea class="notes-area" id="ls-notes" placeholder="Write your own summary…">${esc(Store.data.notes[id] || '')}</textarea>
@@ -378,72 +624,111 @@ function viewLesson(id) {
     bd.textContent = done ? '↩ Mark as not done' : '✓ Mark lesson complete';
   };
   $('#btn-done').addEventListener('click', () => {
-    if (Store.isComplete(id)) { delete Store.data.completed[id]; Store.save(); toast('Lesson marked incomplete.'); }
-    else { Store.completeLesson(id); toast('Lesson complete. ' + Store.streak() + '-day streak and counting.'); }
+    if (Store.isComplete(id)) {
+      delete Store.data.completed[id];
+      Store.save();
+      toast('Lesson marked incomplete.');
+    } else {
+      Store.completeLesson(id);
+      toast('Lesson complete. ' + Store.streak() + '-day streak and counting.');
+    }
     refreshDone();
   });
   const notesEl = $('#ls-notes');
-  notesEl.addEventListener('input', debounce(() => {
-    Store.data.notes[id] = notesEl.value; Store.save();
-  }, 400));
+  notesEl.addEventListener(
+    'input',
+    debounce(() => {
+      Store.data.notes[id] = notesEl.value;
+      Store.save();
+    }, 400)
+  );
 
   refreshDone();
   // Speaker button — Web Speech API
-  const speakBtn=$('#btn-speak'), speakLabel=$('#speak-label');
-  let utter=null;
-  function lessonSpeakText(){
-    const parts=[lesson.title, chapter.title, level.name];
-    lesson.content.forEach(b=>{
-      if(!b) return;
-      const k=Object.keys(b)[0], v=b[k];
-      if(k==='p' && typeof v==='string') parts.push(v.replace(/\*\*/g,''));
-      else if(k==='why' && v) parts.push(v.q+' '+v.p);
-      else if(k==='intuition' && Array.isArray(v)) v.forEach(x=>parts.push(x.h+' '+x.p));
-      else if(k==='def' && Array.isArray(v)) v.forEach(x=>parts.push(x.term+': '+x.text));
-      else if(k==='h' && typeof v==='string') parts.push(v);
-      else if(k==='ul' && Array.isArray(v)) parts.push(v.join('. '));
-      else if(k==='revise' && Array.isArray(v)) parts.push(v.join('. '));
+  const speakBtn = $('#btn-speak'),
+    speakLabel = $('#speak-label');
+  let utter = null;
+  function lessonSpeakText() {
+    const parts = [lesson.title, chapter.title, level.name];
+    lesson.content.forEach((b) => {
+      if (!b) return;
+      const k = Object.keys(b)[0],
+        v = b[k];
+      if (k === 'p' && typeof v === 'string') parts.push(v.replace(/\*\*/g, ''));
+      else if (k === 'why' && v) parts.push(v.q + ' ' + v.p);
+      else if (k === 'intuition' && Array.isArray(v)) v.forEach((x) => parts.push(x.h + ' ' + x.p));
+      else if (k === 'def' && Array.isArray(v))
+        v.forEach((x) => parts.push(x.term + ': ' + x.text));
+      else if (k === 'h' && typeof v === 'string') parts.push(v);
+      else if (k === 'ul' && Array.isArray(v)) parts.push(v.join('. '));
+      else if (k === 'revise' && Array.isArray(v)) parts.push(v.join('. '));
       /* Equations used to be skipped entirely, so a lesson on Newton's law
          was heard with no law in it. LaTeX is converted to spoken English
          rather than having only its $ delimiters stripped, which left
          "\frac{G m_1 m_2}{r^2}" being read as "backslash frac brace...". */
-      else if(k==='formula' && v){
-        if(v.name) parts.push(String(v.name).replace(/<[^>]+>/g,''));
-        if(v.tex) parts.push(typeof texToSpeech==='function' ? texToSpeech(v.tex) : String(v.tex).replace(/\$/g,''));
-        if(v.note) parts.push(String(v.note).replace(/<[^>]+>/g,''));
+      else if (k === 'formula' && v) {
+        if (v.name) parts.push(String(v.name).replace(/<[^>]+>/g, ''));
+        if (v.tex)
+          parts.push(
+            typeof texToSpeech === 'function'
+              ? texToSpeech(v.tex)
+              : String(v.tex).replace(/\$/g, '')
+          );
+        if (v.note) parts.push(String(v.note).replace(/<[^>]+>/g, ''));
       }
     });
     const joined = parts.join('. ').replace(/<[^>]+>/g, ' ');
-    const clean = (typeof speechifyText === 'function') ? speechifyText(joined) : joined.replace(/\$/g, '');
+    const clean =
+      typeof speechifyText === 'function' ? speechifyText(joined) : joined.replace(/\$/g, '');
     return clean.replace(/\s{2,}/g, ' ').slice(0, 4000);
   }
-  speakBtn?.addEventListener('click',()=>{
-    if(window.speechSynthesis.speaking){
+  speakBtn?.addEventListener('click', () => {
+    if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
-      speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 ';
+      speakLabel.textContent = 'Listen';
+      speakBtn.firstChild.textContent = '🔊 ';
       return;
     }
-    const text=lessonSpeakText();
-    utter=new SpeechSynthesisUtterance(text);
-    utter.rate=0.95; utter.lang='en-IN';
-    utter.onstart=()=>{ speakLabel.textContent='Stop'; speakBtn.firstChild.textContent='⏹️ '; };
-    utter.onend=()=>{ speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 '; };
-    utter.onerror=()=>{ speakLabel.textContent='Listen'; speakBtn.firstChild.textContent='🔊 '; };
+    const text = lessonSpeakText();
+    utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.95;
+    utter.lang = 'en-IN';
+    utter.onstart = () => {
+      speakLabel.textContent = 'Stop';
+      speakBtn.firstChild.textContent = '⏹️ ';
+    };
+    utter.onend = () => {
+      speakLabel.textContent = 'Listen';
+      speakBtn.firstChild.textContent = '🔊 ';
+    };
+    utter.onerror = () => {
+      speakLabel.textContent = 'Listen';
+      speakBtn.firstChild.textContent = '🔊 ';
+    };
     window.speechSynthesis.speak(utter);
   });
   // stop on navigate
-  window.addEventListener('hashchange',()=>{ try{window.speechSynthesis.cancel();}catch(e){} }, {once:true});
+  window.addEventListener(
+    'hashchange',
+    () => {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    },
+    { once: true }
+  );
 
   afterRender();
 }
 
 /* ---------------- Topics ---------------- */
 function viewTopics() {
-  const cards = CURRICULUM.flatMap(l => l.chapters.map(ch => {
-    const done = ch.lessons.filter(ls => Store.isComplete(ls.id)).length;
-    const pct = Math.round(100 * done / ch.lessons.length);
-    const target = ch.lessons.find(ls => !Store.isComplete(ls.id)) || ch.lessons[0];
-    return `
+  const cards = CURRICULUM.flatMap((l) =>
+    l.chapters.map((ch) => {
+      const done = ch.lessons.filter((ls) => Store.isComplete(ls.id)).length;
+      const pct = Math.round((100 * done) / ch.lessons.length);
+      const target = ch.lessons.find((ls) => !Store.isComplete(ls.id)) || ch.lessons[0];
+      return `
     <div class="card hover topic-card">
       <h3>${ch.icon} ${esc(ch.title)}</h3>
       <p class="muted">${esc(ch.tagline)}</p>
@@ -455,7 +740,8 @@ function viewTopics() {
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
       <div class="topic-meta"><a class="btn btn-sm ${done ? '' : 'btn-primary'}" href="#/lesson/${target.id}">${done ? '↻ Review' : '▶ Start'}</a></div>
     </div>`;
-  })).join('');
+    })
+  ).join('');
   App.el.innerHTML = `
   <div class="wrap">
     <div class="page-head"><h1>Topics</h1>
@@ -502,39 +788,588 @@ function viewSupport() {
   try {
     const qr = window.qrcode ? window.qrcode(0, 'M') : null;
     if (qr) {
-      qr.addData(UPI_URI); qr.make();
+      qr.addData(UPI_URI);
+      qr.make();
       $('#upi-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
     }
-  } catch (e) { console.warn('QR failed', e); }
+  } catch (e) {
+    console.warn('QR failed', e);
+  }
 
   $('#btn-copy-upi').addEventListener('click', () => {
     const done = () => toast('UPI ID copied: ' + UPI_ID);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(UPI_ID).then(done).catch(() => fallbackCopy(done));
+      navigator.clipboard
+        .writeText(UPI_ID)
+        .then(done)
+        .catch(() => fallbackCopy(done));
     } else fallbackCopy(done);
   });
 }
 
 function fallbackCopy(done) {
   const ta = document.createElement('textarea');
-  ta.value = UPI_ID; ta.style.position = 'fixed'; ta.style.opacity = '0';
-  document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed — the ID is ' + UPI_ID); }
+  ta.value = UPI_ID;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    done();
+  } catch (e) {
+    toast('Copy failed — the ID is ' + UPI_ID);
+  }
   ta.remove();
+}
+
+/* ---------------- Path ---------------- */
+function viewPath() {
+  const path = loadPath();
+  const summary = getPathSummary();
+  const current = getCurrentStep();
+
+  App.el.innerHTML = `
+  <div class="wrap">
+    <div class="page-head"><h1>🗺️ Your Learning Path</h1>
+      <p class="sub">A personalized roadmap based on what you've mastered, what needs review, and what unlocks next.</p></div>
+
+    <div class="card path-summary">
+      <div class="path-stats">
+        <div class="path-stat"><b>${summary.mastered}</b><span>mastered</span></div>
+        <div class="path-stat"><b>${summary.inProgress}</b><span>in progress</span></div>
+        <div class="path-stat"><b>${summary.ready}</b><span>ready to learn</span></div>
+        <div class="path-stat"><b>${summary.weak}</b><span>need review</span></div>
+        ${summary.mistakes ? `<div class="path-stat"><b>${summary.mistakes}</b><span>mistakes to fix</span></div>` : ''}
+        ${summary.blocked ? `<div class="path-stat"><b>${summary.blocked}</b><span>blocked</span></div>` : ''}
+      </div>
+    </div>
+
+    ${
+      current
+        ? `
+    <section class="sec path-next">
+      <div class="sec-title"><h2>Recommended Next</h2></div>
+      <div class="card path-next-card">
+        <div class="path-next-icon" style="background:${current.levelColor || 'var(--acc)'}" aria-hidden="true">${current.chapterIcon || '◆'}</div>
+        <div class="path-next-body">
+          <div class="small muted">${current.levelName ? `${current.levelName} · ` : ''}${current.kind === 'mistake' ? 'Mistake' : current.kind === 'continue' ? 'Continue' : current.kind === 'review' ? 'Review' : 'Learn'}</div>
+          <h3>${esc(current.chapterTitle)}</h3>
+          <p class="muted">${esc(current.reason)}</p>
+          ${current.minutes ? `<div class="small muted">≈ ${current.minutes} min</div>` : ''}
+        </div>
+        ${current.nextLessonId ? `<a class="btn btn-primary path-next-cta" href="#/lesson/${current.nextLessonId}">${current.kind === 'mistake' ? 'Open mistake notebook' : current.kind === 'continue' ? 'Continue lesson' : 'Start lesson'} →</a>` : ''}
+      </div>
+    </section>`
+        : ''
+    }
+
+    <section class="sec">
+      <div class="sec-title"><h2>Full Path</h2></div>
+      <div class="path-levels">
+        ${path.steps
+          .filter((s) => s.levelId)
+          .map((step, i) => {
+            const ch = getChapter(step.chapterId);
+            if (!ch) return '';
+            const lessons = getLessons(step.chapterId);
+            const doneCount = lessons.filter((ls) => Store.isComplete(ls.id)).length;
+            const statusClass =
+              step.status === 'mastered'
+                ? 'mastered'
+                : step.status === 'in-progress'
+                  ? 'in-progress'
+                  : step.status === 'ready'
+                    ? 'ready'
+                    : step.status === 'weak'
+                      ? 'weak'
+                      : step.status === 'blocked'
+                        ? 'blocked'
+                        : step.status === 'mistake'
+                          ? 'mistake'
+                          : 'todo';
+            const statusIcon =
+              step.status === 'mastered'
+                ? '●'
+                : step.status === 'in-progress'
+                  ? '◐'
+                  : step.status === 'ready'
+                    ? '○'
+                    : step.status === 'weak'
+                      ? '⚠'
+                      : step.status === 'blocked'
+                        ? '🔒'
+                        : step.status === 'mistake'
+                          ? '🔧'
+                          : '○';
+            return `
+          <details class="path-level" ${step.status !== 'blocked' && step.status !== 'todo' ? 'open' : ''}>
+            <summary class="path-level-summary">
+              <span class="path-level-icon">${ch.levelIcon || '◆'}</span>
+              <span class="path-level-name">${esc(ch.levelName || ch.levelId)}</span>
+              <span class="path-level-count">${doneCount}/${lessons.length} lessons</span>
+              ${step.status === 'mastered' ? '<span class="chip green">Mastered</span>' : ''}
+            </summary>
+            <ol class="path-chapters">
+              <li class="path-node is-${statusClass}" style="--lv:${ch.levelColor || 'var(--acc)'}">
+                <span class="path-node-dot" aria-hidden="true">${statusIcon}</span>
+                <div class="path-node-body">
+                  <div class="path-node-title">${ch.icon || ''} ${esc(ch.title)}</div>
+                  <div class="path-node-meta">
+                    <span class="path-node-state">${step.reason}</span>
+                    ${step.minutes ? `<span class="small muted">≈ ${step.minutes} min</span>` : ''}
+                  </div>
+                </div>
+                <a class="path-node-go" href="${step.nextLessonId ? `#/lesson/${step.nextLessonId}` : step.status === 'mistake' ? '#/mistakes' : '#/learn'}"
+                   aria-label="${step.status === 'mistake' ? 'Fix mistake' : step.nextLessonId ? `Open ${esc(ch.title)}` : 'View'}">${step.status === 'mastered' ? '✓' : step.status === 'mistake' ? '🔧' : '→'}</a>
+              </li>
+            </ol>
+          </details>`;
+          })
+          .join('')}
+      </div>
+    </section>
+  </div>`;
+
+  afterRender();
+}
+
+/* ---------------- Achievements ---------------- */
+function viewAchievements() {
+  const categories = getAchievementsByCategory();
+  const xpInfo = getXPInfo();
+  const unlockedCount = getUnlockedCount();
+  const totalCount = ACHIEVEMENTS.length;
+
+  App.el.innerHTML = `
+  <div class="wrap">
+    <div class="page-head"><h1>🏆 Achievements</h1>
+      <p class="sub">Track your progress, earn XP, and unlock achievements as you learn.</p></div>
+
+    <div class="card achievements-header">
+      <div class="achievements-xp">
+        <div class="xp-ring" style="--p:${xpInfo.percentToNext}">
+          <span class="rv">${xpInfo.xp} XP</span>
+        </div>
+        <div class="xp-details">
+          <div><b>Level ${xpInfo.level}</b><span class="small muted">of ${Math.floor(Math.sqrt(TOTAL_XP / 50)) + 1}</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:${xpInfo.percentToNext}%"></div></div>
+          <div class="small muted">${xpInfo.xp} / ${TOTAL_XP} XP · ${xpInfo.needed} to next level</div>
+        </div>
+      </div>
+      <div class="achievements-summary">
+        <div class="achieve-stat"><b>${unlockedCount}</b><span>unlocked</span></div>
+        <div class="achieve-stat"><b>${totalCount - unlockedCount}</b><span>remaining</span></div>
+      </div>
+    </div>
+
+    ${Object.values(categories)
+      .map((cat) => {
+        const catAchievements = cat.achievements || [];
+        if (!catAchievements.length) return '';
+        const unlockedInCat = catAchievements.filter((a) => a.unlocked).length;
+        return `
+      <section class="sec">
+        <details class="achievement-category" open>
+          <summary class="achievement-cat-summary">
+            <span class="achievement-cat-icon">${cat.icon}</span>
+            <span class="achievement-cat-name">${cat.name}</span>
+            <span class="achievement-cat-count">${unlockedInCat}/${catAchievements.length}</span>
+            <span class="achievement-cat-pct">${catAchievements.length ? Math.round((100 * unlockedInCat) / catAchievements.length) : 0}%</span>
+          </summary>
+          <div class="achievement-grid">
+            ${catAchievements
+              .map(
+                (a) => `
+            <article class="achievement-card ${a.unlocked ? 'unlocked' : 'locked'}">
+              <div class="achievement-icon">${a.unlocked ? a.icon : '🔒'}</div>
+              <div class="achievement-body">
+                <h4>${esc(a.name)}</h4>
+                <p class="achievement-desc">${esc(a.desc)}</p>
+                <div class="achievement-meta">
+                  <span class="chip ${a.unlocked ? 'green' : 'plain'}">${a.unlocked ? 'Unlocked' : 'Locked'}</span>
+                  <span class="chip cyan">+${a.xp} XP</span>
+                </div>
+                ${a.unlocked ? `<div class="small muted">Unlocked ${new Date(a.unlockedAt).toLocaleDateString()}</div>` : ''}
+              </div>
+            </article>`
+              )
+              .join('')}
+          </div>
+        </details>
+      </section>`;
+      })
+      .join('')}
+  </div>`;
+
+  afterRender();
+}
+
+/* ---------------- Assessment ---------------- */
+function viewAssessment(topicId, sessionId) {
+  /* #/assessment/results/<id> — the router passes the session id as the
+     second path part. Dispatch to the dedicated results view. */
+  if (topicId === 'results' && sessionId) {
+    viewAssessmentResults(sessionId);
+    return;
+  }
+
+  const state = getAssessmentState();
+  const session = state.currentSession;
+  const allTopics = Object.keys(getAllMetadata())
+    .map((m) => getAllMetadata()[m].topic)
+    .filter(Boolean);
+
+  /* If there's an active session, show the assessment interface */
+  if (session && !session.completed) {
+    const item = session.items[session.responses.length];
+    if (item) {
+      const question = QUIZ_BANK.find((q) => q.id === item.qid);
+      if (question) {
+        const metadata = getQuestionMeta(item.qid);
+        const diffCal = DIFFICULTY_CALIBRATION[question.difficulty] || { theta: 0, weight: 0.5 };
+
+        App.el.innerHTML = `
+        <div class="wrap">
+          <div class="page-head"><h1>📊 Assessment: ${metadata?.topic || question.topic}</h1>
+            <p class="sub">Adaptive assessment — difficulty adjusts based on your performance.</p></div>
+
+          <div class="card assessment-header">
+            <div class="assess-progress">
+              <div class="assess-progress-bar">
+                <div class="assess-progress-fill" style="width:${(session.responses.length / session.items.length) * 100}%"></div>
+              </div>
+              <div class="small muted">${session.responses.length} / ${session.items.length} questions</div>
+            </div>
+            <div class="assess-ability">
+              <div class="assess-theta">Estimated ability: <b>${session.abilityTheta.toFixed(2)}</b></div>
+              <div class="small muted">Standard error: ${Math.sqrt(session.abilityVar).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <section class="sec">
+            <div class="sec-title"><h2>Question ${session.responses.length + 1} of ${session.items.length}</h2></div>
+            <div id="assess-q"></div>
+          </section>
+
+          <div class="assess-nav">
+            <button class="btn btn-primary" id="assess-submit" ${item.given == null ? 'disabled' : ''}>Submit Answer</button>
+            <button class="btn" id="assess-end">End Assessment</button>
+          </div>
+        </div>`;
+
+        /* Render the question */
+        const q = question;
+        const diff = { dot: '🔘', label: q.difficulty };
+        const optsBox = document.createElement('div');
+        optsBox.className = 'opts';
+        const letters = ['A', 'B', 'C', 'D'];
+        const fb = document.createElement('div');
+        fb.className = 'feedback';
+        let answered = item.answered;
+
+        const qEl = document.createElement('div');
+        qEl.className = 'quiz-q';
+        qEl.innerHTML =
+          '<div class="q-head"><span class="chip plain">' +
+          esc(q.topic) +
+          '</span>' +
+          '<span class="diff-dot">' +
+          diff.dot +
+          ' ' +
+          diff.label +
+          '</span></div>' +
+          '<div class="q-text">' +
+          mdInline(q.q) +
+          '</div>';
+        qEl.appendChild(optsBox);
+        qEl.appendChild(fb);
+
+        q.choices.forEach((choiceText, i) => {
+          const b = document.createElement('button');
+          b.className = 'opt';
+          b.innerHTML =
+            '<span class="k">' + letters[i] + '</span><span>' + mdInline(choiceText) + '</span>';
+          b.addEventListener('click', () => {
+            if (answered) return;
+            answered = true;
+            const correct = i === q.answer;
+            const btns = Array.from(optsBox.children);
+            btns.forEach((bb, j) => {
+              bb.disabled = true;
+              if (j === q.answer) bb.classList.add('correct');
+              else if (j === i) bb.classList.add('wrong');
+              else bb.classList.add('dim');
+            });
+            fb.className = 'feedback show ' + (correct ? 'ok' : 'bad');
+            fb.innerHTML =
+              (correct ? '<b>✓ Correct!</b> ' : '<b>✗ Not quite.</b> ') +
+              '<div class="q-explain"><b>Why:</b> ' +
+              mdInline(q.why) +
+              '</div>';
+            $('#assess-submit').disabled = false;
+            /* Record only the SELECTION (item.given). item.answered and
+               item.correct belong to the engine: submitAnswer() sets them and
+               guards on item.answered, so if the view pre-marked the item as
+               answered here, the engine would reject the submit with
+               "Already answered" and the session would stall on the same
+               question forever. */
+            item.given = i;
+          });
+          optsBox.appendChild(b);
+        });
+
+        qEl.appendChild(fb);
+        $('#assess-q').appendChild(qEl);
+
+        /* Submit handler */
+        $('#assess-submit').addEventListener('click', async () => {
+          if (item.given == null) return; /* no option selected yet */
+          const qid = item.qid;
+          const given = item.given;
+          await submitAnswer(qid, given, 0); // timeMs not tracked in UI yet
+
+          if (session.responses.length < session.items.length) {
+            /* Next question - reload view */
+            viewAssessment();
+          } else {
+            /* Assessment complete */
+            const finished = finishAssessment();
+            if (finished) {
+              toast(
+                'Assessment complete! ' +
+                  Math.round(
+                    (100 * finished.responses.filter((r) => r.correct).length) /
+                      finished.responses.length
+                  ) +
+                  '%'
+              );
+              viewAssessmentResults(finished.id);
+            }
+          }
+        });
+
+        /* End assessment early */
+        $('#assess-end').addEventListener('click', () => {
+          if (confirm('End assessment early? Progress will be saved.')) {
+            const finished = finishAssessment();
+            if (finished) viewAssessmentResults(finished.id);
+          }
+        });
+
+        return;
+      }
+    }
+  }
+
+  /* No active session - show topic selection or results */
+  if (topicId) {
+    /* Show assessment setup for specific topic */
+    const metadata = getAllMetadata();
+    const topicMeta = metadata[Object.keys(metadata).find((k) => metadata[k].topic === topicId)];
+    const recentSessions = getAssessmentHistory(topicId).slice(-5);
+
+    App.el.innerHTML = `
+      <div class="wrap">
+        <div class="page-head"><h1>📊 Assessment: ${topicId}</h1>
+          <p class="sub">Take an adaptive assessment to measure your understanding and identify gaps.</p></div>
+
+        <div class="card">
+          <h3>Start New Assessment</h3>
+          <p class="muted">Questions adapt to your performance. Takes ~5 minutes.</p>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="start-assess-5">5 Questions (Quick)</button>
+            <button class="btn btn-primary" id="start-assess-10">10 Questions (Standard)</button>
+            <button class="btn btn-primary" id="start-assess-20">20 Questions (Comprehensive)</button>
+          </div>
+        </div>
+
+        ${
+          recentSessions.length
+            ? `
+        <section class="sec">
+          <div class="sec-title"><h2>Recent Assessments</h2></div>
+          <div class="assessment-history">
+            ${recentSessions
+              .map(
+                (s) => `
+            <a class="card assess-history-item" href="#/assessment/results/${s.id}">
+              <div class="assess-hist-date">${new Date(s.endedAt || s.startedAt).toLocaleDateString()}</div>
+              <div class="assess-hist-score">${Math.round((100 * s.responses.filter((r) => r.correct).length) / s.responses.length)}%</div>
+              <div class="assess-hist-theta">θ ${s.abilityAfter?.toFixed(2) || '—'}</div>
+              <div class="small muted">${s.responses.length} questions · ${Math.round((s.endedAt - s.startedAt) / 60000)} min</div>
+            </a>`
+              )
+              .join('')}
+          </div>
+        </section>`
+            : ''
+        }
+
+        <section class="sec">
+          <div class="sec-title"><h2>All Topics</h2></div>
+          <div class="grid g3">
+            ${allTopics
+              .map(
+                (t) => `
+            <a class="card hover topic-card" href="#/assessment/${t}">
+              <h3>${t}</h3>
+              <p class="small muted">Adaptive assessment available</p>
+            </a>`
+              )
+              .join('')}
+          </div>
+        </section>
+      </div>`;
+
+    $('#start-assess-5')?.addEventListener('click', () => {
+      startAssessment(topicId, 5);
+      viewAssessment();
+    });
+    $('#start-assess-10')?.addEventListener('click', () => {
+      startAssessment(topicId, 10);
+      viewAssessment();
+    });
+    $('#start-assess-20')?.addEventListener('click', () => {
+      startAssessment(topicId, 20);
+      viewAssessment();
+    });
+
+    return;
+  }
+
+  /* Topic selection view */
+  App.el.innerHTML = `
+    <div class="wrap">
+      <div class="page-head"><h1>📊 Adaptive Assessment</h1>
+        <p class="sub">Choose a topic to start an adaptive assessment. Questions adapt to your ability in real time.</p></div>
+
+      <div class="grid g3">
+        ${allTopics
+          .map(
+            (t) => `
+        <a class="card hover topic-card" href="#/assessment/${t}">
+          <h3>${t}</h3>
+          <p class="small muted">Adaptive assessment available</p>
+        </a>`
+          )
+          .join('')}
+      </div>
+
+      <section class="sec">
+        <div class="sec-title"><h2>Assessment History</h2></div>
+        <div class="assessment-history">
+          ${state.sessions
+            .slice(-10)
+            .reverse()
+            .map(
+              (s) => `
+          <a class="card assess-history-item" href="#/assessment/${s.targetTopic}">
+            <div class="assess-hist-topic">${s.targetTopic}</div>
+            <div class="assess-hist-date">${new Date(s.endedAt || s.startedAt).toLocaleDateString()}</div>
+            <div class="assess-hist-score">${Math.round((100 * s.responses.filter((r) => r.correct).length) / s.responses.length)}%</div>
+            <div class="small muted">${s.responses.length} questions · θ ${s.abilityAfter?.toFixed(2) || '—'}</div>
+          </a>`
+            )
+            .join('')}
+        </div>
+      </section>
+    </div>`;
+  afterRender();
+}
+
+/* Separate results view */
+function viewAssessmentResults(sessionId) {
+  const session = getSessionReport(sessionId);
+  if (!session) {
+    App.el.innerHTML =
+      '<div class="wrap"><div class="empty-state"><h2>Assessment not found</h2></div></div>';
+    return;
+  }
+
+  const correct = session.responses.filter((r) => r.correct).length;
+  const total = session.responses.length;
+  const pct = total ? Math.round((100 * correct) / total) : 0;
+
+  App.el.innerHTML = `
+  <div class="wrap">
+    <div class="page-head"><h1>📊 Assessment Results</h1>
+      <p class="sub">${session.targetTopic} · ${new Date(session.endedAt).toLocaleDateString()}</p></div>
+
+    <div class="card assess-result-header">
+      <div class="assess-score-ring" style="--p:${pct}">
+        <span class="rv">${pct}%</span>
+      </div>
+      <div class="assess-score-details">
+        <div><b>${correct}/${total}</b> correct</div>
+        <div class="small muted">Ability: θ ${session.abilityAfter?.toFixed(2) || '—'} (was ${session.abilityBefore?.toFixed(2) || '—'})</div>
+        <div class="small muted">${Math.round((session.endedAt - session.startedAt) / 60000)} minutes</div>
+      </div>
+    </div>
+
+    ${
+      session.diagnosis?.length
+        ? `
+    <section class="sec">
+      <div class="sec-title"><h2>Diagnosis & Recommendations</h2></div>
+      <div class="diagnosis-list">
+        ${session.diagnosis
+          .map(
+            (d) => `
+        <div class="card diagnosis-item ${d.type}">
+          <div class="diag-type">${d.type.replace('_', ' ')}</div>
+          <div class="diag-message">${d.message}</div>
+          ${d.skill ? `<div class="small muted">Skill: ${ASSESSMENT_SKILLS[d.skill] || d.skill}</div>` : ''}
+          ${d.difficulty ? `<div class="small muted">Difficulty: ${d.difficulty}</div>` : ''}
+        </div>`
+          )
+          .join('')}
+      </div>
+    </section>`
+        : ''
+    }
+
+    <section class="sec">
+      <div class="sec-title"><h2>Recommendations</h2></div>
+      <div class="recommendations">
+        ${getRecommendations(session.targetTopic)
+          .map(
+            (r) => `
+        <a class="card rec-item" href="${r.href || '#/practice'}">
+          <div class="rec-icon">${r.type === 'review' ? '📚' : r.type === 'practice' ? '🎯' : '📝'}</div>
+          <div class="rec-body">
+            <h4>${r.topic || session.targetTopic}</h4>
+            <p class="small muted">${r.reason}</p>
+            <span class="chip ${r.priority === 'high' ? 'red' : r.priority === 'medium' ? 'amber' : 'cyan'}">${r.priority}</span>
+          </div>
+        </a>`
+          )
+          .join('')}
+      </div>
+    </section>
+
+    <div class="btn-row" style="margin-top:1.5rem">
+      <a class="btn btn-primary" href="#/assessment/${session.targetTopic}">Retake Assessment</a>
+      <a class="btn" href="#/path">View Learning Path</a>
+      <a class="btn" href="#/practice">Practice Questions</a>
+    </div>
+  </div>`;
+
+  afterRender();
 }
 
 /* ---------------- About ---------------- */
 function viewAbout() {
   App.el.innerHTML = `
   <div class="wrap wrap-narrow">
-    <div class="page-head"><h1>About PhysiX Academy</h1>
-      <p class="sub">Built start to finish by one student — no template, no framework, no shortcuts.</p></div>
+    <div class="page-head"><h1>About PhysiX Academy &amp; R.M. Visanthan</h1>
+      <p class="sub">PhysiX Academy is created by R.M. Visanthan — educator, author and the person behind every lesson, simulation and page.</p></div>
 
     <div class="card" style="line-height:1.8">
       <h3>The story</h3>
       <p>Most physics websites give you a wall of notes and call it teaching. I wanted something that actually works the way physics works — with things you can move, formulas you can see respond, and questions that explain themselves.</p>
       <p>So I built it. Every lesson, every simulation, every equation on this site was hand-written. The simulations run live in your browser. The AI tutor solves problems offline. Nothing here is a template or a copied block of notes.</p>
-      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams, JEE, or NEET.</p>
+      <p>It started as a way for me to understand physics properly, and grew into this — a free, ad-free, offline-friendly platform for anyone preparing for board exams.</p>
     </div>
 
     <div class="card" style="line-height:1.8">
@@ -549,7 +1384,7 @@ function viewAbout() {
 
     <div class="card" style="line-height:1.8">
       <h3>Author</h3>
-      <p><b>R.M. VISANTHAN</b> — the sole developer, designer and content writer behind every page of this site.</p>
+      <p><b>R.M. Visanthan</b> is an educator, author, and the creator of PhysiX Academy. He is known for developing educational physics content, including practical study guides, exam preparation resources, and easy-to-understand explanations of physics concepts. Through PhysiX Academy, he aims to make learning physics more visual, interactive, and accessible to students.</p>
       <p>Questions, corrections, or just to say the site helped? Email <a href="mailto:r.m.visanthan@gmail.com">r.m.visanthan@gmail.com</a>.</p>
     </div>
 

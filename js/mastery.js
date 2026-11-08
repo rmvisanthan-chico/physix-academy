@@ -26,7 +26,7 @@ const pct = (n) => Math.max(0, Math.min(100, Math.round(n)));
 export function topicMastery(topic) {
   const pt = Store.data.quiz.perTopic[topic];
   if (!pt || !pt.total) return null;
-  const value = pct(100 * pt.correct / pt.total);
+  const value = pct((100 * pt.correct) / pt.total);
   return {
     topic,
     correct: pt.correct,
@@ -47,7 +47,7 @@ export function allMastery() {
   return Object.keys(Store.data.quiz.perTopic)
     .map(topicMastery)
     .filter(Boolean)
-    .sort((a, b) => a.pct - b.pct);          /* weakest first: that is the point */
+    .sort((a, b) => a.pct - b.pct); /* weakest first: that is the point */
 }
 
 /* ---------- the next thing to learn ----------
@@ -74,7 +74,7 @@ export function resumeLesson() {
   if (!id) return null;
   for (const level of CURRICULUM) {
     for (const ch of level.chapters) {
-      const ls = ch.lessons.find(x => x.id === id);
+      const ls = ch.lessons.find((x) => x.id === id);
       if (ls && !isDone(id)) return { lesson: ls, chapter: ch, level };
     }
   }
@@ -91,12 +91,12 @@ export function resumeLesson() {
    and "has not met this yet". */
 export function reviewQueue(limit = 5) {
   const weak = allMastery()
-    .filter(m => !m.provisional && m.pct < 70)
-    .map(m => ({ kind: 'weak', topic: m.topic, pct: m.pct, label: `Weak · ${m.topic}` }));
+    .filter((m) => !m.provisional && m.pct < 70)
+    .map((m) => ({ kind: 'weak', topic: m.topic, pct: m.pct, label: `Weak · ${m.topic}` }));
 
   const stale = allMastery()
-    .filter(m => !m.provisional && m.pct >= 70 && m.pct < 85)
-    .map(m => ({ kind: 'fading', topic: m.topic, pct: m.pct, label: `Fading · ${m.topic}` }));
+    .filter((m) => !m.provisional && m.pct >= 70 && m.pct < 85)
+    .map((m) => ({ kind: 'fading', topic: m.topic, pct: m.pct, label: `Fading · ${m.topic}` }));
 
   return [...weak, ...stale].slice(0, limit);
 }
@@ -108,13 +108,14 @@ export function overallMastery() {
   if (!ready()) return null;
   const all = Object.values(Store.data.quiz.perTopic);
   if (!all.length) return null;
-  let num = 0, den = 0;
+  let num = 0,
+    den = 0;
   for (const p of all) {
-    const w = Math.min(p.total, 20);          /* cap so one topic cannot dominate */
+    const w = Math.min(p.total, 20); /* cap so one topic cannot dominate */
     num += w * (p.correct / p.total);
     den += w;
   }
-  return den ? pct(100 * num / den) : null;
+  return den ? pct((100 * num) / den) : null;
 }
 
 /* ---------- skill breakdown ----------
@@ -131,31 +132,41 @@ const SKILL_LABEL = {
 
 export function skillBreakdown() {
   if (!ready()) return [];
-  const bands = { beginner: { c: 0, t: 0 }, intermediate: { c: 0, t: 0 }, advanced: { c: 0, t: 0 }, expert: { c: 0, t: 0 } };
+  const bands = {
+    beginner: { c: 0, t: 0 },
+    intermediate: { c: 0, t: 0 },
+    advanced: { c: 0, t: 0 },
+    expert: { c: 0, t: 0 }
+  };
   for (const h of Store.data.quiz.history) {
     const b = bands[h.difficulty];
     if (!b) continue;
-    b.t++; if (h.correct) b.c++;
+    b.t++;
+    if (h.correct) b.c++;
   }
   return Object.keys(bands)
-    .filter(k => bands[k].t > 0)
-    .map(k => ({
+    .filter((k) => bands[k].t > 0)
+    .map((k) => ({
       key: k,
       label: SKILL_LABEL[k],
-      pct: pct(100 * bands[k].c / bands[k].t),
+      pct: pct((100 * bands[k].c) / bands[k].t),
       total: bands[k].t
     }));
 }
 
 /* ---------- curriculum completion ---------- */
 export function curriculumProgress() {
-  let total = 0, done = 0;
+  let total = 0,
+    done = 0;
   for (const level of CURRICULUM) {
     for (const ch of level.chapters) {
-      for (const ls of ch.lessons) { total++; if (isDone(ls.id)) done++; }
+      for (const ls of ch.lessons) {
+        total++;
+        if (isDone(ls.id)) done++;
+      }
     }
   }
-  return { done, total, pct: total ? pct(100 * done / total) : 0 };
+  return { done, total, pct: total ? pct((100 * done) / total) : 0 };
 }
 
 /* ---------- chapter <-> quiz topic bridge ----------
@@ -176,21 +187,21 @@ export function curriculumProgress() {
    extra practice, not a stage in the learning path. Verified by
    tools/audit-bridge.mjs, which fails if a mapped topic stops existing. */
 const CHAPTER_TOPICS = {
-  'l1.what':      [],
-  'l1.units':     ['units', 'math'],
-  'l1.notation':  ['math'],
-  'l1.vectors':   ['vectors', 'math'],
-  'l1.math':      ['math'],
-  'l2.motion':    ['kinematics', 'projectile'],
-  'l2.force':     ['newton', 'friction'],
-  'l2.work':      ['energy', 'rotation'],
-  'l2.momentum':  ['momentum', 'com'],
-  'l2.gravity':   ['gravity'],
-  'l2.heat':      ['heat', 'thermo', 'thermal', 'kinetic', 'solids'],
-  'l2.waves':     ['waves', 'sound', 'shm', 'waveoptics'],
-  'l2.elec':      ['electricity', 'current', 'ac'],
-  'l2.mag':       ['magnetism', 'magforce', 'em-induction'],
-  'l2.light':     ['light', 'optics']
+  'l1.what': [],
+  'l1.units': ['units', 'math'],
+  'l1.notation': ['math'],
+  'l1.vectors': ['vectors', 'math'],
+  'l1.math': ['math'],
+  'l2.motion': ['kinematics', 'projectile'],
+  'l2.force': ['newton', 'friction'],
+  'l2.work': ['energy', 'rotation'],
+  'l2.momentum': ['momentum', 'com'],
+  'l2.gravity': ['gravity'],
+  'l2.heat': ['heat', 'thermo', 'thermal', 'kinetic', 'solids'],
+  'l2.waves': ['waves', 'sound', 'shm', 'waveoptics'],
+  'l2.elec': ['electricity', 'current', 'ac'],
+  'l2.mag': ['magnetism', 'magforce', 'em-induction'],
+  'l2.light': ['light', 'optics']
 };
 
 /* Safe readers for the static curriculum. Everything below uses these instead of
@@ -198,12 +209,18 @@ const CHAPTER_TOPICS = {
    "no data for this chapter" instead of a thrown ReferenceError that takes the
    whole dashboard down. */
 function chaptersOf(level) {
-  try { return (level && Array.isArray(level.chapters)) ? level.chapters : []; }
-  catch (e) { return []; }
+  try {
+    return level && Array.isArray(level.chapters) ? level.chapters : [];
+  } catch (e) {
+    return [];
+  }
 }
 function lessonsOf(ch) {
-  try { return (ch && Array.isArray(ch.lessons)) ? ch.lessons : []; }
-  catch (e) { return []; }
+  try {
+    return ch && Array.isArray(ch.lessons) ? ch.lessons : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 /* Fallback for the ~93 chapters with no explicit entry: use their LEVEL's
@@ -217,22 +234,54 @@ function lessonsOf(ch) {
    rather than invented, and that level's chapters fall back to no quiz signal
    and report on lesson completion alone. */
 const LEVEL_TOPICS = {
-  l1:       ['units', 'math', 'vectors'],
-  l2:       ['kinematics', 'projectile', 'newton', 'friction', 'energy',
-             'rotation', 'momentum', 'com', 'gravity', 'waves', 'sound',
-             'shm', 'waveoptics', 'electricity', 'current', 'ac', 'charges',
-             'potential', 'magnetism', 'magforce', 'em-induction', 'light',
-             'optics', 'heat', 'thermo', 'thermal', 'kinetic', 'solids', 'fluids'],
-  ncert9:   ['kinematics', 'newton', 'sound', 'light'],
-  ncert10:  ['light', 'electricity', 'magnetism', 'heat'],
-  ncert11:  ['kinematics', 'newton', 'energy', 'momentum', 'gravity',
-             'waves', 'electricity', 'magnetism'],
-  ncert12:  ['electricity', 'magnetism', 'waveoptics'],
-  jee:      ['kinematics', 'newton', 'energy', 'momentum', 'electricity',
-             'waves', 'optics'],
+  l1: ['units', 'math', 'vectors'],
+  l2: [
+    'kinematics',
+    'projectile',
+    'newton',
+    'friction',
+    'energy',
+    'rotation',
+    'momentum',
+    'com',
+    'gravity',
+    'waves',
+    'sound',
+    'shm',
+    'waveoptics',
+    'electricity',
+    'current',
+    'ac',
+    'charges',
+    'potential',
+    'magnetism',
+    'magforce',
+    'em-induction',
+    'light',
+    'optics',
+    'heat',
+    'thermo',
+    'thermal',
+    'kinetic',
+    'solids',
+    'fluids'
+  ],
+  ncert9: ['kinematics', 'newton', 'sound', 'light'],
+  ncert10: ['light', 'electricity', 'magnetism', 'heat'],
+  ncert11: [
+    'kinematics',
+    'newton',
+    'energy',
+    'momentum',
+    'gravity',
+    'waves',
+    'electricity',
+    'magnetism'
+  ],
+  ncert12: ['electricity', 'magnetism', 'waveoptics'],
   slarora11: ['kinematics', 'newton', 'energy', 'momentum', 'waves'],
-  l3:       ['rotation', 'waves', 'optics'],
-  l4:       ['optics', 'waveoptics']
+  l3: ['rotation', 'waves', 'optics'],
+  l4: ['optics', 'waveoptics']
 };
 
 function topicsForChapter(ch, level) {
@@ -285,9 +334,15 @@ export function roadmapByLevel() {
     let g = seen.get(ch.levelId);
     if (!g) {
       g = {
-        id: ch.levelId, name: ch.level, tag: ch.tag,
-        color: ch.color, icon: ch.icon, chapters: [],
-        done: 0, total: 0, mastered: 0
+        id: ch.levelId,
+        name: ch.level,
+        tag: ch.tag,
+        color: ch.color,
+        icon: ch.icon,
+        chapters: [],
+        done: 0,
+        total: 0,
+        mastered: 0
       };
       seen.set(ch.levelId, g);
       groups.push(g);
@@ -299,8 +354,8 @@ export function roadmapByLevel() {
   }
   for (const g of groups) {
     const n = g.chapters.length;
-    g.pct = pct(100 * g.mastered / n);
-    g.reached = g.chapters.filter(c => c.state !== 'todo').length;
+    g.pct = pct((100 * g.mastered) / n);
+    g.reached = g.chapters.filter((c) => c.state !== 'todo').length;
     g.state = g.mastered === n ? 'mastered' : g.reached ? 'learning' : 'todo';
   }
   return groups;
@@ -308,22 +363,27 @@ export function roadmapByLevel() {
 
 export function currentChapter() {
   const r = roadmap();
-  return r.find(c => c.state === 'learning') || r.find(c => c.state === 'todo') || r[r.length - 1] || null;
+  return (
+    r.find((c) => c.state === 'learning') ||
+    r.find((c) => c.state === 'todo') ||
+    r[r.length - 1] ||
+    null
+  );
 }
 
 /* Progress as a fraction of chapters reached, not lessons ticked. A chapter is
    "reached" when it is mastered or in progress. */
 export function roadmapProgress() {
   const r = roadmap();
-  const reached = r.filter(c => c.state !== 'todo').length;
-  const mastered = r.filter(c => c.state === 'mastered').length;
+  const reached = r.filter((c) => c.state !== 'todo').length;
+  const mastered = r.filter((c) => c.state === 'mastered').length;
   return {
     total: r.length,
     reached,
     mastered,
     /* chapters reached, because "3 of 14 chapters" is honest where
        "2 of 54 lessons" reads as trivial for a student on day one */
-    pct: r.length ? pct(100 * reached / r.length) : 0,
+    pct: r.length ? pct((100 * reached) / r.length) : 0,
     list: r
   };
 }
@@ -346,17 +406,15 @@ export function roadmap() {
       /* Named lessonsPct, not pct: a local `const pct` here would shadow the
          module-level pct() helper and put it in a temporal dead zone for the
          whole block, which is exactly what happened the first time. */
-      const lessonsPct = n ? pct(100 * done / n) : 0;
+      const lessonsPct = n ? pct((100 * done) / n) : 0;
       const m = chapterMastery(ch, level);
       /* Chapter state needs both signals: finishing the reading is not the
          same as being able to use it, and a chapter can be quiz-strong before
          its lessons are read (someone practised elsewhere first). Report the
          earlier of the two as "not started" only when neither has begun. */
-      const state = mastered > 0 ? 'mastered'
-        : (done > 0 || learning > 0) ? 'learning'
-        : 'todo';
+      const state = mastered > 0 ? 'mastered' : done > 0 || learning > 0 ? 'learning' : 'todo';
       const shownPct = Math.max(lessonsPct, m ? m.pct : 0);
-      const nextLessonHere = lessons.find(l => !Store.isComplete(l.id)) || lessons[0];
+      const nextLessonHere = lessons.find((l) => !Store.isComplete(l.id)) || lessons[0];
       out.push({
         id: ch.id,
         title: ch.title,
@@ -402,9 +460,10 @@ export function recommendation() {
     return {
       kind: 'retry',
       title: `Fix ${m.topic}`,
-      why: m.times > 1
-        ? `You have missed this ${m.times} times. Fixing a repeated mistake is worth more than anything new.`
-        : 'You got this wrong recently. Fixing it now is worth more than new material.',
+      why:
+        m.times > 1
+          ? `You have missed this ${m.times} times. Fixing a repeated mistake is worth more than anything new.`
+          : 'You got this wrong recently. Fixing it now is worth more than new material.',
       href: '#/mistakes',
       cta: 'Open mistake notebook',
       badge: m.times > 1 ? `missed ${m.times}×` : null
@@ -426,10 +485,10 @@ export function recommendation() {
   /* Only surface a weak topic once nothing is half-finished, and prefer the
      earliest such topic in curriculum order rather than the lowest number. */
   const weak = allMastery()
-    .filter(m => !m.provisional && m.pct < 70)
+    .filter((m) => !m.provisional && m.pct < 70)
     .sort((a, b) => a.pct - b.pct)[0];
   if (weak) {
-    const path = roadmap().find(c => c.state === 'learning' || c.state === 'mastered');
+    const path = roadmap().find((c) => c.state === 'learning' || c.state === 'mastered');
     return {
       kind: 'review',
       title: `Review ${weak.topic}`,

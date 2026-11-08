@@ -12,8 +12,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch { return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))('playwright'); }
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
+    return createRequire(path.join(process.env.APPDATA + '\\npm\\node_modules', 'noop.js'))(
+      'playwright'
+    );
+  }
 }
 const { chromium } = loadPlaywright();
 const BASE = process.argv[2] || 'http://localhost:4316';
@@ -21,7 +26,10 @@ const OUT = path.join(os.tmpdir(), 'opencode', 'shots');
 const SHOTS = process.argv.includes('--shots');
 
 const results = [];
-const ok = (n, p, d = '') => { results.push(p); console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`); };
+const ok = (n, p, d = '') => {
+  results.push(p);
+  console.log(`  ${p ? 'ok  ' : 'FAIL'}  ${n}${d ? `  — ${d}` : ''}`);
+};
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'] });
 
@@ -36,7 +44,9 @@ const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'
   await page.waitForSelector('.predict-input', { timeout: 20000 });
   const have = await page.evaluate(() => !!window.PhysixPrediction);
   ok('prediction module is addressable (window.PhysixPrediction)', have);
-  await page.evaluate(() => { window.P = window.PhysixPrediction; });
+  await page.evaluate(() => {
+    window.P = window.PhysixPrediction;
+  });
 
   const parse = await page.evaluate(() => {
     const P = window.P;
@@ -54,7 +64,11 @@ const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'
       inf: P.parseAnswer('Infinity', 'm')
     };
   });
-  ok('plain number accepted', parse.plain.ok && parse.plain.value === 12.5, JSON.stringify(parse.plain));
+  ok(
+    'plain number accepted',
+    parse.plain.ok && parse.plain.value === 12.5,
+    JSON.stringify(parse.plain)
+  );
   ok('negative number accepted', parse.signed.ok && parse.signed.value === -3);
   ok('matching unit accepted', parse.withUnit.ok && parse.withUnit.value === 4);
   ok('no unit accepted when a unit is expected', parse.bare.ok && parse.bare.value === 4);
@@ -80,9 +94,11 @@ const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'
      guarantee: tolerance is the MAX of the two terms, and at 15 m the relative
      term is 1.5x the 0.2 m floor, not 10x. Asserting the actual contract -
      never below the floor, scales with magnitude - instead of a magic ratio. */
-  ok('tolerance scales with magnitude, staying above the floor',
+  ok(
+    'tolerance scales with magnitude, staying above the floor',
     tol.large === 1.5 && tol.large > tol.small,
-    `small(0.4m)=${tol.small} large(15m)=${tol.large}, expected max(15*0.1, 0.2)=1.5`);
+    `small(0.4m)=${tol.small} large(15m)=${tol.large}, expected max(15*0.1, 0.2)=1.5`
+  );
   await page.close();
 }
 
@@ -120,17 +136,27 @@ const browser = await chromium.launch({ channel: 'chrome', args: ['--no-sandbox'
     g.destroy();
     return { exact, between, before, after, none, single, singleMiss, range };
   });
-  ok('exact sample found', q.exact && q.exact.exact === true && Math.abs(q.exact.y - 10) < 1e-9, JSON.stringify(q.exact));
-  ok('between samples: linear interpolation', q.between && Math.abs(q.between.y - 11) < 1e-9,
-    `y(5.5)=${q.between && q.between.y}`);
+  ok(
+    'exact sample found',
+    q.exact && q.exact.exact === true && Math.abs(q.exact.y - 10) < 1e-9,
+    JSON.stringify(q.exact)
+  );
+  ok(
+    'between samples: linear interpolation',
+    q.between && Math.abs(q.between.y - 11) < 1e-9,
+    `y(5.5)=${q.between && q.between.y}`
+  );
   ok('interpolation flagged as not exact', q.between && q.between.exact === false);
   ok('before the recorded range returns null', q.before === null, JSON.stringify(q.before));
   ok('after the recorded range returns null', q.after === null, JSON.stringify(q.after));
   ok('empty series returns null rather than 0', q.none === null);
   ok('single sample at that exact x resolves', q.single && q.single.y === 1);
   ok('single sample cannot answer a different x', q.singleMiss === null);
-  ok('timeRange reports the recorded window', q.range && q.range.from === 0 && q.range.to === 10,
-    `${JSON.stringify(q.range)}`);
+  ok(
+    'timeRange reports the recorded window',
+    q.range && q.range.from === 0 && q.range.to === 10,
+    `${JSON.stringify(q.range)}`
+  );
   await page.close();
 }
 
@@ -151,11 +177,14 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
 }
 
 {
-  const c = await browser.newContext({ viewport: { width: 1360, height: 1000 }, reducedMotion: 'reduce' });
+  const c = await browser.newContext({
+    viewport: { width: 1360, height: 1000 },
+    reducedMotion: 'reduce'
+  });
   const page = await c.newPage();
   const errs = [];
-  page.on('pageerror', e => errs.push(String(e)));
-  page.on('console', m => {
+  page.on('pageerror', (e) => errs.push(String(e)));
+  page.on('console', (m) => {
     if (m.type() !== 'error') return;
     const loc = m.location() || {};
     if (/\/_vercel\//.test(loc.url || '')) return;
@@ -192,7 +221,9 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   const res = await page.evaluate(() => ({
     outHidden: document.querySelector('.predict-out')?.hidden,
     verdict: (document.querySelector('.predict-verdict-title')?.textContent || '').trim(),
-    rows: [...document.querySelectorAll('.predict-rows div')].map(d => d.textContent.replace(/\s+/g, ' ').trim()),
+    rows: [...document.querySelectorAll('.predict-rows div')].map((d) =>
+      d.textContent.replace(/\s+/g, ' ').trim()
+    ),
     provenance: (document.querySelector('.predict-verdict .small')?.textContent || '').trim(),
     why: (document.querySelector('.predict-why')?.textContent || '').replace(/\s+/g, ' ').trim(),
     locked: document.querySelector('.predict-input')?.disabled
@@ -201,7 +232,10 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   ok('a result appears once real data exists', res.outHidden === false);
   ok('result names the estimate', /12\.00 m/.test(res.rows.join(' ')), res.rows[0]);
   ok('result names the measured value', /Measured from the simulation/.test(res.rows.join(' ')));
-  ok('result shows the difference', /higher than you predicted|lower than you predicted/.test(res.rows.join(' ')));
+  ok(
+    'result shows the difference',
+    /higher than you predicted|lower than you predicted/.test(res.rows.join(' '))
+  );
   ok('an explanation is given', res.why.length > 40, `${res.why.slice(0, 70)}...`);
   ok('verdict is a sentence, not just a colour', res.verdict.length > 5, res.verdict);
 
@@ -209,18 +243,24 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   const cross = await page.evaluate(async (t) => {
     const G = window.PhysixGraph.Graph;
     void G;
-    const rows = [...document.querySelectorAll('.predict-rows div')].map(d => d.textContent.replace(/\s+/g, ' ').trim());
+    const rows = [...document.querySelectorAll('.predict-rows div')].map((d) =>
+      d.textContent.replace(/\s+/g, ' ').trim()
+    );
     const m = rows.join(' | ').match(/Measured from the simulation([\d.]+) m/);
     return m ? parseFloat(m[1]) : null;
   }, flow.target);
   const G = 9.8;
-  const expected = 0 + 25 * Math.sin(45 * Math.PI / 180) * flow.target - 0.5 * G * flow.target * flow.target;
-  ok('measured value matches the closed-form solution',
+  const expected =
+    0 + 25 * Math.sin((45 * Math.PI) / 180) * flow.target - 0.5 * G * flow.target * flow.target;
+  ok(
+    'measured value matches the closed-form solution',
     cross != null && Math.abs(cross - expected) < 0.35,
-    `reported ${cross} m, theory ${expected.toFixed(2)} m at t=${flow.target}s`);
+    `reported ${cross} m, theory ${expected.toFixed(2)} m at t=${flow.target}s`
+  );
   ok('provenance is stated (sample vs interpolated)', res.provenance.length > 10, res.provenance);
 
-  if (SHOTS) await page.locator('.sim-frame').screenshot({ path: path.join(OUT, 'pred-projectile.png') });
+  if (SHOTS)
+    await page.locator('.sim-frame').screenshot({ path: path.join(OUT, 'pred-projectile.png') });
 
   /* retry */
   const again = await page.$('.predict-out .btn');
@@ -241,10 +281,15 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   const again2 = await runFlow(page, { answer: '18', settle: 7000 });
   const res2 = await page.evaluate(() => ({
     shown: !document.querySelector('.predict-out')?.hidden,
-    rows: [...document.querySelectorAll('.predict-rows div')].map(d => d.textContent.replace(/\s+/g, ' ').trim())
+    rows: [...document.querySelectorAll('.predict-rows div')].map((d) =>
+      d.textContent.replace(/\s+/g, ' ').trim()
+    )
   }));
-  ok('a second attempt produces a fresh result', res2.shown && /18\.00 m/.test(res2.rows.join(' ')),
-    res2.rows[0]);
+  ok(
+    'a second attempt produces a fresh result',
+    res2.shown && /18\.00 m/.test(res2.rows.join(' ')),
+    res2.rows[0]
+  );
 
   /* changing parameters moves the target */
   const t1 = parseFloat((again2.question.match(/t\s*=\s*([\d.]+)/) || [])[1]);
@@ -262,8 +307,11 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
     if (!g) return { err: 'no graph' };
     return { past: g.valueAt('y', 1e6), range: g.timeRange('y') };
   });
-  ok('an unreachable target returns null, not a fabricated value',
-    unreach.past === null, `range=${JSON.stringify(unreach.range)}`);
+  ok(
+    'an unreachable target returns null, not a fabricated value',
+    unreach.past === null,
+    `range=${JSON.stringify(unreach.range)}`
+  );
 
   /* missing data path */
   const missing = await page.evaluate(() => {
@@ -279,7 +327,10 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
 /* ================= D. MOBILE ================= */
 {
   const c = await browser.newContext({
-    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce'
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    reducedMotion: 'reduce'
   });
   const page = await c.newPage();
   await page.goto(`${BASE}/#/sims/${SIM}`, { waitUntil: 'networkidle' });
@@ -291,13 +342,15 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   const m = await page.evaluate(() => {
     const inp = document.querySelector('.predict-input');
     const btn = document.querySelector('.predict-actions .btn');
-    const ir = inp.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    const ir = inp.getBoundingClientRect(),
+      br = btn.getBoundingClientRect();
     return {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       inputH: Math.round(ir.height),
       btnW: Math.round(br.width),
       legendStacked: (document.querySelector('.predict-rows > div') || {}).getBoundingClient
-        ? document.querySelector('.predict-rows > div').getBoundingClientRect().width : 0,
+        ? document.querySelector('.predict-rows > div').getBoundingClientRect().width
+        : 0,
       shown: !document.querySelector('.predict-out')?.hidden
     };
   });
@@ -320,11 +373,12 @@ async function runFlow(page, { answer = '12', settle = 6000 } = {}) {
   ok('input is keyboard reachable', kb.inputTabbable);
   ok('submit button is type=button (no accidental form submit)', kb.btnType === 'button');
 
-  if (SHOTS) await page.locator('.sim-frame').screenshot({ path: path.join(OUT, 'pred-mobile.png') });
+  if (SHOTS)
+    await page.locator('.sim-frame').screenshot({ path: path.join(OUT, 'pred-mobile.png') });
   await c.close();
 }
 
 await browser.close();
-const bad = results.filter(r => !r).length;
+const bad = results.filter((r) => !r).length;
 console.log(`\nprediction system  ${results.length - bad}/${results.length} ok`);
 process.exit(bad ? 1 : 0);

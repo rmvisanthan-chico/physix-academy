@@ -16,13 +16,16 @@ const LABEL = process.argv[3] || 'target';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch (_) {
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch (_) {
     // On Windows the npm shim is npm.cmd; spawnSync('npm') fails with ENOENT,
     // and Node >=18 refuses to spawn a .cmd without a shell (EINVAL).
     const win = process.platform === 'win32';
-    const globals = execFileSync(win ? 'npm.cmd' : 'npm', ['root', '-g'],
-      { encoding: 'utf8', shell: win }).trim();
+    const globals = execFileSync(win ? 'npm.cmd' : 'npm', ['root', '-g'], {
+      encoding: 'utf8',
+      shell: win
+    }).trim();
     return createRequire(path.join(globals, 'noop.js'))('playwright');
   }
 }
@@ -31,14 +34,25 @@ const { chromium } = loadPlaywright();
 // Every route the SPA can render. Each is checked for thrown errors and for
 // having actually painted something into the view container.
 const ROUTES = [
-  '#/', '#/learn', '#/topics', '#/sims', '#/games', '#/practice', '#/tutor',
-  '#/formulas', '#/calculators', '#/people', '#/progress', '#/support'
+  '#/',
+  '#/learn',
+  '#/topics',
+  '#/sims',
+  '#/games',
+  '#/practice',
+  '#/tutor',
+  '#/formulas',
+  '#/calculators',
+  '#/people',
+  '#/progress',
+  '#/support'
 ];
 const SIM_PAGES = ['#/sims/newton', '#/sims/energy', '#/sims/circuit', '#/sims/collision'];
 
 // NOTE: must be a single regex. `reA || reB` would keep only reA, since a
 // regex literal is truthy - that silently dropped the ViewTransition filter.
-const IGNORE = /favicon|_vercel|netlify|googletagmanager|gtag|adsbygoogle|ERR_INTERNET_DISCONNECTED|Failed to load resource|Transition was skipped|New ViewTransition started/i;
+const IGNORE =
+  /favicon|_vercel|netlify|googletagmanager|gtag|adsbygoogle|ERR_INTERNET_DISCONNECTED|Failed to load resource|Transition was skipped|New ViewTransition started/i;
 
 const browser = await chromium.launch({
   channel: 'chrome',
@@ -51,12 +65,13 @@ const report = [];
 
 for (const route of [...ROUTES, ...SIM_PAGES]) {
   const errs = [];
-  const onErr = e => {
+  const onErr = (e) => {
     const m = e.message || String(e);
     if (!IGNORE.test(m)) errs.push(m.split('\n')[0].slice(0, 160));
   };
-  const onCon = m => {
-    if (m.type() === 'error' && !IGNORE.test(m.text())) errs.push('console: ' + m.text().slice(0, 160));
+  const onCon = (m) => {
+    if (m.type() === 'error' && !IGNORE.test(m.text()))
+      errs.push('console: ' + m.text().slice(0, 160));
   };
   page.on('pageerror', onErr);
   page.on('console', onCon);
@@ -70,7 +85,9 @@ for (const route of [...ROUTES, ...SIM_PAGES]) {
       await page.goto(BASE + '/index.html', { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(2600);
     } else {
-      await page.evaluate(r => { location.hash = r; }, route);
+      await page.evaluate((r) => {
+        location.hash = r;
+      }, route);
     }
     await page.waitForTimeout(route.startsWith('#/sims/') ? 3200 : 2400);
     info = await page.evaluate(() => {
@@ -104,15 +121,21 @@ const simDir = path.join(ROOT, 'html5-sims');
 const simFiles = [];
 try {
   const { readdirSync } = await import('node:fs');
-  for (const f of readdirSync(simDir)) if (f.endsWith('.html') && f !== 'index.html') simFiles.push(f);
-} catch (_) { /* running against a live URL where this tree may not exist */ }
+  for (const f of readdirSync(simDir))
+    if (f.endsWith('.html') && f !== 'index.html') simFiles.push(f);
+} catch (_) {
+  /* running against a live URL where this tree may not exist */
+}
 
 let simFails = 0;
 for (const f of simFiles) {
   const errs = [];
-  const onErr = e => errs.push(e.message.split('\n')[0].slice(0, 140));
-  const onCon = m => { if (m.type() === 'error' && !IGNORE.test(m.text())) errs.push(m.text().slice(0, 140)); };
-  page.on('pageerror', onErr); page.on('console', onCon);
+  const onErr = (e) => errs.push(e.message.split('\n')[0].slice(0, 140));
+  const onCon = (m) => {
+    if (m.type() === 'error' && !IGNORE.test(m.text())) errs.push(m.text().slice(0, 140));
+  };
+  page.on('pageerror', onErr);
+  page.on('console', onCon);
   let painted = false;
   try {
     await page.goto(`${BASE}/html5-sims/${f}`, { waitUntil: 'load', timeout: 40000 });
@@ -121,8 +144,11 @@ for (const f of simFiles) {
       const c = document.querySelector('canvas');
       return !!c && c.width > 0;
     });
-  } catch (e) { errs.push('nav: ' + e.message.split('\n')[0].slice(0, 100)); }
-  page.off('pageerror', onErr); page.off('console', onCon);
+  } catch (e) {
+    errs.push('nav: ' + e.message.split('\n')[0].slice(0, 100));
+  }
+  page.off('pageerror', onErr);
+  page.off('console', onCon);
   if (errs.length || !painted) {
     simFails++;
     report.push({ route: f, bad: true, errs: [...new Set(errs)].slice(0, 2), info: { painted } });
@@ -133,9 +159,13 @@ await browser.close();
 console.log(`\n=== ${LABEL} (${BASE}) ===`);
 for (const r of report) {
   const tag = r.bad ? 'FAIL' : 'ok  ';
-  console.log(`  ${tag} ${r.route.padEnd(20)} nodes=${String(r.info.nodes ?? '-').padEnd(6)} chars=${String(r.info.chars ?? '-').padEnd(6)} canvas=${r.info.canvases ?? '-'}`);
+  console.log(
+    `  ${tag} ${r.route.padEnd(20)} nodes=${String(r.info.nodes ?? '-').padEnd(6)} chars=${String(r.info.chars ?? '-').padEnd(6)} canvas=${r.info.canvases ?? '-'}`
+  );
   for (const e of r.errs) console.log(`       ${e}`);
 }
 const totalRoutes = ROUTES.length + SIM_PAGES.length;
-console.log(`\nroutes ${totalRoutes - fails}/${totalRoutes} ok   standalone sims ${simFiles.length - simFails}/${simFiles.length} ok`);
+console.log(
+  `\nroutes ${totalRoutes - fails}/${totalRoutes} ok   standalone sims ${simFiles.length - simFails}/${simFiles.length} ok`
+);
 process.exit(fails + simFails ? 1 : 0);

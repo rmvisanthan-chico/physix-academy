@@ -23,10 +23,15 @@ import { App } from './core.js';
 import { topicMastery } from './mastery.js';
 
 const Q_BY_ID = {};
-QUIZ_BANK.forEach(q => { Q_BY_ID[q.id] = q; });
+QUIZ_BANK.forEach((q) => {
+  Q_BY_ID[q.id] = q;
+});
 
 const DIFF_DOT = {
-  beginner: '🟢', intermediate: '🔵', advanced: '🟠', expert: '🟣'
+  beginner: '🟢',
+  intermediate: '🔵',
+  advanced: '🟠',
+  expert: '🟣'
 };
 
 function ago(ts) {
@@ -64,7 +69,9 @@ export function viewMistakes() {
          more than any new lesson, because these are the exact places your understanding is thin.</p>
     </div>
 
-    ${all.length ? `
+    ${
+      all.length
+        ? `
       <div class="grid g2" style="align-items:center;margin-bottom:1.6rem">
         <div class="card stat"><div class="sv">${all.length}</div><div class="sl">Distinct questions missed</div></div>
         <div class="card stat"><div class="sv">${groups.length}</div><div class="sl">Topics affected</div></div>
@@ -74,27 +81,30 @@ export function viewMistakes() {
         <a class="btn btn-primary" href="#/practice">Practise weak topics</a>
         <a class="btn" href="#/progress">Back to progress</a>
       </div>
-    ` : `
+    `
+        : `
       <div class="empty-state">
         <h2>No mistakes yet 🎉</h2>
         <p>Either you have not answered anything, or you have not got anything wrong.
            Answer some practice questions and this page fills up with the ones you miss.</p>
         <a class="btn btn-primary btn-sm" href="#/practice">Answer questions →</a>
       </div>
-    `}
+    `
+    }
   </div>`;
 
   if (all.length) wireRetry();
 }
 
 function renderGroups(groups) {
-  return groups.map(g => {
-    const m = topicMastery(g.topic);
-    const bar = m
-      ? `<div class="topic-meta"><span class="chip ${m.pct >= 70 ? 'green' : 'red'}">${m.pct}% in ${g.topic}</span>
+  return groups
+    .map((g) => {
+      const m = topicMastery(g.topic);
+      const bar = m
+        ? `<div class="topic-meta"><span class="chip ${m.pct >= 70 ? 'green' : 'red'}">${m.pct}% in ${g.topic}</span>
            <span class="small muted">${m.correct}/${m.total} correct</span></div>`
-      : '';
-    return `
+        : '';
+      return `
     <section class="sec">
       <div class="sec-title">
         <h2>${esc(g.topic)}</h2>
@@ -103,7 +113,8 @@ function renderGroups(groups) {
       ${bar}
       ${g.items.map(card).join('')}
     </section>`;
-  }).join('');
+    })
+    .join('');
 }
 
 function card(m) {
@@ -115,16 +126,15 @@ function card(m) {
       question bank (${esc(m.topic)}). It is no longer available to retry.</p></div>`;
   }
   const letters = ['A', 'B', 'C', 'D'];
-  const given = m.given != null && q.choices[m.given] != null
-    ? `<div class="mistake-given">You picked <b>${letters[m.given]}. ${esc(q.choices[m.given])}</b></div>`
-    : '';
+  const given =
+    m.given != null && q.choices[m.given] != null
+      ? `<div class="mistake-given">You picked <b>${letters[m.given]}. ${esc(q.choices[m.given])}</b></div>`
+      : '';
   /* Guard on a real count rather than truthiness: m.times is always a number,
      but if a future caller passes a collapsed entry without it, a badge
      reading "missed 1x" on a single miss would be a lie. */
   const times = Number(m.times) || 1;
-  const repeat = times > 1
-    ? `<span class="chip red">missed ${times}&times;</span>`
-    : '';
+  const repeat = times > 1 ? `<span class="chip red">missed ${times}&times;</span>` : '';
   /* Be explicit that this is not cleared yet, rather than leaving the student
      wondering why it is still here. */
   const streak = `<p class="mistake-streak small muted">Needs ${Store.CLEAN_STREAK} correct answers in a row to clear.</p>`;
@@ -154,7 +164,7 @@ function card(m) {
 /* Re-ask the actual question in place, rather than navigating away and losing
    the student's place in their own list. */
 function wireRetry() {
-  $$all('[data-retry]').forEach(btn => {
+  $$all('[data-retry]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const qid = btn.dataset.retry;
       const host = btn.closest('.mistake-card').querySelector('.retry-slot');
@@ -171,7 +181,8 @@ function wireRetry() {
                requirement is visible rather than mysterious. */
             const need = Store.CLEAN_STREAK;
             const card = btn.closest('.mistake-card');
-            const note = card.querySelector('.mistake-streak') ||
+            const note =
+              card.querySelector('.mistake-streak') ||
               card.querySelector('.btn-row').parentElement.querySelector('.mistake-streak');
             const clear = Store.clearedSinceMiss(qid);
             const line = document.createElement('p');
@@ -184,7 +195,9 @@ function wireRetry() {
             if (clear) {
               card.style.transition = 'opacity .3s';
               card.style.opacity = '0';
-              setTimeout(() => { viewMistakes(); }, 340);
+              setTimeout(() => {
+                viewMistakes();
+              }, 340);
             } else {
               btn.disabled = true;
               btn.textContent = 'Answered ✓';

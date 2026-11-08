@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 function loadPlaywright() {
-  try { return createRequire(import.meta.url)('playwright'); }
-  catch {
+  try {
+    return createRequire(import.meta.url)('playwright');
+  } catch {
     const glob = process.env.APPDATA + '\\npm\\node_modules';
     return createRequire(path.join(glob, 'noop.js'))('playwright');
   }
@@ -29,7 +30,7 @@ const browser = await chromium.launch({
 });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 const errors = [];
-page.on('pageerror', e => errors.push(String(e)));
+page.on('pageerror', (e) => errors.push(String(e)));
 
 /* 1. signed out shows the form, not the saved panel */
 await page.goto(`${BASE}/login.html`, { waitUntil: 'domcontentloaded' });
@@ -87,6 +88,6 @@ await page.waitForTimeout(800);
 ok('gate stays off: home is not redirected', !/login/.test(page.url()), page.url());
 
 await browser.close();
-const bad = results.filter(r => !r.pass);
+const bad = results.filter((r) => !r.pass);
 console.log(`\nprofile flow  ${results.length - bad.length}/${results.length} ok`);
 process.exit(bad.length ? 1 : 0);

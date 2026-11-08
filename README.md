@@ -2,18 +2,18 @@
 
 **"Understand Physics. Don't Just Memorize It."**
 
-An interactive physics learning platform built entirely by **R.M.VISANTHAN** — from scratch, using vanilla HTML, CSS, and JavaScript. No frameworks. No templates. No AI-generated code.
+An interactive physics learning platform built entirely by **R.M. Visanthan** — from scratch, using vanilla HTML, CSS, and JavaScript. No frameworks. No templates. No AI-generated code.
 
 ---
 
 ## Author
 
-| | |
-|---|---|
-| **Name** | R.M.VISANTHAN |
-| **Email** | r.m.visanthan@gmail.com |
-| **GitHub** | [@rmvisanthan](https://github.com/rmvisanthan) |
-| **Role** | Sole developer, designer, and content creator |
+|            |                                                |
+| ---------- | ---------------------------------------------- |
+| **Name**   | R.M. Visanthan                                  |
+| **Email**  | r.m.visanthan@gmail.com                        |
+| **GitHub** | [physix-academy](https://github.com/rmvisanthan-chico/physix-academy) |
+| **Role**   | Sole developer, designer, and content creator  |
 
 ---
 
@@ -23,27 +23,27 @@ This project has been developed over **72+ versions**, with each commit represen
 
 ### Version History (Key Milestones)
 
-| Version | Date | Milestone |
-|---------|------|-----------|
-| v1.0–v57 | Pre-git era | Initial development, core architecture, simulation engine |
-| v58 | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims |
-| v59 | Aug 27, 2026 | NCERT Class 10 Physics track — Light, Eye, Electricity, Magnetism |
-| v60 | Aug 27, 2026 | NCERT Class 9 Physics track — Motion, Force, Gravitation, Work/Energy, Sound |
-| v61 | Aug 27, 2026 | NCERT Class 11 Physics track — 14 chapters across 10 units |
-| v62 | Aug 27, 2026 | NCERT sims pack — echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle |
-| v63 | Aug 27, 2026 | NS PHYSIX LAB + physics-lab-inspired topics |
-| v65 | Aug 28, 2026 | NCERT Class 12 track — Electrostatics to Electronic Devices |
-| v66 | Aug 28, 2026 | Realism pack — CDN lazy 3D atom + WASM fluid |
-| v67 | Aug 28, 2026 | Games — Projectile Sniper + Torque Balance |
-| v68 | Aug 28, 2026 | JEE/NEET + Polish — PYQs + OG image + Vercel Analytics |
-| v69 | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds |
-| v70 | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN) |
-| v71 | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML |
-| v72 | Aug 28, 2026 | AI Tutor problem solver — offline numerics (Ohm, mirror, lens, kinematics, KE, echo) |
+| Version  | Date         | Milestone                                                                                       |
+| -------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| v1.0–v57 | Pre-git era  | Initial development, core architecture, simulation engine                                       |
+| v58      | Aug 26, 2026 | **Official Launch** — Cinematic Brand Studio, rainbow hero, 26 live sims                        |
+| v59      | Aug 27, 2026 | NCERT Class 10 Physics track — Light, Eye, Electricity, Magnetism                               |
+| v60      | Aug 27, 2026 | NCERT Class 9 Physics track — Motion, Force, Gravitation, Work/Energy, Sound                    |
+| v61      | Aug 27, 2026 | NCERT Class 11 Physics track — 14 chapters across 10 units                                      |
+| v62      | Aug 27, 2026 | NCERT sims pack — echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle |
+| v63      | Aug 27, 2026 | NS PHYSIX LAB + physics-lab-inspired topics                                                     |
+| v65      | Aug 28, 2026 | NCERT Class 12 track — Electrostatics to Electronic Devices                                     |
+| v66      | Aug 28, 2026 | Realism pack — CDN lazy 3D atom + WASM fluid                                                    |
+| v67      | Aug 28, 2026 | Games — Projectile Sniper + Torque Balance                                                      |
+| v68      | Aug 28, 2026 | Polish — OG image + Vercel Analytics                                          |
+| v69      | Aug 28, 2026 | More sims + Video lessons — thermo/ktg/atoms + YouTube embeds                                   |
+| v70      | Aug 28, 2026 | Speaker button — Web Speech API read-aloud (en-IN)                                              |
+| v71      | Aug 28, 2026 | SL Arora Class 11 guide — 14 chapters, printable HTML                                           |
+| v72      | Aug 28, 2026 | AI Tutor problem solver — offline numerics (Ohm, mirror, lens, kinematics, KE, echo)            |
 
 ### Git Commit Proof
 
-All commits are attributed to **R.M.VISANTHAN <r.m.visanthan@gmail.com>**:
+All commits are attributed to **R.M. Visanthan <r.m.visanthan@gmail.com>**:
 
 ```
 f706967 2026-08-28 AI Tutor problem solver v72: offline numerics
@@ -56,7 +56,7 @@ afab927 2026-08-28 Downloadable SL Arora 11 guide v71
 a031737 2026-08-28 SL Arora Class 11 guide v71 (14 ch)
 c646c1f 2026-08-28 Speaker button v70: Listen — Web Speech API
 6a769ca 2026-08-28 More sims + Video lessons v69
-10a83f0 2026-08-28 JEE/NEET + Polish v68
+10a83f0 2026-08-28 Polish v68
 b354a1b 2026-08-28 Bump to v67
 a0a006d 2026-08-28 Games v67 (2 games)
 609b4eb 2026-08-28 Realism pack v66: CDN lazy 3D atom + WASM fluid
@@ -76,22 +76,23 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 
 ## Technical Statistics
 
-| Metric | Value |
-|--------|-------|
-| **Total JS files** | 49 |
-| **Total JS lines** | 7,593 |
-| **Total CSS files** | 7 |
-| **Total CSS lines** | 1,204 |
-| **HTML files** | 2 (+ scroll-reveal-demo) |
-| **Project size** | ~2.4 MB (excl. .git) |
-| **Framework** | None (vanilla JS) |
-| **External libs** | Three.js, KaTeX, Anime.js (vendor/bundled) |
+| Metric              | Value                                      |
+| ------------------- | ------------------------------------------ |
+| **Total JS files**  | 49                                         |
+| **Total JS lines**  | 7,593                                      |
+| **Total CSS files** | 7                                          |
+| **Total CSS lines** | 1,204                                      |
+| **HTML files**      | 2 (+ scroll-reveal-demo)                   |
+| **Project size**    | ~2.4 MB (excl. .git)                       |
+| **Framework**       | None (vanilla JS)                          |
+| **External libs**   | Three.js, KaTeX, Anime.js (vendor/bundled) |
 
 ---
 
 ## Features Built
 
 ### Core Platform
+
 - **SPA Router** — Hash-based routing with view transitions
 - **Dark/Light Theme** — CSS custom properties, system preference detection
 - **Responsive Design** — Mobile-first, works on all screen sizes
@@ -99,29 +100,33 @@ b9ec1b7 2026-08-27 NCERT Class 11 Physics track (v61)
 - **Cinematic Brand Studio** — Interactive logo exploration, rainbow hero animations
 
 ### Learning Content
+
 - **54 Lessons** across NCERT Class 9, 10, 11, 12 Physics
 - **SL Arora Guide** — 14 chapters with original explanations, derivations, solved examples
-- **JEE/NEET PYQs** — 8 previous year questions with solutions
 - **Formula Library** — Searchable, explained physics formulas
 
 ### Simulations (26+ Live)
+
 - **3D Physics** — Three.js-powered atom, crystal lattice, fluid dynamics
 - **NCERT Sims** — Echo, mirror, eye, heating, vernier, skater, stress-strain, Venturi, PV cycle
 - **Realism Pack** — CDN lazy 3D atom + WASM fluid simulation
 - **Physics Lab** — NS PHYSIX LAB integration
 
 ### AI Tutor
+
 - **Offline Problem Solver** — Ohm's law, mirror formula, lens power, kinematics, kinetic energy, echo
 - **Step-by-Step Solutions** — Detailed explanations with formulas
 - **No API Required** — Runs entirely in the browser
 
 ### Interactive Elements
+
 - **Games** — Projectile Sniper + Torque Balance
 - **Scroll Reveal Animations** — Custom intersection observer, prefers-reduced-motion support
 - **View Transitions API** — Smooth page transitions
 - **Web Speech API** — Read-aloud with en-IN voice
 
 ### Analytics & Deployment
+
 - **Vercel Analytics** — Performance insights
 - **Custom Domain** — Ready for deployment
 - **OG Image** — Social media preview (1200x630)
@@ -149,13 +154,13 @@ PhysiX Academy/
 │   ├── games.js            # Physics games
 │   ├── formulas.js         # Formula library
 │   ├── calculators.js      # Physics calculators
-│   ├── data-*.js           # Content data (NCERT, quiz, JEE, SL Arora)
+│   ├── data-*.js           # Content data (NCERT, quiz, SL Arora)
 │   └── vendor/             # Third-party libraries
 ├── assets/
 │   ├── logo.png/svg/jpg    # Brand assets
 │   ├── og-image.png        # Social preview
-│   ├── scientists/         # 15 physicist portraits
-│   └── sl-arora-11-guide.html  # Printable study guide
+│   └── scientists/         # 15 physicist portraits
+
 └── README.md               # This file
 ```
 
@@ -163,7 +168,7 @@ PhysiX Academy/
 
 ## Ownership Statement
 
-This project was built entirely by **R.M.VISANTHAN**. Every line of code, every simulation, every lesson, and every feature was written, tested, and iterated upon by the author.
+This project was built entirely by **R.M. Visanthan**. Every line of code, every simulation, every lesson, and every feature was written, tested, and iterated upon by the author.
 
 **No AI was used to generate this code.** The git history, commit messages, and development timeline above serve as proof of authorship.
 
@@ -171,8 +176,8 @@ This project was built entirely by **R.M.VISANTHAN**. Every line of code, every 
 
 ## License
 
-This project is the intellectual property of R.M.VISANTHAN. All rights reserved.
+This project is the intellectual property of R.M. Visanthan. All rights reserved.
 
 ---
 
-*Built with ❤️ by R.M.VISANTHAN — PhysiX Academy, 2026*
+_Built with ❤️ by R.M. Visanthan — PhysiX Academy, 2026_

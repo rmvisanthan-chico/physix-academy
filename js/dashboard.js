@@ -19,9 +19,18 @@ import { userLabel } from './profile.js';
 import { CURRICULUM } from './data-core.js';
 import { QUIZ_BANK } from './data-quiz-a.js';
 import {
-  allMastery, recommendation, roadmap, roadmapByLevel, roadmapProgress,
-  currentChapter, curriculumProgress, skillBreakdown, overallMastery,
-  reviewQueue, isNewStudent, topicMastery
+  allMastery,
+  recommendation,
+  roadmap,
+  roadmapByLevel,
+  roadmapProgress,
+  currentChapter,
+  curriculumProgress,
+  skillBreakdown,
+  overallMastery,
+  reviewQueue,
+  isNewStudent,
+  topicMastery
 } from './mastery.js';
 
 /* Deliberately does NOT import afterRender from views.js. views.js imports this
@@ -38,13 +47,25 @@ const STATE_ICON = { todo: '○', learning: '◐', mastered: '●' };
    lookup must not take the page down: every read goes through here and returns
    null instead of throwing. */
 const lessonAt = (chapter, i) => {
-  try { return chapter && chapter.lessons && chapter.lessons[i]; } catch (e) { return null; }
+  try {
+    return chapter && chapter.lessons && chapter.lessons[i];
+  } catch (e) {
+    return null;
+  }
 };
 const chaptersOf = (level) => {
-  try { return (level && Array.isArray(level.chapters)) ? level.chapters : []; } catch (e) { return []; }
+  try {
+    return level && Array.isArray(level.chapters) ? level.chapters : [];
+  } catch (e) {
+    return [];
+  }
 };
 const lessonsOf = (chapter) => {
-  try { return (chapter && Array.isArray(chapter.lessons)) ? chapter.lessons : []; } catch (e) { return []; }
+  try {
+    return chapter && Array.isArray(chapter.lessons) ? chapter.lessons : [];
+  } catch (e) {
+    return [];
+  }
 };
 
 /* ---------- tiny local render helpers ---------- */
@@ -134,7 +155,10 @@ function continueCard() {
 function masteryCard() {
   const overall = overallMastery();
   const skills = skillBreakdown();
-  const topics = allMastery().filter(m => !m.provisional).sort((a, b) => b.pct - a.pct).slice(0, 6);
+  const topics = allMastery()
+    .filter((m) => !m.provisional)
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 6);
   if (overall == null && !topics.length) return '';
 
   return `
@@ -142,16 +166,23 @@ function masteryCard() {
     <div class="sec-title"><h2>Your mastery</h2>
       <span class="small muted">from ${Store.data.solved} answers</span></div>
     <div class="card dash-mastery">
-      ${overall != null ? `
+      ${
+        overall != null
+          ? `
         <div class="dash-mastery-ring">
           <div class="dash-ring" style="--p:${overall}"
                role="img" aria-label="Overall mastery ${overall} percent">
             <span class="rv">${overall}%</span>
           </div>
           <div class="small muted" style="margin-top:.6rem">overall</div>
-        </div>` : ''}
+        </div>`
+          : ''
+      }
       <div class="dash-skills">
-        ${skills.map(s => `
+        ${
+          skills
+            .map(
+              (s) => `
           <div class="dash-skill">
             <div class="bar-row">
               <span class="nm">${esc(s.label)}</span>
@@ -159,20 +190,31 @@ function masteryCard() {
               <span class="bv">${s.pct}%</span>
             </div>
             <div class="small muted">${s.total} ${s.total === 1 ? 'question' : 'questions'}</div>
-          </div>`).join('') || '<p class="muted small">No questions answered yet.</p>'}
+          </div>`
+            )
+            .join('') || '<p class="muted small">No questions answered yet.</p>'
+        }
       </div>
     </div>
 
-    ${topics.length ? `
+    ${
+      topics.length
+        ? `
     <div class="dash-topics">
-      ${topics.map(m => `
+      ${topics
+        .map(
+          (m) => `
         <div class="dash-topic">
           <a class="dash-topic-name" href="#/practice">${esc(m.topic)}</a>
           <span class="mastery-track"><span class="mastery-fill ${tone(m.pct)}" style="width:${m.pct}%"></span></span>
           <span class="mastery-pct">${m.pct}%</span>
           <span class="small muted">${m.correct}/${m.total}</span>
-        </div>`).join('')}
-    </div>` : ''}
+        </div>`
+        )
+        .join('')}
+    </div>`
+        : ''
+    }
   </section>`;
 }
 
@@ -186,9 +228,11 @@ function reviewCard() {
     <section class="sec">
       <div class="sec-title"><h2>Review this</h2></div>
       <div class="card">
-        <p class="muted" style="margin:0">${any
-          ? 'Nothing needs review right now — no topic is below 70%. Keep the streak going.'
-          : 'Once you answer a few questions, anything you are shaky on will appear here automatically.'}</p>
+        <p class="muted" style="margin:0">${
+          any
+            ? 'Nothing needs review right now — no topic is below 70%. Keep the streak going.'
+            : 'Once you answer a few questions, anything you are shaky on will appear here automatically.'
+        }</p>
       </div>
     </section>`;
   }
@@ -197,10 +241,11 @@ function reviewCard() {
     <div class="sec-title"><h2>Review this</h2>
       <a class="more" href="#/practice">Practise →</a></div>
     <div class="dash-review">
-      ${items.map(r => {
-        const m = topicMastery(r.topic);
-        const cls = r.kind === 'weak' ? 'red' : 'amber';
-        return `
+      ${items
+        .map((r) => {
+          const m = topicMastery(r.topic);
+          const cls = r.kind === 'weak' ? 'red' : 'amber';
+          return `
         <a class="card dash-review-item" href="#/practice">
           <div>
             <div class="dash-review-topic">${esc(r.topic)}</div>
@@ -211,7 +256,8 @@ function reviewCard() {
             <span class="small muted">${m ? `${m.correct}/${m.total}` : ''}</span>
           </div>
         </a>`;
-      }).join('')}
+        })
+        .join('')}
     </div>
   </section>`;
 }
@@ -223,18 +269,23 @@ function mistakesCard() {
   if (!recent.length) return '';
 
   const byId = {};
-  QUIZ_BANK.forEach(q => { byId[q.id] = q; });
+  QUIZ_BANK.forEach((q) => {
+    byId[q.id] = q;
+  });
 
   return `
   <section class="sec">
     <div class="sec-title"><h2>Recent mistakes</h2>
       <a class="more" href="#/mistakes">All ${all.length} →</a></div>
     <div class="dash-mistakes">
-      ${recent.map(m => {
-        const q = byId[m.qid];
-        const letters = ['A', 'B', 'C', 'D'];
-        const stem = q ? q.q.replace(/\s+/g, ' ').trim() : `${m.qid} (no longer in the question bank)`;
-        return `
+      ${recent
+        .map((m) => {
+          const q = byId[m.qid];
+          const letters = ['A', 'B', 'C', 'D'];
+          const stem = q
+            ? q.q.replace(/\s+/g, ' ').trim()
+            : `${m.qid} (no longer in the question bank)`;
+          return `
         <div class="card dash-mistake">
           <div class="dash-mistake-top">
             <span class="chip plain">${esc(m.topic)}</span>
@@ -246,7 +297,8 @@ function mistakesCard() {
             <a class="btn btn-sm" href="#/mistakes">Review &amp; retry</a>
           </div>
         </div>`;
-      }).join('')}
+        })
+        .join('')}
     </div>
   </section>`;
 }
@@ -262,9 +314,10 @@ function roadmapView() {
 
   return `
   <div class="dash-levels">
-    ${groups.map(g => {
-      const holds = current && g.chapters.some(c => c.id === current.id);
-      return `
+    ${groups
+      .map((g) => {
+        const holds = current && g.chapters.some((c) => c.id === current.id);
+        return `
       <details class="dash-level" ${holds || g.state !== 'todo' ? 'open' : ''}>
         <summary>
           <span class="dash-level-icon" aria-hidden="true">${g.icon || '◆'}</span>
@@ -275,7 +328,9 @@ function roadmapView() {
           <span class="dash-level-pct">${g.pct}%</span>
         </summary>
         <ol class="dash-roadmap">
-          ${g.chapters.map(c => `
+          ${g.chapters
+            .map(
+              (c) => `
             <li class="dash-node is-${c.state} ${current && c.id === current.id ? 'is-current' : ''}"
                 style="--lv:${c.color || 'var(--acc)'}">
               <span class="dash-node-dot" aria-hidden="true">${STATE_ICON[c.state]}</span>
@@ -293,10 +348,13 @@ function roadmapView() {
               </div>
               <a class="dash-node-go" href="${esc(c.href)}" aria-label="Open ${esc(c.title)}"
                  >${c.state === 'mastered' ? '✓' : '→'}</a>
-            </li>`).join('')}
+            </li>`
+            )
+            .join('')}
         </ol>
       </details>`;
-    }).join('')}
+      })
+      .join('')}
   </div>`;
 }
 

@@ -67,9 +67,9 @@ export const FIXED_DT = 1 / 60;
 
 export function createSimControls(opts) {
   const parent = opts.parent;
-  const advance = opts.advance;      /* (h) => integrate exactly one sub-step */
-  const sample = opts.sample;        /* () => push ONE graph sample          */
-  const render = opts.render;        /* () => draw only, never integrate      */
+  const advance = opts.advance; /* (h) => integrate exactly one sub-step */
+  const sample = opts.sample; /* () => push ONE graph sample          */
+  const render = opts.render; /* () => draw only, never integrate      */
   /* Where to sit in the frame. These simulations build canvas -> sliders ->
      readouts -> graph, and the graph already owns the bottom of the panel. A
      bar appended last would land BELOW the graph, pushing the thing the
@@ -110,7 +110,7 @@ export function createSimControls(opts) {
   function advanceFixed(n) {
     let done = 0;
     for (let i = 0; i < n; i++) {
-      if (!canAdvance()) break;      /* landed, or the run is otherwise finished */
+      if (!canAdvance()) break; /* landed, or the run is otherwise finished */
       advance(FIXED_DT);
       /* One sample PER SUB-STEP, not one per frame. The old SU.loop code pushed
          once per animation frame, which coincided with one physics step only
@@ -128,13 +128,17 @@ export function createSimControls(opts) {
 
   /* ---------- the single animation loop ---------- */
   function frame(now) {
-    if (!alive || !parent.isConnected) { destroy(); return; }
+    if (!alive || !parent.isConnected) {
+      destroy();
+      return;
+    }
 
     /* Hidden-tab protection, preserved from SU.loop: keep the rAF chain alive so
        returning does not need a re-mount, but integrate nothing, and re-base the
        clock so the first visible frame cannot see a huge dt. */
     if (document.hidden) {
-      last = now; acc = 0;
+      last = now;
+      acc = 0;
       raf = requestAnimationFrame(frame);
       render();
       return;
@@ -142,18 +146,21 @@ export function createSimControls(opts) {
 
     let dt = (now - last) / 1000;
     last = now;
-    if (!(dt >= 0)) dt = 0;          /* first frame has no reference yet */
+    if (!(dt >= 0)) dt = 0; /* first frame has no reference yet */
     if (dt > MAX_FRAME_DT) dt = MAX_FRAME_DT;
 
     if (paused) {
-      acc = 0;                        /* time while paused was not simulated */
+      acc = 0; /* time while paused was not simulated */
     } else {
       acc += dt;
       let n = Math.floor(acc / FIXED_DT);
       if (n > MAX_SUBSTEPS_PER_FRAME) n = MAX_SUBSTEPS_PER_FRAME;
       acc -= n * FIXED_DT;
-      if (acc > FIXED_DT) acc = 0;    /* a dropped backlog must not accumulate */
-      if (n > 0) { advanceFixed(n); updateClock(); }
+      if (acc > FIXED_DT) acc = 0; /* a dropped backlog must not accumulate */
+      if (n > 0) {
+        advanceFixed(n);
+        updateClock();
+      }
     }
 
     /* Drawn unconditionally, including while paused, on purpose. */
@@ -183,13 +190,18 @@ export function createSimControls(opts) {
      boolean means one is always meaningless, and a student who presses the wrong
      one is left unsure whether anything happened. */
   const playBtn = mkBtn('sim-time-play', '⏸ Pause', 'Pause the simulation', () => {
-    if (paused) play(); else pause();
+    if (paused) play();
+    else pause();
   });
 
   const stepBtn = mkBtn('sim-time-step', '⏭ Step', 'Advance one ' + stepLabel, () => step());
 
-  const resetBtn = mkBtn('sim-time-reset', '⟲ Reset',
-    'Reset the simulation to its initial conditions', () => reset());
+  const resetBtn = mkBtn(
+    'sim-time-reset',
+    '⟲ Reset',
+    'Reset the simulation to its initial conditions',
+    () => reset()
+  );
 
   /* Step size. A 1.44s flight is 87 clicks at 1/60s - tedious enough to be a real
      barrier to using the control for its purpose. Coarser options stay ACCURATE: a
@@ -202,14 +214,18 @@ export function createSimControls(opts) {
   const stepSel = document.createElement('select');
   stepSel.className = 'sim-time-stepsize';
   stepSel.setAttribute('aria-label', 'Length of one step');
-  [[FIXED_DT, '1/60 s'], [1 / 30, '1/30 s'], [1 / 20, '1/20 s'], [0.1, '0.1 s']]
-    .forEach(([val, label]) => {
-      const o = document.createElement('option');
-      o.value = String(val);
-      o.textContent = label;
-      if (val === FIXED_DT) o.selected = true;
-      stepSel.appendChild(o);
-    });
+  [
+    [FIXED_DT, '1/60 s'],
+    [1 / 30, '1/30 s'],
+    [1 / 20, '1/20 s'],
+    [0.1, '0.1 s']
+  ].forEach(([val, label]) => {
+    const o = document.createElement('option');
+    o.value = String(val);
+    o.textContent = label;
+    if (val === FIXED_DT) o.selected = true;
+    stepSel.appendChild(o);
+  });
   stepSel.addEventListener('change', () => {
     stepSeconds = parseFloat(stepSel.value) || FIXED_DT;
     updateClock();
@@ -221,7 +237,7 @@ export function createSimControls(opts) {
   /* Running/paused as an icon AND a word, never colour alone. */
   const state = document.createElement('span');
   state.className = 'sim-time-state';
-  state.setAttribute('role', 'status');    /* announced on change */
+  state.setAttribute('role', 'status'); /* announced on change */
   bar.appendChild(state);
 
   const clock = document.createElement('span');
@@ -244,7 +260,8 @@ export function createSimControls(opts) {
     /* A role=status region announces only when its text CHANGES, so this has to
        carry a word the student can act on, not just a swapped glyph. */
     state.textContent = paused ? '⏸ Paused' : '▶ Running';
-    if (paused) acc = 0; else last = performance.now();
+    if (paused) acc = 0;
+    else last = performance.now();
     updateClock();
     if (opts.onStateChange) opts.onStateChange(paused);
   }
@@ -256,7 +273,9 @@ export function createSimControls(opts) {
     setPaused(false);
   }
 
-  function pause() { setPaused(true); }
+  function pause() {
+    setPaused(true);
+  }
 
   /* Step while running pauses FIRST, then advances one step. Stepping on top of a
      moving simulation would leave the student unsure whether they are looking
@@ -291,10 +310,17 @@ export function createSimControls(opts) {
   /* Keyboard parity, scoped to this bar so a focused slider or a prediction input
      keeps its own key handling: Space on a focused button must remain that
      button's Space, and ArrowRight must not page through the prediction field. */
-  bar.addEventListener('keydown', e => {
-    if (e.target !== bar && e.target !== playBtn && e.target !== stepBtn && e.target !== resetBtn) return;
-    if (e.key === ' ') { e.preventDefault(); if (paused) play(); else pause(); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); step(); }
+  bar.addEventListener('keydown', (e) => {
+    if (e.target !== bar && e.target !== playBtn && e.target !== stepBtn && e.target !== resetBtn)
+      return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (paused) play();
+      else pause();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      step();
+    }
   });
 
   function destroy() {
@@ -318,14 +344,23 @@ export function createSimControls(opts) {
   raf = requestAnimationFrame(frame);
 
   return {
-    play, pause, step, reset, destroy,
+    play,
+    pause,
+    step,
+    reset,
+    destroy,
     isPaused: () => paused,
     /* How many times advance() has been called. See the note above - this is how
        the tests prove "one Step = exactly one integration" rather than guessing
        from elapsed time. */
     advanceCalls: () => advanceCalls,
-    get stepSeconds() { return stepSeconds; },
-    setStepSeconds(v) { stepSeconds = v || FIXED_DT; stepSel.value = String(stepSeconds); },
+    get stepSeconds() {
+      return stepSeconds;
+    },
+    setStepSeconds(v) {
+      stepSeconds = v || FIXED_DT;
+      stepSel.value = String(stepSeconds);
+    },
     refresh: updateClock,
     FIXED_DT
   };

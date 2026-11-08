@@ -18,11 +18,14 @@ export const SU = {
   canvas(host, h) {
     const wrap = SU.el('div', 'sim-canvas-wrap');
     const c = document.createElement('canvas');
-    wrap.appendChild(c); host.appendChild(wrap);
+    wrap.appendChild(c);
+    host.appendChild(wrap);
     const W = Math.max(280, wrap.clientWidth || host.clientWidth || 640);
     const dpr = window.devicePixelRatio || 1;
-    c.width = W * dpr; c.height = h * dpr;
-    c.style.width = W + 'px'; c.style.height = h + 'px';
+    c.width = W * dpr;
+    c.height = h * dpr;
+    c.style.width = W + 'px';
+    c.style.height = h + 'px';
     const g = c.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     return { c, g, W, H: h };
@@ -41,9 +44,13 @@ export const SU = {
    * is away, then resumes at a state the student never saw. Pausing keeps the
    * physics honest as well as cheap. */
   loop(cv, fn) {
-    let last = performance.now(), alive = true;
+    let last = performance.now(),
+      alive = true;
     function step(t) {
-      if (!alive || !cv.isConnected) { alive = false; return; }
+      if (!alive || !cv.isConnected) {
+        alive = false;
+        return;
+      }
       if (document.hidden) {
         /* Skip the simulation but keep the rAF chain alive, so resuming does
            not require re-mounting. Reset `last` on return so the first frame
@@ -52,15 +59,24 @@ export const SU = {
         requestAnimationFrame(step);
         return;
       }
-      const dt = Math.min(0.033, (t - last) / 1000); last = t;
+      const dt = Math.min(0.033, (t - last) / 1000);
+      last = t;
       fn(dt, t / 1000);
       requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   },
   slider(parent, label, min, max, step, val, oninput, fmt) {
-    fmt = fmt || (v => v);
+    fmt = fmt || ((v) => v);
+    /* Not every slider needs to react on input (many sims only read .get()
+       each frame). The handler was called unconditionally, so dragging any
+       such slider threw "oninput is not a function" - a live error across
+       several simulations. A no-op default makes the helper safe by
+       construction instead of relying on 40+ call sites to pass one. */
+    oninput = oninput || (() => {});
     const w = SU.el('div', 'ctl', '<label></label>');
     /* A label wrapping the text but not the input does NOT name the input for
        assistive tech unless the input is inside the label. It was not, so all
@@ -75,7 +91,11 @@ export const SU = {
 
     const out = w.querySelector('output');
     const inp = document.createElement('input');
-    inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = val;
+    inp.type = 'range';
+    inp.min = min;
+    inp.max = max;
+    inp.step = step;
+    inp.value = val;
     inp.id = lid;
     /* The visible caption is the accessible name. Kept in sync via aria-label
        rather than aria-labelledby so the range and the caption cannot drift. */
@@ -89,11 +109,18 @@ export const SU = {
       inp.setAttribute('aria-valuetext', fmt(+inp.value));
     };
     upd();
-    inp.addEventListener('input', () => { upd(); oninput(+inp.value); });
-    w.appendChild(inp); parent.appendChild(w);
+    inp.addEventListener('input', () => {
+      upd();
+      oninput(+inp.value);
+    });
+    w.appendChild(inp);
+    parent.appendChild(w);
     return {
       get: () => +inp.value,
-      set(v) { inp.value = v; upd(); },
+      set(v) {
+        inp.value = v;
+        upd();
+      },
       el: inp
     };
   },
@@ -101,7 +128,11 @@ export const SU = {
     const r = SU.el('div', 'readout', label + ' <b>' + (val == null ? '—' : val) + '</b>');
     parent.appendChild(r);
     const b = r.querySelector('b');
-    return { set(v) { b.textContent = v; } };
+    return {
+      set(v) {
+        b.textContent = v;
+      }
+    };
   },
   btn(parent, label, fn, primary) {
     const b = SU.el('button', 'btn btn-sm' + (primary ? ' btn-primary' : ''), label);
@@ -112,9 +143,18 @@ export const SU = {
   arrowH(g, x, y, len, col) {
     if (Math.abs(len) < 3) return;
     const s = Math.sign(len);
-    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 3;
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y); g.stroke();
-    g.beginPath(); g.moveTo(x + len, y); g.lineTo(x + len - 8 * s, y - 4); g.lineTo(x + len - 8 * s, y + 4); g.fill();
+    g.strokeStyle = col;
+    g.fillStyle = col;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + len, y);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(x + len, y);
+    g.lineTo(x + len - 8 * s, y - 4);
+    g.lineTo(x + len - 8 * s, y + 4);
+    g.fill();
   }
 };
 
@@ -122,34 +162,44 @@ export const SU = {
    imports by design: it is the leaf kernel that every other module depends on,
    so importing utils.js from here would make the graph circular. */
 function esc(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
 }
 
 /* shared vector drawing helpers (used across sim files) */
 export function pxArrow(g, x, y, dx, dy, col, w) {
-  const len = Math.hypot(dx, dy); if (len < 2) return;
-  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w || 3;
-  g.beginPath(); g.moveTo(x, y); g.lineTo(x + dx, y + dy); g.stroke();
-  const a = Math.atan2(dy, dx), h = (w || 3) + 5;
+  const len = Math.hypot(dx, dy);
+  if (len < 2) return;
+  g.strokeStyle = col;
+  g.fillStyle = col;
+  g.lineWidth = w || 3;
+  g.beginPath();
+  g.moveTo(x, y);
+  g.lineTo(x + dx, y + dy);
+  g.stroke();
+  const a = Math.atan2(dy, dx),
+    h = (w || 3) + 5;
   g.beginPath();
   g.moveTo(x + dx, y + dy);
   g.lineTo(x + dx - h * Math.cos(a - 0.42), y + dy - h * Math.sin(a - 0.42));
   g.lineTo(x + dx - h * Math.cos(a + 0.42), y + dy - h * Math.sin(a + 0.42));
-  g.closePath(); g.fill();
+  g.closePath();
+  g.fill();
 }
 export function pxLabel(g, x, y, t, col) {
-  g.fillStyle = col || '#9aa8c3'; g.font = '11px Segoe UI'; g.textAlign = 'left';
+  g.fillStyle = col || '#9aa8c3';
+  g.font = '11px Segoe UI';
+  g.textAlign = 'left';
   g.fillText(t, x, y);
 }
-
 
 /* App is pure view state (main element + active level filter). It lives here,
    not in views.js, because ~8 modules read App while views.js imports those
    same modules back for their view functions. Owning it in the leaf kernel
    keeps that graph acyclic. */
 export const App = { el: null, levelFilter: 'all' };
-
 
 /* ---------- post-render hooks ----------
    These used to be monkey-patched onto window.afterRender by five files

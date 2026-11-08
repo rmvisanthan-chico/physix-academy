@@ -2,9 +2,11 @@
 
 > Understand Physics. Don't Just Memorize It.
 
-PhysiX Academy is a free, interactive physics learning platform for students of Class 9-12, JEE and NEET. It features hand-written lessons, live in-browser simulations, an offline AI tutor, a formula library, calculators, quizzes and physics games. It is a static site built by R.M.VISANTHAN with vanilla HTML/CSS/JS — no framework.
+PhysiX Academy is a free, interactive physics learning platform for students of Class 9-12. It features hand-written lessons, live in-browser simulations, an offline AI tutor, a formula library, calculators, quizzes and physics games. It is a static site built by R.M. Visanthan with vanilla HTML/CSS/JS — no framework.
 
-Author: R.M. VISANTHAN (r.m.visanthan@gmail.com)
+Author: R.M. Visanthan (r.m.visanthan@gmail.com)
+
+About the author: R.M. Visanthan is an educator, author, and the creator of PhysiX Academy. He is known for developing educational physics content, including practical study guides, exam preparation resources, and easy-to-understand explanations of physics concepts. Through PhysiX Academy, he aims to make learning physics more visual, interactive, and accessible to students.
 
 ## Main entry points
 
@@ -21,7 +23,7 @@ Author: R.M. VISANTHAN (r.m.visanthan@gmail.com)
 
 ## Content notes
 
-- Content is original work by R.M.VISANTHAN, written for educational purposes and inspired by standard textbooks (including NCERT and SL Arora), not verbatim copies.
+- Content is original work by R.M. Visanthan, written for educational purposes and inspired by standard textbooks (including NCERT and SL Arora), not verbatim copies.
 - The site is a single-page app using hash-based routing (#/route).
 - Simulations run entirely in the browser; the "AI tutor" uses offline algorithms over local curriculum data — no external AI API is used.
-- Users: students preparing for board exams (Class 9-12), JEE, and NEET.
+- Users: students preparing for board exams (Class 9-12).

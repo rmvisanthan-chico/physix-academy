@@ -21,9 +21,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /* same import list, same order, as js/main.js */
 const CURRICULUM_FILES = [
-  'data-core.js', 'data-ncert9.js', 'data-ncert10.js', 'data-ncert11.js',
-  'data-ncert12.js', 'data-jee.js', 'data-slarora11.js', 'data-l3a.js',
-  'data-l3b.js', 'data-l3c.js', 'data-l3d.js', 'data-l3e.js', 'data-l4.js'
+  'data-core.js',
+  'data-ncert9.js',
+  'data-ncert10.js',
+  'data-ncert11.js',
+  'data-ncert12.js',
+  'data-slarora11.js',
+  'data-l3a.js',
+  'data-l3b.js',
+  'data-l3c.js',
+  'data-l3d.js',
+  'data-l3e.js',
+  'data-l4.js'
 ];
 
 /* Evaluate the curriculum for real: strip the DOM imports, point the shared
@@ -52,7 +61,7 @@ for (const lv of CURRICULUM) {
 }
 const chapterSet = new Set(chapterIds);
 const levelSet = new Set(levelIds);
-const lvlKeys = new Set();   /* filled once LEVEL_TOPICS is parsed below */
+const lvlKeys = new Set(); /* filled once LEVEL_TOPICS is parsed below */
 
 /* every quiz topic across the three bank files */
 const quizTopics = new Set();
@@ -71,11 +80,14 @@ if (!block) {
 }
 const map = {};
 for (const m of block[1].matchAll(/'([^']+)'\s*:\s*\[([^\]]*)\]/g)) {
-  map[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map(x => x[1]);
+  map[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 }
 
 let bad = 0;
-const fail = (msg) => { console.log(`  FAIL  ${msg}`); bad++; };
+const fail = (msg) => {
+  console.log(`  FAIL  ${msg}`);
+  bad++;
+};
 
 console.log(`  curriculum            : ${core}`);
 console.log(`  levels                : ${levelIds.length}`);
@@ -97,12 +109,14 @@ if (!lvlBlock) {
 } else {
   const lmap = {};
   for (const m of lvlBlock[1].matchAll(/(\w+)\s*:\s*\[([^\]]*)\]/g)) {
-    lmap[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map(x => x[1]);
+    lmap[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   }
   for (const [lid, topics] of Object.entries(lmap)) {
-    if (!levelSet.has(lid)) fail(`LEVEL_TOPICS has "${lid}", which is not a level in the curriculum`);
+    if (!levelSet.has(lid))
+      fail(`LEVEL_TOPICS has "${lid}", which is not a level in the curriculum`);
     for (const t of topics) {
-      if (!quizTopics.has(t)) fail(`level "${lid}" maps to quiz topic "${t}", which does not exist`);
+      if (!quizTopics.has(t))
+        fail(`level "${lid}" maps to quiz topic "${t}", which does not exist`);
     }
     lvlKeys.add(lid);
   }
@@ -125,7 +139,7 @@ for (const [id, topics] of Object.entries(map)) {
 /* 4. informational: topics with no chapter. Not a failure - they are extra
    practice that belongs to no stage of the path - but worth seeing. */
 const mappedTopics = new Set(Object.values(map).flat());
-const orphans = [...quizTopics].filter(t => !mappedTopics.has(t)).sort();
+const orphans = [...quizTopics].filter((t) => !mappedTopics.has(t)).sort();
 
 console.log(`  quiz topics not in any chapter (extra practice): ${orphans.length}`);
 if (orphans.length) console.log(`    ${orphans.join(', ')}`);

@@ -2,17 +2,39 @@ import { $, $$, esc } from './utils.js';
 import { chFirstLesson } from './scientists.js';
 import { App } from './core.js';
 /* PhysiX Academy — Studio page: motion-site port (vanilla, no React) */
-'use strict';
+('use strict');
 
 const STUDIES = [
-  { id: '01', title: 'Field / Lines', type: 'Electric fields, drawn in space', mins: '18 MIN LESSON', cls: 'art-lime', ch: 'l3.charges' },
-  { id: '02', title: 'Gravity / Well', type: 'Orbits you can tilt and warp', mins: '12 MIN LESSON', cls: 'art-coral', ch: 'l2.gravity' },
-  { id: '03', title: 'Light / Matter', type: 'Where waves become particles', mins: '16 MIN LESSON', cls: 'art-mix', ch: 'l3.dual' }
+  {
+    id: '01',
+    title: 'Field / Lines',
+    type: 'Electric fields, drawn in space',
+    mins: '18 MIN LESSON',
+    cls: 'art-lime',
+    ch: 'l3.charges'
+  },
+  {
+    id: '02',
+    title: 'Gravity / Well',
+    type: 'Orbits you can tilt and warp',
+    mins: '12 MIN LESSON',
+    cls: 'art-coral',
+    ch: 'l2.gravity'
+  },
+  {
+    id: '03',
+    title: 'Light / Matter',
+    type: 'Where waves become particles',
+    mins: '16 MIN LESSON',
+    cls: 'art-mix',
+    ch: 'l3.dual'
+  }
 ];
 
 function mountStudioScene(host) {
   if (!host || !window.THREE || host.querySelector('canvas')) return;
-  const W = () => host.clientWidth || 600, H = () => host.clientHeight || 500;
+  const W = () => host.clientWidth || 600,
+    H = () => host.clientHeight || 500;
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(W(), H());
@@ -23,30 +45,59 @@ function mountStudioScene(host) {
   camera.position.set(0, 0, 5.8);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-  const l1 = new THREE.PointLight(0xd8ff62, 30, 40); l1.position.set(3, 3, 4); scene.add(l1);
-  const l2 = new THREE.PointLight(0xff5b43, 16, 40); l2.position.set(-3, -2, 2); scene.add(l2);
+  const l1 = new THREE.PointLight(0xd8ff62, 30, 40);
+  l1.position.set(3, 3, 4);
+  scene.add(l1);
+  const l2 = new THREE.PointLight(0xff5b43, 16, 40);
+  l2.position.set(-3, -2, 2);
+  scene.add(l2);
 
   const core = new THREE.Group();
   scene.add(core);
 
-  core.add(new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.18, 5),
-    new THREE.MeshPhysicalMaterial({
-      color: 0xc9ff38, transmission: 0.92, thickness: 0.65, roughness: 0.14,
-      metalness: 0.05, transparent: true, opacity: 0.96, clearcoat: 0.6
-    })));
-  core.add(new THREE.Mesh(
-    new THREE.SphereGeometry(0.42, 32, 32),
-    new THREE.MeshStandardMaterial({ color: 0xff7357, emissive: 0xd63f2d, emissiveIntensity: 3, roughness: 0.25 })));
+  core.add(
+    new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1.18, 5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xc9ff38,
+        transmission: 0.92,
+        thickness: 0.65,
+        roughness: 0.14,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.96,
+        clearcoat: 0.6
+      })
+    )
+  );
+  core.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 32, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0xff7357,
+        emissive: 0xd63f2d,
+        emissiveIntensity: 3,
+        roughness: 0.25
+      })
+    )
+  );
   [0, Math.PI / 3, -Math.PI / 3].forEach((rx, i) => {
-    core.add(new THREE.Mesh(
-      new THREE.TorusGeometry(1.78, 0.024, 10, 128),
-      new THREE.MeshStandardMaterial({ color: 0xc9ff38, emissive: 0x83ad16, emissiveIntensity: 1.3 })));
+    core.add(
+      new THREE.Mesh(
+        new THREE.TorusGeometry(1.78, 0.024, 10, 128),
+        new THREE.MeshStandardMaterial({
+          color: 0xc9ff38,
+          emissive: 0x83ad16,
+          emissiveIntensity: 1.3
+        })
+      )
+    );
     core.children[core.children.length - 1].rotation.set(rx, i * 0.8, rx);
   });
 
   /* sparkle dust */
-  const N = 260, pos = new Float32Array(N * 3);
+  const N = 260,
+    pos = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
     pos[i * 3] = (Math.random() - 0.5) * 7;
     pos[i * 3 + 1] = (Math.random() - 0.5) * 7;
@@ -54,20 +105,38 @@ function mountStudioScene(host) {
   }
   const dustGeo = new THREE.BufferGeometry();
   dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xc9ff38, size: 0.02, transparent: true, opacity: 0.85 })));
+  scene.add(
+    new THREE.Points(
+      dustGeo,
+      new THREE.PointsMaterial({ color: 0xc9ff38, size: 0.02, transparent: true, opacity: 0.85 })
+    )
+  );
 
-  let tx = 0.15, ty = 0, drag = false, lx = 0, ly = 0;
-  host.addEventListener('pointerdown', e => { drag = true; lx = e.clientX; ly = e.clientY; });
-  window.addEventListener('pointermove', e => {
+  let tx = 0.15,
+    ty = 0,
+    drag = false,
+    lx = 0,
+    ly = 0;
+  host.addEventListener('pointerdown', (e) => {
+    drag = true;
+    lx = e.clientX;
+    ly = e.clientY;
+  });
+  window.addEventListener('pointermove', (e) => {
     if (!drag) return;
     ty += (e.clientX - lx) * 0.006;
     tx += (e.clientY - ly) * 0.006;
     tx = Math.max(-1.1, Math.min(1.1, tx));
-    lx = e.clientX; ly = e.clientY;
+    lx = e.clientX;
+    ly = e.clientY;
   });
-  window.addEventListener('pointerup', () => drag = false);
+  window.addEventListener('pointerup', () => (drag = false));
 
-  const fit = () => { renderer.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); };
+  const fit = () => {
+    renderer.setSize(W(), H());
+    camera.aspect = W() / H();
+    camera.updateProjectionMatrix();
+  };
   window.addEventListener('resize', fit);
 
   let alive = true;
@@ -117,7 +186,8 @@ function viewStudio() {
         <p class="st-note">A small archive of interactive systems<br>built from first principles.<br>Click any card to open its lesson.</p>
       </div>
       <div class="st-grid">
-        ${STUDIES.map(s => `
+        ${STUDIES.map(
+          (s) => `
         <article class="study" data-href="${chFirstLesson(s.ch)}">
           <div class="study-art ${s.cls}">
             <span class="art-shape"></span>
@@ -128,7 +198,8 @@ function viewStudio() {
             <div><h3>${esc(s.title)}</h3><p>${esc(s.type)}</p></div>
             <time>${s.mins}</time>
           </div>
-        </article>`).join('')}
+        </article>`
+        ).join('')}
       </div>
     </section>
 
@@ -154,7 +225,9 @@ function viewStudio() {
 
   mountStudioScene($('#st-scene'));
   $('#st-scroll').addEventListener('click', () =>
-    $('#st-work').scrollIntoView({ behavior: 'smooth' }));
-  $$('.study', App.el).forEach(card =>
-    card.addEventListener('click', () => location.hash = card.dataset.href));
+    $('#st-work').scrollIntoView({ behavior: 'smooth' })
+  );
+  $$('.study', App.el).forEach((card) =>
+    card.addEventListener('click', () => (location.hash = card.dataset.href))
+  );
 }
