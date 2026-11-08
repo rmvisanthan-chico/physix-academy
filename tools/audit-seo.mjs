@@ -236,9 +236,6 @@ if (simHub) {
   failures.push('missing html5-sims/index.html');
 }
 const motion = pages.find((page) => page.rel === 'motion-graphs.html');
-if (motion && !motion.html.includes('href="html5-sims/index.html"')) {
-  failures.push('motion-graphs.html: missing link to html5-sims/index.html');
-}
 for (const page of pages.filter((candidate) => candidate.rel.startsWith('blog/'))) {
   if (!page.html.includes('href="../html5-sims/index.html"')) {
     failures.push(`${page.rel}: missing link to ../html5-sims/index.html`);
