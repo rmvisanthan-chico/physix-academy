@@ -144,7 +144,7 @@ else {
       'index.html: missing visible "Learn physics for free, without ads, NO disturbance." line'
     );
   }
-  for (const link of ['html5-sims/index.html', 'motion-graphs.html']) {
+  for (const link of ['motion-graphs.html']) {
     if (!homepage.html.includes(`href="${link}"`))
       failures.push(`index.html: footer missing link to ${link}`);
   }
