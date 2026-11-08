@@ -317,6 +317,10 @@ export const Workstation = {
         xKey: gd.xKey || 't',
         title: gd.title || '',
         height: gd.height || 150,
+        /* Sample buffer size. Some simulations need a longer record than the
+           engine's default 600 (a 14 s run at 60 Hz is 840 samples), so a
+           simulation can ask for its own capacity. */
+        capacity: gd.capacity || 600,
         yLabel: gd.yLabel,
         yUnit: gd.yUnit
       });

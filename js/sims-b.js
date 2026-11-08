@@ -1,9 +1,6 @@
 import { SU } from './core.js';
 import { Sims } from './sims-a.js';
-import { createGraph, GRAPH_COLORS as GC } from './graph-engine.js';
 import { createPrediction } from './prediction.js';
-import { createSimControls } from './sim-controls.js';
-import { attachTimeControls } from './sim-controls-helper.js';
 import { Workstation } from './sim-ui.js';
 /* PhysiX Academy — Simulations Part B: waves, circuits, magnetism, kinematics */
 ('use strict');
@@ -861,417 +858,795 @@ Sims.register(
 );
 
 /* ---------------- Charge in magnetic field ---------------- */
-Sims.register('bfield', 'Charge in a B Field', 'Cyclotron motion: r = mv / qB.', '🧭', (frame) => {
-  const cv = SU.canvas(frame, 300);
-  const ctr = SU.el('div', 'sim-controls');
-  frame.appendChild(ctr);
-  const ro = SU.el('div', 'sim-readouts');
-  frame.appendChild(ro);
-  let pos,
-    vel,
-    trail,
-    t = 0;
-  const reset = () => {
-    pos = [cv.W * 0.3, cv.H / 2];
-    vel = [0, -V0.get()];
-    trail = [];
-    t = 0;
-  };
-  const V0 = SU.slider(ctr, 'Speed v', 60, 260, 5, 140, reset);
-  const B = SU.slider(ctr, 'Field B (signed)', -4, 4, 0.1, 2, reset, (v) => v.toFixed(1));
-  const QM = SU.slider(ctr, 'q/m ratio', 0.05, 0.4, 0.01, 0.15, reset, (v) => v.toFixed(2));
-  const rR = SU.readout(ro, 'Radius'),
-    rT = SU.readout(ro, 'Period'),
-    rD = SU.readout(ro, 'Direction');
-  reset();
-  /* BUG FIX (pre-existing, live): this simulation called SU.btn(act, ...) but
-     never declared `act`. That threw "ReferenceError: act is not defined" on
-     mount. The error boundary caught it and rendered the frame, so the failure
-     was invisible - the page looked fine, but the animation loop below the
-     offending line never started, so the readouts sat at their initial em dash
-     forever. Found while integrating this sim for time controls; the control bar
-     replaces that button, so the reference is gone. */
-  function advance(h) {
-    t += h;
-    const qm = QM.get(),
-      b = B.get(),
-      w = qm * b;
-    /* Exact rotation by the cyclotron angle, then a straight step. This is an
-       analytic update, not an Euler approximation of the Lorentz force, so it
-       stays exact for any h - which is what makes Step trustworthy here. */
-    const ca = Math.cos(w * h),
-      sa = Math.sin(w * h);
-    vel = [vel[0] * ca - vel[1] * sa, vel[0] * sa + vel[1] * ca];
-    pos = [pos[0] + vel[0] * h, pos[1] + vel[1] * h];
-    if (pos[0] < -50 || pos[0] > cv.W + 50 || pos[1] < -50 || pos[1] > cv.H + 50) reset();
-    trail.push([pos[0], pos[1]]);
-    if (trail.length > 900) trail.shift();
-  }
-  function render() {
-    const qm = QM.get(),
-      b = B.get(),
-      w = qm * b;
-    const sp = Math.hypot(vel[0], vel[1]);
-    const Rth = Math.abs(sp / (qm * Math.abs(b) || 1));
-    rR.set(Rth.toFixed(0) + ' px');
-    rT.set(((2 * Math.PI) / Math.abs(w || 1)).toFixed(2) + ' s');
-    rD.set(b >= 0 ? '↻ clockwise (+q)' : '↺ anticlockwise (+q)');
-    const g = cv.g;
-    g.fillStyle = '#05070d';
-    g.fillRect(0, 0, cv.W, cv.H);
-    g.strokeStyle = 'rgba(107,122,153,.35)';
-    g.fillStyle = 'rgba(107,122,153,.55)';
-    g.font = '13px Segoe UI';
-    g.lineWidth = 1;
-    for (let x = 30; x < cv.W; x += 56)
-      for (let y = 28; y < cv.H; y += 48) {
-        if (b >= 0) {
-          g.beginPath();
-          g.moveTo(x - 6, y - 6);
-          g.lineTo(x + 6, y + 6);
-          g.moveTo(x + 6, y - 6);
-          g.lineTo(x - 6, y + 6);
-          g.stroke();
-        } else {
-          g.beginPath();
-          g.arc(x, y, 6, 0, 7);
-          g.stroke();
+/* ---------------- Charge in magnetic field ---------------- */
+Sims.register(
+  'bfield',
+  'Charge in a B Field',
+  'Cyclotron motion: r = mv / qB.',
+  '🧭',
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'bfield',
+      title: 'Charge in a B Field',
+      desc: 'A positive charge crosses a uniform magnetic field and curves into a circle. The magnetic force is always perpendicular to the velocity, so the field can steer the particle but can never slow it down: the speed holds steady while the direction turns at a constant rate ω = (q/m)B. That constant rate is why a cyclotron can be driven at one fixed radio frequency no matter how fast the particle is already moving.',
+      icon: '🧭',
+      topic: 'Electromagnetism',
+      level: 'Grade 11–12',
+      appKey: 'bfield',
+      height: 300,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Vacuum chamber' },
+        { id: 'science', label: 'Orbit geometry' }
+      ],
+      presets: [
+        { label: 'Reference beam', apply: (s) => { s.v = 140; s.b = 2; s.qm = 0.15; } },
+        { label: 'Tight orbit', apply: (s) => { s.v = 140; s.b = 4; s.qm = 0.4; } },
+        { label: 'Reversed field', apply: (s) => { s.v = 140; s.b = -2; s.qm = 0.15; } },
+        { label: 'Field switched off', apply: (s) => { s.v = 140; s.b = 0; s.qm = 0.15; } }
+      ],
+      graphs: [
+        {
+          title: 'Speed v(t) — a magnetic field does no work',
+          xLabel: 'Time',
+          xUnit: 's',
+          xKey: 't',
+          yLabel: 'Speed v',
+          yUnit: 'px/s',
+          height: 128,
+          series: [{ id: 'speed', label: 'Speed v', unit: 'px/s', color: '#22d3ee' }]
+        },
+        {
+          title: 'Turning angle θ(t) — constant rate ω = (q/m)B',
+          xLabel: 'Time',
+          xUnit: 's',
+          xKey: 't',
+          yLabel: 'θ',
+          yUnit: '°',
+          height: 128,
+          series: [{ id: 'theta', label: 'Turned θ', unit: '°', color: '#fbbf24' }]
         }
-      }
-    g.strokeStyle = 'rgba(109,93,246,.75)';
-    g.lineWidth = 2;
-    g.beginPath();
-    trail.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
-    g.stroke();
-    g.fillStyle = '#fbbf24';
-    g.beginPath();
-    g.arc(pos[0], pos[1], 7, 0, 7);
-    g.fill();
-    g.fillStyle = '#e8edf7';
-    g.font = '11px Segoe UI';
-    g.fillText('+q', pos[0] + 10, pos[1] - 8);
-    SU.arrowH(g, pos[0], pos[1], vel[0] * 0.12, '#34d399');
-  }
-  attachTimeControls({
-    frame,
-    advance,
-    render,
-    reset,
-    getTime: () => t,
-    /* No canAdvance gate: the particle is never "finished" - it either leaves the
-       canvas (which auto-resets) or keeps circulating. */
-    stepLabel: 'time step',
-    probe: () => {
-      const qm = QM.get(),
-        b = B.get(),
-        w = qm * b;
-      const sp = Math.hypot(vel[0], vel[1]);
-      return {
-        t,
-        w,
-        speed: sp,
-        T: (2 * Math.PI) / Math.abs(w || 1),
-        R: Math.abs(sp / (qm * Math.abs(b) || 1)),
-        state: { x: +pos[0].toFixed(6), y: +pos[1].toFixed(6) }
-      };
-    }
-  });
-});
+      ],
+      setup(api) {
+        const { g, W, H, state: S } = api;
+        const FIXED = 1 / 60;
+        let acc = 0;
 
+        S.v = 140;
+        S.b = 2;
+        S.qm = 0.15;
+        S.t = 0; /* flight clock — the original simulation's own time */
+        S.clock = 0; /* monotonic clock since the last full reset (graph axis) */
+        S.pos = [W * 0.3, H / 2];
+        S.vel = [0, -S.v];
+        S.trail = [];
+        S.turn = 0; /* total angle the velocity has turned, in degrees */
+        S.prevAng = Math.atan2(S.vel[1], S.vel[0]);
+
+        /* ---- controls (order and ranges are the original's) ---- */
+        const sV = api.SU.slider(api.panel, 'Speed v', 60, 260, 5, 140, (v) => {
+          S.v = v;
+          fullReset();
+        });
+        const sB = api.SU.slider(
+          api.panel,
+          'Field B (signed)',
+          -4,
+          4,
+          0.1,
+          2,
+          (v) => {
+            S.b = v;
+            fullReset();
+          },
+          (v) => v.toFixed(1)
+        );
+        const sQ = api.SU.slider(
+          api.panel,
+          'q/m ratio',
+          0.05,
+          0.4,
+          0.01,
+          0.15,
+          (v) => {
+            S.qm = v;
+            fullReset();
+          },
+          (v) => v.toFixed(2)
+        );
+        api.SU.btn(api.panel, '⟲ Re-enter chamber', () => fullReset(), true);
+
+        /* ---- readouts ---- */
+        const rR = api.SU.readout(api.readouts, 'Radius', '—');
+        const rT = api.SU.readout(api.readouts, 'Period', '—');
+        const rD = api.SU.readout(api.readouts, 'Direction', '—');
+
+        /* The original's own quantities, transcribed with their |1| guards so
+           the numbers stay finite when the field (or the ratio) is zero. */
+        const omega = () => S.qm * S.b;
+        const speed = () => Math.hypot(S.vel[0], S.vel[1]);
+        const Rth = () => Math.abs(speed() / (S.qm * Math.abs(S.b) || 1));
+        const Tth = () => (2 * Math.PI) / Math.abs(omega() || 1);
+
+        /* ---- the original reset(), verbatim: new entry point, new velocity,
+           cleared trail, clock back to zero. ---- */
+        function resetFlight() {
+          S.pos = [W * 0.3, H / 2];
+          S.vel = [0, -S.v];
+          S.trail = [];
+          S.t = 0;
+          /* Re-anchor the angle measurement to the new entry direction. The
+             teleport is not a physical turn, so it must not be counted as one. */
+          S.prevAng = Math.atan2(S.vel[1], S.vel[0]);
+        }
+
+        /* A full reset also wipes the recorded run: this is what the sliders,
+           the presets and the workstation Reset button do. */
+        function fullReset() {
+          resetFlight();
+          S.clock = 0;
+          S.turn = 0;
+          acc = 0;
+          api.graphs.forEach((G) => G.clear());
+          sync();
+          if (S.pred) S.pred.refresh();
+        }
+
+        /* ---- physics: the analytic cyclotron update, exactly as written ----
+           The velocity is rotated by exactly the cyclotron angle w*h and the
+           position is then stepped with the NEW velocity. This is not an Euler
+           approximation of the Lorentz force, so it stays exact for any h -
+           which is what makes Step trustworthy here. */
+        function advance(h) {
+          S.t += h;
+          S.clock += h;
+          const w = omega();
+          const ca = Math.cos(w * h),
+            sa = Math.sin(w * h);
+          const v0 = S.vel[0],
+            v1 = S.vel[1];
+          S.vel = [v0 * ca - v1 * sa, v0 * sa + v1 * ca];
+          S.pos = [S.pos[0] + S.vel[0] * h, S.pos[1] + S.vel[1] * h];
+          if (S.pos[0] < -50 || S.pos[0] > W + 50 || S.pos[1] < -50 || S.pos[1] > H + 50)
+            resetFlight();
+          S.trail.push([S.pos[0], S.pos[1]]);
+          if (S.trail.length > 900) S.trail.shift();
+        }
+
+        /* ---- sampling: the two measurements the graphs record ---- */
+        function sample() {
+          const sp = speed();
+          /* Measure the direction of the velocity vector and unwrap it, so the
+             angle on the graph is an observation of the simulated path rather
+             than a restatement of w*t. Each step turns the vector by far less
+             than half a turn, so the unwrap is unambiguous. */
+          const ang = Math.atan2(S.vel[1], S.vel[0]);
+          let d = ang - S.prevAng;
+          if (d > Math.PI) d -= 2 * Math.PI;
+          if (d < -Math.PI) d += 2 * Math.PI;
+          S.prevAng = ang;
+          S.turn += (d * 180) / Math.PI;
+          api.graphs[0].push({ t: S.clock, speed: sp });
+          api.graphs[1].push({ t: S.clock, theta: S.turn });
+        }
+
+        function sync() {
+          rR.set(Rth().toFixed(0) + ' px');
+          rT.set(Tth().toFixed(2) + ' s');
+          rD.set(S.b >= 0 ? '↻ clockwise (+q)' : '↺ anticlockwise (+q)');
+        }
+
+        function reset() {
+          fullReset();
+        }
+
+        /* ---- drawing ---- */
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          g.fillStyle = '#05070d';
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawScience();
+          else drawChamber();
+          api.pxLabel(g, 18, 20, 'PHYSIX CYCLOTRON CHAMBER', 'rgba(232,237,247,0.65)');
+          api.pxLabel(
+            g,
+            18,
+            36,
+            'B = ' + S.b.toFixed(1) + ' · q/m = ' + S.qm.toFixed(2) + ' · v = ' + S.v.toFixed(0) + ' px/s',
+            'rgba(34,211,238,0.9)'
+          );
+        }
+
+        /* The uniform-field markers. The sense of the marker follows the sign
+           of B, exactly as the original simulation drew it: crosses for a field
+           out of the page, circles for a field into it. */
+        function drawField(alpha) {
+          g.strokeStyle = 'rgba(107,122,153,' + alpha + ')';
+          g.fillStyle = 'rgba(107,122,153,' + alpha + ')';
+          g.font = '13px Segoe UI';
+          g.lineWidth = 1;
+          for (let x = 30; x < W; x += 56) {
+            for (let y = 28; y < H; y += 48) {
+              if (S.b >= 0) {
+                g.beginPath();
+                g.moveTo(x - 6, y - 6);
+                g.lineTo(x + 6, y + 6);
+                g.moveTo(x + 6, y - 6);
+                g.lineTo(x - 6, y + 6);
+                g.stroke();
+              } else {
+                g.beginPath();
+                g.arc(x, y, 6, 0, 7);
+                g.stroke();
+              }
+            }
+          }
+        }
+
+        function drawChamber() {
+          drawField('.35');
+          /* the trail of the charge */
+          g.strokeStyle = 'rgba(109,93,246,.75)';
+          g.lineWidth = 2;
+          g.beginPath();
+          S.trail.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
+          g.stroke();
+          /* the charge itself */
+          g.fillStyle = '#fbbf24';
+          g.beginPath();
+          g.arc(S.pos[0], S.pos[1], 7, 0, 7);
+          g.fill();
+          g.fillStyle = '#e8edf7';
+          g.font = '11px Segoe UI';
+          g.fillText('+q', S.pos[0] + 10, S.pos[1] - 8);
+          api.SU.arrowH(g, S.pos[0], S.pos[1], S.vel[0] * 0.12, '#34d399');
+        }
+
+        /* The geometry layer draws what the chamber view hides: the circle the
+           charge is riding, its centre, the radius and the full velocity
+           vector. The radius is the true geometric one, v/|w|, so it is only
+           meaningful when there is a field to curve the path. */
+        function drawScience() {
+          drawField('.18');
+          const w = omega();
+          const R = Math.abs(speed() / (w || 1));
+          if (w !== 0 && isFinite(R)) {
+            const cx = W * 0.3 + (w > 0 ? R : -R),
+              cy = H / 2;
+            g.strokeStyle = 'rgba(34,211,238,.6)';
+            g.lineWidth = 1.5;
+            g.setLineDash([5, 4]);
+            g.beginPath();
+            g.arc(cx, cy, R, 0, 7);
+            g.stroke();
+            g.setLineDash([]);
+            g.strokeStyle = 'rgba(251,191,36,.8)';
+            g.lineWidth = 2;
+            g.beginPath();
+            g.moveTo(cx, cy);
+            g.lineTo(S.pos[0], S.pos[1]);
+            g.stroke();
+            g.fillStyle = '#fbbf24';
+            g.beginPath();
+            g.arc(cx, cy, 3, 0, 7);
+            g.fill();
+          }
+          api.pxArrow(g, S.pos[0], S.pos[1], S.vel[0] * 0.16, S.vel[1] * 0.16, '#34d399', 2);
+          g.fillStyle = '#fbbf24';
+          g.beginPath();
+          g.arc(S.pos[0], S.pos[1], 7, 0, 7);
+          g.fill();
+          const lines = [
+            'ω = (q/m)B = ' + omega().toFixed(3) + ' rad/s',
+            'T = 2π/|ω| = ' + Tth().toFixed(2) + ' s',
+            'r = v/|ω| = ' + Rth().toFixed(0) + ' px',
+            'turned so far: ' + S.turn.toFixed(1) + '°'
+          ];
+          g.font = '12px "DM Mono", monospace';
+          g.fillStyle = 'rgba(232,237,247,0.85)';
+          lines.forEach((t, i) => g.fillText(t, 18, H - 78 + i * 17));
+        }
+
+        /* ---- pump ---- */
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          sync();
+        }
+
+        fullReset();
+
+        return {
+          update,
+          draw,
+          reset,
+          onPreset() {
+            sV.set(S.v);
+            sB.set(S.b);
+            sQ.set(S.qm);
+            fullReset();
+          },
+          destroy() {
+            if (S._watchTimer) {
+              clearInterval(S._watchTimer);
+              S._watchTimer = 0;
+            }
+          }
+        };
+      },
+      probe(api) {
+        const S = api.state;
+        const qm = S.qm,
+          b = S.b,
+          w = qm * b;
+        const sp = Math.hypot(S.vel[0], S.vel[1]);
+        return {
+          t: S.t,
+          w,
+          speed: sp,
+          T: (2 * Math.PI) / Math.abs(w || 1),
+          R: Math.abs(sp / (qm * Math.abs(b) || 1)),
+          state: { x: +S.pos[0].toFixed(6), y: +S.pos[1].toFixed(6) }
+        };
+      },
+      predict(api) {
+        const S = api.state;
+        /* The charge always clears the chamber in well over a second, so a
+           target of 1.0 s is inside the first traverse for every setting of
+           the three sliders. */
+        const TARGET = 1.0;
+        let pendingReveal = null;
+        function stopWatching() {
+          if (S._watchTimer) {
+            clearInterval(S._watchTimer);
+            S._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          S._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[1].timeRange('theta');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[1],
+          series: 'theta',
+          unit: '°',
+          quantity: 'turned angle',
+          absFloor: 0.2,
+          rel: 0.1,
+          context() {
+            const w = S.qm * S.b;
+            return {
+              qm: S.qm,
+              b: S.b,
+              v: S.v,
+              w,
+              paramsText:
+                'v = ' +
+                S.v.toFixed(0) +
+                ' px/s, B = ' +
+                S.b.toFixed(1) +
+                ', q/m = ' +
+                S.qm.toFixed(2) +
+                ' → ω = ' +
+                w.toFixed(3) +
+                ' rad/s'
+            };
+          },
+          targetTime: () => TARGET,
+          question() {
+            return 'Predict first: through how many degrees has the velocity turned after 1.0 s?';
+          },
+          observe() {
+            const hit = api.graphs[1].valueAt('theta', TARGET);
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            const th = ((ctx.w * TARGET * 180) / Math.PI);
+            return (
+              'The magnetic force is always perpendicular to the velocity, so it can only turn the charge, ' +
+              'never slow it down — that is why the speed trace stays flat while the angle trace climbs. The ' +
+              'turning rate is the cyclotron frequency ω = (q/m)B = ' +
+              ctx.w.toFixed(3) +
+              ' rad/s, so after 1.0 s the velocity has turned θ = ωt = ' +
+              th.toFixed(1) +
+              '°. Reverse the field and the turn reverses, but the rate is unchanged.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            pendingReveal = TARGET;
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        S.pred = pred;
+        pred.refresh();
+        return pred;
+      }
+    }),
+  { chrome: 'workstation' }
+);
 /* ---------------- 1-D kinematics with graphs ---------------- */
 Sims.register(
   'kin1d',
   '1-D Motion Lab',
   'Move a car — watch the graphs being drawn.',
   '🚗',
-  (frame) => {
-    const cv = SU.canvas(frame, 330);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    const act = SU.el('div', 'sim-actions');
-    frame.appendChild(act);
-    /* Phase 3A graph. This sim already keeps `hist` as [t, x, v] triples for its
-     own hand-drawn plot; the graph is fed from the same three numbers, and the
-     old canvas plot is left in place because it scales x and v independently
-     while the shared engine auto-scales both together. */
-    const graph = createGraph(
-      frame,
-      {
-        xLabel: 'Time',
-        xUnit: 's',
-        xKey: 't',
-        yLabel: 'x, v',
-        yUnit: 'm, m/s',
-        title: 'Position and velocity — a straight line and a straight line',
-        height: 190,
-        capacity: 900
-      },
-      [
-        { id: 'x', label: 'Position x', unit: 'm', color: GC.a },
-        { id: 'v', label: 'Velocity v', unit: 'm/s', color: GC.b }
-      ]
-    );
-    const gTog = SU.el('div', 'sim-actions');
-    frame.appendChild(gTog);
-    const gtog = (id, label) => {
-      const b = document.createElement('button');
-      b.className = 'btn btn-sm';
-      b.type = 'button';
-      b.textContent = label;
-      let on = true;
-      b.setAttribute('aria-pressed', 'true');
-      b.addEventListener('click', () => {
-        on = !on;
-        graph.setVisible(id, on);
-        b.setAttribute('aria-pressed', String(on));
-        b.style.opacity = on ? '' : '.55';
-      });
-      gTog.appendChild(b);
-    };
-    gtog('x', 'Position');
-    gtog('v', 'Velocity');
-    if (window.MutationObserver) {
-      const mo = new MutationObserver(() => {
-        if (!frame.isConnected) {
-          graph.destroy();
-          mo.disconnect();
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'kin1d',
+      title: '1-D Motion Lab',
+      desc: 'A test car runs down a straight track under a constant acceleration while a radar beam tracks its distance. The closed-form law x = ut + ½at² turns into a straight line on the distance trace and a straight line on the speed trace, which is exactly why a radar gun can reconstruct a vehicle’s speed from two sightings.',
+      icon: '🚗',
+      topic: 'Mechanics',
+      level: 'Grade 9–10',
+      appKey: 'kin1d',
+      height: 330,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Test track' },
+        { id: 'science', label: 'Distance & speed' }
+      ],
+      presets: [
+        { label: 'Cruise', apply: (s) => { s.u = 4; s.a = 1; } },
+        { label: 'Hard braking', apply: (s) => { s.u = 12; s.a = -4; } },
+        { label: 'Launch from rest', apply: (s) => { s.u = 0; s.a = 2; } },
+        { label: 'Reversing', apply: (s) => { s.u = -8; s.a = 1; } }
+      ],
+      graphs: [
+        {
+          title: 'Position and velocity — a straight line and a straight line',
+          xLabel: 'Time',
+          xUnit: 's',
+          xKey: 't',
+          yLabel: 'x, v',
+          yUnit: 'm, m/s',
+          height: 190,
+          capacity: 900,
+          series: [
+            { id: 'x', label: 'Position x', unit: 'm', color: '#22d3ee' },
+            { id: 'v', label: 'Velocity v', unit: 'm/s', color: '#fbbf24' }
+          ]
         }
-      });
-      mo.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
+      ],
+      setup(api) {
+        const { g, W, H, state: S } = api;
+        const FIXED = 1 / 60;
+        let acc = 0;
 
-    let t = 0,
-      hist = [];
-    const reset = () => {
-      t = 0;
-      hist = [];
-      graph.clear();
-    };
-    const U = SU.slider(ctr, 'Initial u (m/s)', -15, 15, 0.5, 4, reset);
-    const A = SU.slider(ctr, 'Acceleration a (m/s²)', -4, 4, 0.1, 1, reset);
-    const rT = SU.readout(ro, 't'),
-      rX = SU.readout(ro, 'x'),
-      rV = SU.readout(ro, 'v');
-    const XMAX = 60;
+        S.u = 4;
+        S.a = 1;
+        S.t = 0;
+        S.hist = [];
+        const XMAX = 60;
 
-    /* Phase 3C: three-way split, same as projectile and SHM. Kinematics 1D is the
-     one case where the "physics" is closed-form - x(t) = ut + ½at² evaluated
-     directly from the clock - so advance() here only has to move the clock and
-     recompute. That is exactly why splitting advance from sample is worth doing
-     here: there is no integrator to guard, so Step is trivially exact. */
-    function advance(h) {
-      t += h;
-      /* The 14s auto-replay is preserved. It is a deliberate feature: the car
-       driving off the right edge and restarting keeps the demo alive. Note it
-       fires inside advance, so it cannot run while paused - a paused sim at
-       t = 14.01 stays paused rather than silently resetting. */
-      if (t > 14) reset();
-    }
-
-    function sample() {
-      const u = U.get(),
-        a = A.get();
-      const x = u * t + 0.5 * a * t * t;
-      const v = u + a * t;
-      hist.push([t, x, v]);
-      if (hist.length > 1200) hist.shift();
-      graph.push({ t, x, v });
-    }
-
-    function render() {
-      const u = U.get(),
-        a = A.get();
-      const x = u * t + 0.5 * a * t * t;
-      const v = u + a * t;
-      rT.set(t.toFixed(1) + ' s');
-      rV.set(v.toFixed(1) + ' m/s');
-      rX.set(Math.max(-999, Math.min(x, 999)).toFixed(1) + ' m');
-      const g = cv.g;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      const roadY = 46,
-        pxPerM = cv.W / XMAX;
-      const carX = Math.max(-30, Math.min(cv.W + 30, x * pxPerM));
-      g.strokeStyle = '#33415c';
-      g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(0, roadY + 16);
-      g.lineTo(cv.W, roadY + 16);
-      g.stroke();
-      g.strokeStyle = '#26314a';
-      for (let i = 10; i < cv.W; i += 40) {
-        g.beginPath();
-        g.moveTo(i, roadY + 16);
-        g.lineTo(i - 12, roadY + 26);
-        g.stroke();
-      }
-      g.fillStyle = '#6d5df6';
-      g.fillRect(carX - 17, roadY - 8, 34, 16);
-      g.fillStyle = '#22d3ee';
-      g.beginPath();
-      g.arc(carX - 9, roadY + 10, 5, 0, 7);
-      g.fill();
-      g.beginPath();
-      g.arc(carX + 9, roadY + 10, 5, 0, 7);
-      g.fill();
-      const gx0 = 44,
-        gy0 = cv.H - 24,
-        gw = cv.W - 66,
-        gh = cv.H - 110;
-      g.strokeStyle = '#33415c';
-      g.lineWidth = 1;
-      g.strokeRect(gx0, gy0 - gh, gw, gh);
-      g.fillStyle = '#6b7a99';
-      g.font = '11px Segoe UI';
-      g.fillText('x (m)', gx0 - 36, gy0 - gh / 2);
-      g.fillText('v (m/s)', gx0 - 44, gy0 - gh / 2 + 14);
-      g.fillText('t → ' + t.toFixed(0) + 's', gx0 + gw - 52, gy0 + 14);
-      const tMax = 14,
-        xScale = Math.max(XMAX, ...hist.map((h) => Math.abs(h[1]))) * 1.05 || XMAX;
-      const vScale = Math.max(16, ...hist.map((h) => Math.abs(h[2]))) * 1.05;
-      const plot = (col, idx, scale) => {
-        g.strokeStyle = col;
-        g.lineWidth = 2;
-        g.beginPath();
-        hist.forEach((h, i) => {
-          const X = gx0 + (h[0] / tMax) * gw;
-          const Y = gy0 - (h[idx] / scale) * (gh / 2) - (idx === 1 ? gh / 2 : 0);
-          i ? g.lineTo(X, Y) : g.moveTo(X, Y);
+        /* ---- controls (order and ranges are the original's) ---- */
+        const sU = api.SU.slider(api.panel, 'Initial u (m/s)', -15, 15, 0.5, 4, (v) => {
+          S.u = v;
+          reset();
         });
-        g.stroke();
-      };
-      plot('#22d3ee', 1, xScale);
-      plot('#34d399', 2, vScale);
-    }
+        const sA = api.SU.slider(api.panel, 'Acceleration a (m/s²)', -4, 4, 0.1, 1, (v) => {
+          S.a = v;
+          reset();
+        });
 
-    /* The old "⟲ Replay" button is replaced by the shared bar's Reset - see the
-     note on the SHM side. Two differently-behaved resets in one panel is worse
-     than none. */
-    const controls = createSimControls({
-      parent: frame,
-      advance,
-      sample,
-      render,
-      reset,
-      getTime: () => t,
-      timeUnit: 's',
-      canAdvance: () => t <= 14,
-      stepLabel: 'time step'
-    });
+        /* ---- series toggles: the original's Position / Velocity buttons ---- */
+        const toggle = (id, label) => {
+          const b = document.createElement('button');
+          b.className = 'btn btn-sm';
+          b.type = 'button';
+          b.textContent = label;
+          let on = true;
+          b.setAttribute('aria-pressed', 'true');
+          b.addEventListener('click', () => {
+            on = !on;
+            api.graphs[0].setVisible(id, on);
+            b.setAttribute('aria-pressed', String(on));
+            b.style.opacity = on ? '' : '.55';
+          });
+          api.panel.appendChild(b);
+        };
+        toggle('x', 'Position');
+        toggle('v', 'Velocity');
 
-    const kinProbe = () => {
-      const u = U.get(),
-        a = A.get();
-      return {
-        t,
-        x: u * t + 0.5 * a * t * t,
-        v: u + a * t,
-        y0: 0,
-        paused: controls.isPaused(),
-        samples: graph.sampleCount('x') /* one series only - see the projectile note */,
-        calls: controls.advanceCalls()
-      };
-    };
-    window.__tcProbe = kinProbe;
-    const clearProbe = () => {
-      if (window.__tcProbe === kinProbe) window.__tcProbe = null;
-    };
+        /* ---- readouts ---- */
+        const rT = api.SU.readout(api.readouts, 't', '—');
+        const rX = api.SU.readout(api.readouts, 'x', '—');
+        const rV = api.SU.readout(api.readouts, 'v', '—');
 
-    /* ---------- Phase 3B prediction ----------
-     Constant acceleration is the clearest prediction in the whole set, because
-     both curves are exactly straight lines and the answer can be checked with
-     arithmetic. "Where is it at t = 3 s?" is the canonical first kinematics
-     question, and it is reachable for every value of u and a since the run
-     lasts 14 s. Target is clamped to stay inside that run even at the extremes
-     of both sliders. */
-    const T_MAX = 14; /* must match the loop's reset point */
-    const targetFor = () => Math.min(3, T_MAX * 0.6);
+        const pos = () => S.u * S.t + 0.5 * S.a * S.t * S.t;
+        const vel = () => S.u + S.a * S.t;
 
-    let pendingReveal = null;
-    let revealTimer = 0;
-    function stopWatching() {
-      if (revealTimer) {
-        clearInterval(revealTimer);
-        revealTimer = 0;
-      }
-    }
-    function watchForTarget() {
-      stopWatching();
-      revealTimer = setInterval(() => {
-        if (!pendingReveal || pred.prediction === null || pred.result) return;
-        const range = graph.timeRange('x');
-        if (range && range.to >= pendingReveal) {
-          if (pred.reveal()) {
-            pendingReveal = null;
-            stopWatching();
-          }
+        /* ---- the original reset() ---- */
+        function reset() {
+          S.t = 0;
+          S.hist = [];
+          acc = 0;
+          api.graphs[0].clear();
+          if (S.pred) S.pred.refresh();
         }
-      }, 120);
-    }
 
-    const pred = createPrediction(frame, {
-      graph,
-      series: 'x',
-      unit: 'm',
-      quantity: 'position',
-      absFloor: 0.4 /* metres; positions here run to tens of metres */,
-      context() {
-        const u = U.get(),
-          a = A.get();
+        /* ---- physics ----
+           Kinematics 1D is the one case where the physics is closed-form:
+           x(t) = ut + ½at² evaluated directly from the clock, so advance()
+           only has to move the clock and recompute. */
+        function advance(h) {
+          S.t += h;
+          /* The 14s auto-replay is preserved. It is a deliberate feature: the
+             car driving off the right edge and restarting keeps the demo alive.
+             It fires inside advance, so it cannot run while paused - a paused
+             sim at t = 14.01 stays paused rather than silently resetting. */
+          if (S.t > 14) reset();
+        }
+
+        function sample() {
+          const x = pos(),
+            v = vel();
+          S.hist.push([S.t, x, v]);
+          if (S.hist.length > 1200) S.hist.shift();
+          api.graphs[0].push({ t: S.t, x, v });
+        }
+
+        function sync() {
+          const x = pos(),
+            v = vel();
+          rT.set(S.t.toFixed(1) + ' s');
+          rV.set(v.toFixed(1) + ' m/s');
+          rX.set(Math.max(-999, Math.min(x, 999)).toFixed(1) + ' m');
+        }
+
+        /* ---- drawing ---- */
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          g.fillStyle = '#05070d';
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawTraces();
+          else drawTrack();
+          api.pxLabel(g, 18, 20, 'PHYSIX 1-D MOTION LAB', 'rgba(232,237,247,0.65)');
+          api.pxLabel(
+            g,
+            18,
+            36,
+            'u = ' + S.u.toFixed(1) + ' m/s · a = ' + S.a.toFixed(1) + ' m/s²',
+            'rgba(34,211,238,0.9)'
+          );
+        }
+
+        /* The road, the distance ruler and the car - the original's track view. */
+        function drawTrack() {
+          const roadY = 46,
+            pxPerM = W / XMAX;
+          const carX = Math.max(-30, Math.min(W + 30, pos() * pxPerM));
+          g.strokeStyle = '#33415c';
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(0, roadY + 16);
+          g.lineTo(W, roadY + 16);
+          g.stroke();
+          g.strokeStyle = '#26314a';
+          for (let i = 10; i < W; i += 40) {
+            g.beginPath();
+            g.moveTo(i, roadY + 16);
+            g.lineTo(i - 12, roadY + 26);
+            g.stroke();
+          }
+          /* distance ruler: one tick every 10 m, a label every 20 m */
+          g.strokeStyle = 'rgba(107,122,153,.45)';
+          g.fillStyle = 'rgba(107,122,153,.75)';
+          g.font = '10px "DM Mono", monospace';
+          g.lineWidth = 1;
+          for (let m = 0; m <= XMAX; m += 10) {
+            const px = m * pxPerM;
+            g.beginPath();
+            g.moveTo(px, roadY + 16);
+            g.lineTo(px, roadY + 22);
+            g.stroke();
+            if (m % 20 === 0 && px < W - 18) g.fillText(m + ' m', px + 3, roadY + 34);
+          }
+          /* the car */
+          g.fillStyle = '#6d5df6';
+          g.fillRect(carX - 17, roadY - 8, 34, 16);
+          g.fillStyle = '#22d3ee';
+          g.beginPath();
+          g.arc(carX - 9, roadY + 10, 5, 0, 7);
+          g.fill();
+          g.beginPath();
+          g.arc(carX + 9, roadY + 10, 5, 0, 7);
+          g.fill();
+          /* the velocity arrow */
+          api.pxArrow(g, carX, roadY - 18, vel() * 2.4, 0, '#34d399', 2);
+        }
+
+        /* The original's hand-drawn plot, kept because it scales distance and
+           speed independently, which the shared auto-scaling engine does not. */
+        function drawTraces() {
+          const gx0 = 44,
+            gy0 = H - 24,
+            gw = W - 66,
+            gh = H - 110;
+          g.strokeStyle = '#33415c';
+          g.lineWidth = 1;
+          g.strokeRect(gx0, gy0 - gh, gw, gh);
+          g.fillStyle = '#6b7a99';
+          g.font = '11px Segoe UI';
+          g.fillText('x (m)', gx0 - 36, gy0 - gh / 2);
+          g.fillText('v (m/s)', gx0 - 44, gy0 - gh / 2 + 14);
+          g.fillText('t → ' + S.t.toFixed(0) + 's', gx0 + gw - 52, gy0 + 14);
+          const tMax = 14,
+            xScale = Math.max(XMAX, ...S.hist.map((h) => Math.abs(h[1]))) * 1.05 || XMAX;
+          const vScale = Math.max(16, ...S.hist.map((h) => Math.abs(h[2]))) * 1.05;
+          const plot = (col, idx, scale) => {
+            g.strokeStyle = col;
+            g.lineWidth = 2;
+            g.beginPath();
+            S.hist.forEach((h, i) => {
+              const X = gx0 + (h[0] / tMax) * gw;
+              const Y = gy0 - (h[idx] / scale) * (gh / 2) - (idx === 1 ? gh / 2 : 0);
+              i ? g.lineTo(X, Y) : g.moveTo(X, Y);
+            });
+            g.stroke();
+          };
+          plot('#22d3ee', 1, xScale);
+          plot('#34d399', 2, vScale);
+          g.font = '11px "DM Mono", monospace';
+          g.fillStyle = '#22d3ee';
+          g.fillText('x', gx0 - 36, gy0 - gh / 2 - 12);
+          g.fillStyle = '#34d399';
+          g.fillText('v', gx0 - 44, gy0 - gh / 2 + 26);
+        }
+
+        /* ---- pump ---- */
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0;
+          sync();
+        }
+
+        reset();
+
         return {
-          u,
-          a,
-          paramsText: `u = ${u} m/s, a = ${a} m/s²`
+          update,
+          draw,
+          reset,
+          onPreset() {
+            sU.set(S.u);
+            sA.set(S.a);
+            reset();
+          },
+          destroy() {
+            if (S._watchTimer) {
+              clearInterval(S._watchTimer);
+              S._watchTimer = 0;
+            }
+          }
         };
       },
-      targetTime: targetFor,
-      question() {
-        return `Predict first: where is the car at t = ${targetFor().toFixed(1)} s?`;
+      probe(api) {
+        const S = api.state;
+        const u = S.u,
+          a = S.a;
+        return {
+          t: S.t,
+          x: u * S.t + 0.5 * a * S.t * S.t,
+          v: u + a * S.t,
+          y0: 0,
+          paused: !api.transport.playing(),
+          samples: api.graphs[0].sampleCount('x')
+        };
       },
-      observe() {
-        const hit = graph.valueAt('x', targetFor());
-        return hit ? { value: hit.y, exact: hit.exact } : null;
-      },
-      explain(r, ctx) {
-        const t = targetFor();
-        const x = ctx.u * t + 0.5 * ctx.a * t * t;
-        return `Constant acceleration means <b>x = ut + ½at²</b>, and it is a straight line in t².
+      predict(api) {
+        const S = api.state;
+        /* Constant acceleration is the clearest prediction in the whole set,
+           because both curves are exactly straight lines and the answer can be
+           checked with arithmetic. "Where is it at t = 3 s?" is the canonical
+           first kinematics question, and it is reachable for every value of u
+           and a since the run lasts 14 s. */
+        const T_MAX = 14; /* must match the loop's reset point */
+        const targetFor = () => Math.min(3, T_MAX * 0.6);
+
+        let pendingReveal = null;
+        function stopWatching() {
+          if (S._watchTimer) {
+            clearInterval(S._watchTimer);
+            S._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          S._watchTimer = setInterval(() => {
+            if (!pendingReveal || pred.prediction === null || pred.result) return;
+            const range = api.graphs[0].timeRange('x');
+            if (range && range.to >= pendingReveal) {
+              if (pred.reveal()) {
+                pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'x',
+          unit: 'm',
+          quantity: 'position',
+          absFloor: 0.4 /* metres; positions here run to tens of metres */,
+          context() {
+            const u = S.u,
+              a = S.a;
+            return {
+              u,
+              a,
+              paramsText: `u = ${u} m/s, a = ${a} m/s²`
+            };
+          },
+          targetTime: targetFor,
+          question() {
+            return `Predict first: where is the car at t = ${targetFor().toFixed(1)} s?`;
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('x', targetFor());
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            const t = targetFor();
+            const x = ctx.u * t + 0.5 * ctx.a * t * t;
+            return `Constant acceleration means <b>x = ut + ½at²</b>, and it is a straight line in t².
         Here x = (${ctx.u})(t) + ½(${ctx.a})(${t})² = ${x.toFixed(1)} m.
         Try sliding a negative: the parabola curves the other way, and the position falls through zero.`;
-      },
-      onLock() {
-        /* Phase 3C: resume the run. The reveal poller waits on the graph's
-         recorded range and a paused graph does not grow, so locking a prediction
-         while paused would leave the student waiting on a reveal that can never
-         arrive. */
-        reset();
-        pendingReveal = targetFor();
-        controls.play();
+          },
+          onLock() {
+            /* Resume the run: the reveal poller waits on the graph's recorded
+               range and a paused graph does not grow, so locking a prediction
+               while paused would leave the student waiting on a reveal that can
+               never arrive. */
+            api.transport.reset();
+            pendingReveal = targetFor();
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        S.pred = pred;
         pred.refresh();
-        watchForTarget();
-      },
-      onReset() {
-        pendingReveal = null;
-        stopWatching();
-        reset();
-        pred.refresh();
+        return pred;
       }
-    });
-    pred.refresh();
-
-    if (window.MutationObserver) {
-      const mo2 = new MutationObserver(() => {
-        if (!frame.isConnected) {
-          stopWatching();
-          controls.destroy();
-          clearProbe();
-          mo2.disconnect();
-        }
-      });
-      mo2.observe(document.getElementById('main') || frame, { childList: true, subtree: true });
-    }
-    return { controls, graph, getTime: () => t };
-  }
+    }),
+  { chrome: 'workstation' }
 );

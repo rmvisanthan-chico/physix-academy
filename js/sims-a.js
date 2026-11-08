@@ -1,6 +1,5 @@
 import { pxArrow, pxLabel, SU } from './core.js';
 import { esc, Store } from './utils.js';
-import { attachTimeControls } from './sim-controls-helper.js';
 import { collide1D, stepOrbit, orbitalEnergy } from './physics.js';
 import { Workstation } from './sim-ui.js';
 import { createPrediction } from './prediction.js';
@@ -1224,139 +1223,495 @@ Sims.register(
 Sims.register(
   'collision',
   'Collision Lab',
-  'Momentum always survives; KE may not.',
+  'Momentum survives the impact; kinetic energy survives only when e = 1.',
   '🎱',
-  (frame) => {
-    const cv = SU.canvas(frame, 240);
-    const ctr = SU.el('div', 'sim-controls');
-    frame.appendChild(ctr);
-    const ro = SU.el('div', 'sim-readouts');
-    frame.appendChild(ro);
-    const act = SU.el('div', 'sim-actions');
-    frame.appendChild(act);
-    let a,
-      b,
-      KE0 = 1,
-      t = 0;
-    const rad = (m) => 10 + Math.sqrt(m) * 5;
-    const relaunch = () => {
-      a = { m: 0, v: V1.get(), x: cv.W * 0.22, r: 0 };
-      b = { m: 0, v: V2.get(), x: cv.W * 0.78, r: 0 };
-      a.m = M1.get();
-      a.r = rad(a.m);
-      b.m = M2.get();
-      b.r = rad(b.m);
-      KE0 = 0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v || 1;
-      t = 0;
-    };
-    const M1 = SU.slider(ctr, 'Mass 1 (kg)', 0.5, 8, 0.5, 3, relaunch);
-    const M2 = SU.slider(ctr, 'Mass 2 (kg)', 0.5, 8, 0.5, 1, relaunch);
-    const V1 = SU.slider(ctr, 'Velocity 1 (m/s)', -8, 8, 0.5, 4, relaunch);
-    const V2 = SU.slider(ctr, 'Velocity 2 (m/s)', -8, 8, 0.5, 0, relaunch);
-    const E = SU.slider(
-      ctr,
-      'Elasticity e',
-      0,
-      1,
-      0.05,
-      1,
-      () => {},
-      (v) => v.toFixed(2)
-    );
-    const rP = SU.readout(ro, 'Total p'),
-      rK = SU.readout(ro, 'Total KE'),
-      rSt = SU.readout(ro, 'Type'),
-      rLoss = SU.readout(ro, 'KE lost');
-    relaunch();
-    const gy = () => cv.H * 0.66;
-    /* Phase 3C.1: the collision resolution and wall bounces are unchanged. Worth
-     noting WHY this is a good Step simulation: the interesting instant - the
-     impulse - happens between two samples. A student can walk up to the contact
-     with Step and watch momentum before, during and after the collision, which
-     is exactly the kind of thing a running simulation makes impossible to see. */
-    function advance(h) {
-      t += h;
-      a.x += a.v * 30 * h;
-      b.x += b.v * 30 * h;
-      const gap = a.r + b.r;
-      if (Math.abs(b.x - a.x) < gap && a.v !== b.v) {
-        const u1 = a.v,
-          u2 = b.v,
-          e = E.get();
-        const hit = collide1D(a.m, u1, b.m, u2, e);
-        a.v = hit.v1;
-        b.v = hit.v2;
-        const mid = (a.x + b.x) / 2;
-        a.x = mid - gap / 2;
-        b.x = mid + gap / 2;
-      }
-      [a, b].forEach((p) => {
-        if (p.x < p.r) {
-          p.x = p.r;
-          p.v = Math.abs(p.v);
+  (frame) =>
+    Workstation.mount(frame, {
+      id: 'collision',
+      title: 'Collision Lab',
+      desc: 'Two balls on a crash-test track. Momentum is conserved through the impact itself — the impulse the striker receives is exactly the impulse the target gives up — while kinetic energy survives only in the elastic case. The elastic end walls sit outside the system, so they are the one place where the total momentum may jump.',
+      icon: '🎱',
+      topic: 'Mechanics',
+      level: 'Grade 11–12',
+      appKey: 'collision',
+      height: 240,
+      quality: 'auto',
+      layers: [
+        { id: 'real', label: 'Crash track' },
+        { id: 'science', label: 'Momentum ledger' }
+      ],
+      presets: [
+        {
+          label: 'Elastic 3/1',
+          apply: (s) => {
+            s.m1 = 3;
+            s.m2 = 1;
+            s.v1 = 4;
+            s.v2 = 0;
+            s.e = 1;
+          }
+        },
+        {
+          label: 'Sticky head-on',
+          apply: (s) => {
+            s.m1 = 2;
+            s.m2 = 2;
+            s.v1 = 4;
+            s.v2 = -4;
+            s.e = 0;
+          }
+        },
+        {
+          label: 'Faster striker',
+          apply: (s) => {
+            s.m1 = 2;
+            s.m2 = 4;
+            s.v1 = 6;
+            s.v2 = 2;
+            s.e = 1;
+          }
+        },
+        {
+          label: 'Heavy catcher',
+          apply: (s) => {
+            s.m1 = 5;
+            s.m2 = 1;
+            s.v1 = 2;
+            s.v2 = 0;
+            s.e = 0.8;
+          }
         }
-        if (p.x > cv.W - p.r) {
-          p.x = cv.W - p.r;
-          p.v = -Math.abs(p.v);
+      ],
+      graphs: [
+        {
+          title: 'Total momentum p(t) — flat straight through the impact',
+          xLabel: 'Time',
+          xUnit: 's',
+          xKey: 't',
+          yLabel: 'p',
+          yUnit: 'kg·m/s',
+          height: 128,
+          series: [{ id: 'p', label: 'Total p', unit: 'kg·m/s', color: '#22d3ee' }]
+        },
+        {
+          title: 'Total kinetic energy (J) — flat only while e = 1',
+          xLabel: 'Time',
+          xUnit: 's',
+          xKey: 't',
+          yLabel: 'KE',
+          yUnit: 'J',
+          height: 128,
+          series: [{ id: 'ke', label: 'Total KE', unit: 'J', color: '#fbbf24' }]
         }
-      });
-    }
-    function render() {
-      rP.set((a.m * a.v + b.m * b.v).toFixed(2) + ' kg·m/s');
-      rK.set((0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v).toFixed(1) + ' J');
-      rSt.set(E.get() >= 0.95 ? 'Elastic' : E.get() <= 0.05 ? 'Sticky' : 'Partly elastic');
-      rLoss.set(
-        ((1 - (0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v) / KE0) * 100).toFixed(0) + ' %'
-      );
-      const g = cv.g;
-      g.fillStyle = '#05070d';
-      g.fillRect(0, 0, cv.W, cv.H);
-      g.strokeStyle = '#33415c';
-      g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(0, gy());
-      g.lineTo(cv.W, gy());
-      g.stroke();
-      [a, b].forEach((p, i) => {
-        g.fillStyle = i ? '#fbbf24' : '#22d3ee';
-        g.beginPath();
-        g.arc(p.x, gy() - p.r, p.r, 0, 7);
-        g.fill();
-        SU.arrowH(g, p.x, gy() - p.r * 2 - 18, p.v * 12, '#34d399');
-        g.fillStyle = '#6b7a99';
-        g.font = '11px Segoe UI';
-        g.textAlign = 'center';
-        g.fillText(p.m + ' kg', p.x, gy() + 16);
-        g.textAlign = 'left';
-      });
-    }
-    attachTimeControls({
-      frame,
-      advance,
-      render,
-      reset: relaunch,
-      replaceButtons: ['Relaunch'],
-      getTime: () => t,
-      /* Elastic walls mean the balls never settle; Step stays meaningful for the
-       whole run. */
-      canAdvance: () => true,
-      stepLabel: 'collision time step',
-      probe: () => {
-        const p = a.m * a.v + b.m * b.v;
-        /* Momentum before the run, for the conservation check in the suite. */
-        return {
-          t,
-          p,
-          p0: M1.get() * V1.get() + M2.get() * V2.get(),
-          ke: 0.5 * a.m * a.v * a.v + 0.5 * b.m * b.v * b.v,
-          state: { ax: +a.x.toFixed(6), av: +a.v.toFixed(6) }
-        };
-      }
-    });
-  }
-);
+      ],
+      setup(api) {
+        const { g, W, H, state: S } = api;
+        const FIXED = 1 / 60;
+        let acc = 0;
 
-/* ---------------- Orbit simulator ---------------- */
+        const rad = (m) => 10 + Math.sqrt(m) * 5;
+        const gy = () => H * 0.66;
+
+        /* ---- state lives on the scene so probe / predict / reset share it ---- */
+        S.m1 = 3;
+        S.m2 = 1;
+        S.v1 = 4;
+        S.v2 = 0;
+        S.e = 1;
+        S.t = 0;
+        S.a = { m: 3, v: 4, x: 0, r: 0 };
+        S.b = { m: 1, v: 0, x: 0, r: 0 };
+        S.ke0 = 1;
+        S.target = 1;
+
+        /* ---- controls (DOM order: m1, m2, v1, v2, e) ---- */
+        const sM1 = api.SU.slider(api.panel, 'Mass 1 (kg)', 0.5, 8, 0.5, 3, (v) => {
+          S.m1 = v;
+          relaunch();
+        });
+        const sM2 = api.SU.slider(api.panel, 'Mass 2 (kg)', 0.5, 8, 0.5, 1, (v) => {
+          S.m2 = v;
+          relaunch();
+        });
+        const sV1 = api.SU.slider(api.panel, 'Velocity 1 (m/s)', -8, 8, 0.5, 4, (v) => {
+          S.v1 = v;
+          relaunch();
+        });
+        const sV2 = api.SU.slider(api.panel, 'Velocity 2 (m/s)', -8, 8, 0.5, 0, (v) => {
+          S.v2 = v;
+          relaunch();
+        });
+        /* The original elasticity slider only stored the value — it did not
+           relaunch the run, so the collision keeps whatever velocity state it
+           had. That behaviour is preserved here: the new e applies to the NEXT
+           impact, exactly as before. */
+        const sE = api.SU.slider(
+          api.panel,
+          'Elasticity e',
+          0,
+          1,
+          0.05,
+          1,
+          (v) => {
+            S.e = v;
+            sync();
+          },
+          (v) => v.toFixed(2)
+        );
+        api.SU.btn(api.panel, '⟲ Relaunch', () => relaunch());
+
+        /* ---- readouts ---- */
+        const rP = api.SU.readout(api.readouts, 'Total p', '—');
+        const rK = api.SU.readout(api.readouts, 'Total KE', '—');
+        const rSt = api.SU.readout(api.readouts, 'Type', '—');
+        const rLoss = api.SU.readout(api.readouts, 'KE lost', '—');
+
+        /* ---- the target instant for the prediction ----
+           The honest window for a momentum measurement is the stretch of the
+           run before either ball can reach an elastic end wall, because the
+           wall is outside the system and applies an external impulse. The
+           first impact is inside that window (a ball-ball impact conserves p
+           whatever e is), so the target is placed just after the impact when
+           there is one, and otherwise just before the earliest wall contact. */
+        function timeToWall(x, r, v) {
+          const sp = v * 30; /* the original px-per-(m/s) scale */
+          if (sp > 0) return (W - r - x) / sp;
+          if (sp < 0) return (x - r) / -sp;
+          return Infinity;
+        }
+        function computeTarget() {
+          const rA = rad(S.m1);
+          const rB = rad(S.m2);
+          const tWall = Math.min(
+            timeToWall(W * 0.22, rA, S.v1),
+            timeToWall(W * 0.78, rB, S.v2)
+          );
+          const closing = (S.v1 - S.v2) * 30;
+          const tHit =
+            closing > 0 ? Math.max(0, (0.56 * W - (rA + rB)) / closing) : Infinity;
+          const afterHit = tHit + 0.15;
+          let T = Math.min(afterHit, tWall - 0.05);
+          if (!isFinite(T)) T = isFinite(afterHit) ? afterHit : 1;
+          return Math.max(0.05, Math.min(T, 8));
+        }
+
+        /* ---- physics: the collision resolution and the wall bounces,
+           transcribed exactly. ---- */
+        function relaunch() {
+          S.a = { m: S.m1, v: S.v1, x: W * 0.22, r: rad(S.m1) };
+          S.b = { m: S.m2, v: S.v2, x: W * 0.78, r: rad(S.m2) };
+          S.ke0 = 0.5 * S.a.m * S.a.v * S.a.v + 0.5 * S.b.m * S.b.v * S.b.v || 1;
+          S.t = 0;
+          acc = 0;
+          S.target = computeTarget();
+          api.graphs.forEach((G) => G.clear());
+          sync();
+          /* keep a locked-in prediction pointing at the new target */
+          if (S.pendingReveal) S.pendingReveal = S.target;
+          if (S.pred && S.pred.prediction === null) S.pred.refresh();
+        }
+
+        function advance(h) {
+          S.t += h;
+          S.a.x += S.a.v * 30 * h;
+          S.b.x += S.b.v * 30 * h;
+          const gap = S.a.r + S.b.r;
+          if (Math.abs(S.b.x - S.a.x) < gap && S.a.v !== S.b.v) {
+            const u1 = S.a.v,
+              u2 = S.b.v,
+              e = S.e;
+            const hit = collide1D(S.a.m, u1, S.b.m, u2, e);
+            S.a.v = hit.v1;
+            S.b.v = hit.v2;
+            const mid = (S.a.x + S.b.x) / 2;
+            S.a.x = mid - gap / 2;
+            S.b.x = mid + gap / 2;
+          }
+          [S.a, S.b].forEach((p) => {
+            if (p.x < p.r) {
+              p.x = p.r;
+              p.v = Math.abs(p.v);
+            }
+            if (p.x > W - p.r) {
+              p.x = W - p.r;
+              p.v = -Math.abs(p.v);
+            }
+          });
+        }
+
+        function sample() {
+          const p = S.a.m * S.a.v + S.b.m * S.b.v;
+          const ke = 0.5 * S.a.m * S.a.v * S.a.v + 0.5 * S.b.m * S.b.v * S.b.v;
+          api.graphs[0].push({ t: S.t, p });
+          api.graphs[1].push({ t: S.t, ke });
+        }
+
+        function sync() {
+          const p = S.a.m * S.a.v + S.b.m * S.b.v;
+          const ke = 0.5 * S.a.m * S.a.v * S.a.v + 0.5 * S.b.m * S.b.v * S.b.v;
+          rP.set(p.toFixed(2) + ' kg·m/s');
+          rK.set(ke.toFixed(1) + ' J');
+          rSt.set(S.e >= 0.95 ? 'Elastic' : S.e <= 0.05 ? 'Sticky' : 'Partly elastic');
+          rLoss.set(((1 - ke / S.ke0) * 100).toFixed(0) + ' %');
+        }
+
+        function reset() {
+          relaunch();
+        }
+
+        /* ---- drawing ---- */
+        function draw() {
+          g.clearRect(0, 0, W, H);
+          const bg = g.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#0a1020');
+          bg.addColorStop(1, '#070b16');
+          g.fillStyle = bg;
+          g.fillRect(0, 0, W, H);
+          if (api.getLayer() === 'science') drawScience();
+          else drawTrack();
+        }
+
+        function drawTrack() {
+          const gy_ = gy();
+          /* the elastic end walls — external, which is why p may jump there */
+          g.strokeStyle = 'rgba(251,191,36,.45)';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(0, gy_ - 46);
+          g.lineTo(0, gy_ + 22);
+          g.moveTo(W, gy_ - 46);
+          g.lineTo(W, gy_ + 22);
+          g.stroke();
+
+          g.strokeStyle = '#33415c';
+          g.lineWidth = 3;
+          g.beginPath();
+          g.moveTo(0, gy_);
+          g.lineTo(W, gy_);
+          g.stroke();
+
+          [S.a, S.b].forEach((p, i) => {
+            g.fillStyle = i ? '#fbbf24' : '#22d3ee';
+            g.beginPath();
+            g.arc(p.x, gy_ - p.r, p.r, 0, 7);
+            g.fill();
+            api.SU.arrowH(g, p.x, gy_ - p.r * 2 - 18, p.v * 12, '#34d399');
+            g.fillStyle = '#6b7a99';
+            g.font = '11px "DM Mono", monospace';
+            g.textAlign = 'center';
+            g.fillText(p.m + ' kg', p.x, gy_ + 16);
+            g.textAlign = 'left';
+          });
+
+          api.pxLabel(g, 20, 22, 'PHYSIX COLLISION TRACK', 'rgba(232,237,247,0.7)');
+          api.pxLabel(
+            g,
+            W - 230,
+            22,
+            'p = ' + (S.a.m * S.a.v + S.b.m * S.b.v).toFixed(2) + ' kg·m/s · e = ' + S.e.toFixed(2),
+            'rgba(34,211,238,0.9)'
+          );
+          api.pxLabel(
+            g,
+            20,
+            H - 14,
+            'walls are elastic but external — momentum can jump at the end stops',
+            'rgba(232,237,247,0.45)'
+          );
+        }
+
+        function drawScience() {
+          g.strokeStyle = 'rgba(255,255,255,0.05)';
+          g.lineWidth = 1;
+          for (let x = 0; x < W; x += 40) {
+            g.beginPath();
+            g.moveTo(x, 0);
+            g.lineTo(x, H);
+            g.stroke();
+          }
+          for (let y = 0; y < H; y += 40) {
+            g.beginPath();
+            g.moveTo(0, y);
+            g.lineTo(W, y);
+            g.stroke();
+          }
+          const p = S.a.m * S.a.v + S.b.m * S.b.v;
+          const ke = 0.5 * S.a.m * S.a.v * S.a.v + 0.5 * S.b.m * S.b.v * S.b.v;
+          g.fillStyle = 'rgba(232,237,247,0.92)';
+          g.font = '13px "DM Mono", monospace';
+          g.textAlign = 'center';
+          g.fillText('p = m₁v₁ + m₂v₂', W / 2, H * 0.34);
+          g.fillText('KE = ½m₁v₁² + ½m₂v₂²', W / 2, H * 0.34 + 22);
+          g.fillStyle = 'rgba(34,211,238,0.9)';
+          g.fillText(
+            'p = ' + p.toFixed(2) + ' kg·m/s   ·   KE = ' + ke.toFixed(1) + ' J',
+            W / 2,
+            H * 0.34 + 50
+          );
+          g.fillStyle = 'rgba(251,191,36,0.85)';
+          g.font = '12px "DM Mono", monospace';
+          g.fillText(
+            'm₁Δv₁ = −m₂Δv₂ at the impact  ·  ΔKE = −(1−e²)·½μ(v₁−v₂)²',
+            W / 2,
+            H * 0.34 + 74
+          );
+          g.textAlign = 'left';
+          api.pxLabel(
+            g,
+            20,
+            22,
+            'momentum ledger — the impact swaps momentum, it never creates it',
+            'rgba(232,237,247,0.75)'
+          );
+          api.pxLabel(
+            g,
+            20,
+            40,
+            'the end walls are outside the system: they can take momentum away',
+            'rgba(232,237,247,0.45)'
+          );
+        }
+
+        /* ---- per-frame pump ---- */
+        function update(dt) {
+          acc += dt;
+          let n = 0;
+          while (acc >= FIXED && n < 10) {
+            advance(FIXED);
+            sample();
+            acc -= FIXED;
+            n++;
+          }
+          if (acc > FIXED) acc = 0; /* drop the backlog, same fixed-step rule */
+          sync();
+        }
+
+        relaunch();
+
+        return {
+          update,
+          draw,
+          reset,
+          onPreset() {
+            sM1.set(S.m1);
+            sM2.set(S.m2);
+            sV1.set(S.v1);
+            sV2.set(S.v2);
+            sE.set(S.e);
+            relaunch();
+          },
+          destroy() {
+            if (S._watchTimer) {
+              clearInterval(S._watchTimer);
+              S._watchTimer = 0;
+            }
+          }
+        };
+      },
+      probe(api) {
+        const S = api.state;
+        return {
+          t: S.t,
+          p: S.a.m * S.a.v + S.b.m * S.b.v,
+          p0: S.m1 * S.v1 + S.m2 * S.v2,
+          ke: 0.5 * S.a.m * S.a.v * S.a.v + 0.5 * S.b.m * S.b.v * S.b.v,
+          state: { ax: +S.a.x.toFixed(6), av: +S.a.v.toFixed(6) }
+        };
+      },
+      predict(api) {
+        const S = api.state;
+        S.pendingReveal = null;
+        function stopWatching() {
+          if (S._watchTimer) {
+            clearInterval(S._watchTimer);
+            S._watchTimer = 0;
+          }
+        }
+        function watchForTarget() {
+          stopWatching();
+          S._watchTimer = setInterval(() => {
+            if (!S.pendingReveal || !S.pred) return;
+            if (S.pred.prediction === null || S.pred.result) return;
+            const range = api.graphs[0].timeRange('p');
+            if (range && range.to >= S.pendingReveal) {
+              if (S.pred.reveal()) {
+                S.pendingReveal = null;
+                stopWatching();
+              }
+            }
+          }, 120);
+        }
+        const pred = createPrediction(api.por, {
+          graph: api.graphs[0],
+          series: 'p',
+          unit: 'kg·m/s',
+          quantity: 'total momentum',
+          absFloor: 1,
+          context() {
+            return {
+              m1: S.m1,
+              m2: S.m2,
+              v1: S.v1,
+              v2: S.v2,
+              e: S.e,
+              paramsText:
+                'm₁ = ' +
+                S.m1 +
+                ' kg · v₁ = ' +
+                S.v1 +
+                ' m/s · m₂ = ' +
+                S.m2 +
+                ' kg · v₂ = ' +
+                S.v2 +
+                ' m/s · e = ' +
+                S.e
+            };
+          },
+          targetTime: () => S.target,
+          question() {
+            return (
+              'Predict first: what is the total momentum p of the pair at t = ' +
+              S.target.toFixed(2) +
+              ' s?'
+            );
+          },
+          observe() {
+            const hit = api.graphs[0].valueAt('p', S.target);
+            return hit ? { value: hit.y, exact: hit.exact } : null;
+          },
+          explain(r, ctx) {
+            const p0 = ctx.m1 * ctx.v1 + ctx.m2 * ctx.v2;
+            return (
+              'The total momentum of the pair is p = m₁v₁ + m₂v₂ = ' +
+              p0.toFixed(2) +
+              ' kg·m/s. The p trace stays flat straight through the impact: the impulse ball 1 receives is exactly ' +
+              'the impulse ball 2 gives up, so the total is unchanged whatever e is. The one place p can jump is ' +
+              'the elastic end wall — the track sits outside the system, so it applies an external impulse. ' +
+              'Kinetic energy is the stricter test: it survives only when e = 1, and whatever is missing went into ' +
+              'heat, sound and deformation, which is what the "KE lost" readout is counting.'
+            );
+          },
+          onLock() {
+            api.transport.reset();
+            S.pendingReveal = S.target;
+            api.transport.play();
+            pred.refresh();
+            watchForTarget();
+          },
+          onReset() {
+            S.pendingReveal = null;
+            stopWatching();
+            api.transport.reset();
+            pred.refresh();
+          }
+        });
+        S.pred = pred;
+        pred.refresh();
+        return pred;
+      }
+    }),
+  { chrome: 'workstation' }
+);
 Sims.register(
   'orbit',
   'Orbit Simulator',
