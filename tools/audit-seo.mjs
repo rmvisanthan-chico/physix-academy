@@ -139,9 +139,9 @@ else {
   if (homepage.description !== expectedDescription)
     failures.push('index.html: description does not match the mandated master value');
   if (homepage.robots && /noindex/i.test(homepage.robots)) failures.push('index.html: is noindex');
-  if (!homepage.html.includes('Learn physics for free, without advertisements.')) {
+  if (!homepage.html.includes('Learn physics for free, without ads, NO disturbance.')) {
     failures.push(
-      'index.html: missing visible "Learn physics for free, without advertisements." line'
+      'index.html: missing visible "Learn physics for free, without ads, NO disturbance." line'
     );
   }
   for (const link of ['html5-sims/index.html', 'motion-graphs.html']) {
