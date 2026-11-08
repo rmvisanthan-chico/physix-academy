@@ -32,3 +32,8 @@ downloads/*
 # Astra AI (local learner profiles + secrets)
 astra/.data/
 astra/.env
+
+# Brag video outputs (generated)
+brag-output/
+brag-output-2026-11-06-180044/
+tools/.shots/

@@ -2303,8 +2303,19 @@ input[type='range'] {
   padding: 2rem 1.2rem;
   display: grid;
   gap: 1rem;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: max-content 1fr;
   font-size: 0.9rem;
+}
+.footer-brand strong {
+  white-space: nowrap;
+}
+.footer-tagline {
+  margin: 0.35rem 0 0;
+  line-height: 1.5;
+}
+.footer-tagline span {
+  display: block;
+  white-space: nowrap;
 }
 .footer-links {
   display: flex;
