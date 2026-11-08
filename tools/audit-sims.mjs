@@ -92,27 +92,31 @@ const MANIFEST = {
   shm: { cls: 'dynamic', why: 'spring-mass oscillator integrates', probe: 't' },
 
   /* ---- frame-driven natives ---- */
+  'workstation-demo': { cls: 'dynamic', why: 'fixed-step dynamics-cart run; graph records x/v over time' },
   wave: { cls: 'dynamic', why: 'travelling wave phase is a function of elapsed time' },
   circuit: { cls: 'dynamic', why: 'current phase advances each frame' },
   doppler: { cls: 'dynamic', why: 'source translates, wavefronts expand' },
   induction: { cls: 'dynamic', why: 'magnet translates, flux changes, emf decays' },
-  standing: { cls: 'dynamic', why: 'superposition phase advances' },
-  interference: { cls: 'dynamic', why: 'two-source interference phase advances' },
+  standing: { cls: 'dynamic', why: 'superposition phase advances', staticGraph: true },
+  interference: { cls: 'dynamic', why: 'two-source interference phase advances', staticGraph: true },
   rc: { cls: 'dynamic', why: 'capacitor charges/discharges over t' },
   cooling: { cls: 'dynamic', why: 'Newton cooling curve advances over t' },
   collision2d: { cls: 'dynamic', why: 'two discs integrate with impulse response' },
-  'ncert9-echo': { cls: 'dynamic', why: 'ping cycle runs on a ~1.4s loop', slow: true },
+  /* Workstation plots are static sweeps for several benches: the graph data is
+     real published data, but it is parameterised, not time-accumulating. */
+  'ncert9-echo': { cls: 'dynamic', why: 'ping cycle runs on a ~1.4s loop', slow: true, staticGraph: true },
   'ncert11-rotation': { cls: 'dynamic', why: 'skater angular velocity integrates' },
-  'ncert11-venturi': { cls: 'dynamic', why: 'flow arrows animate on a phase clock' },
+  'ncert11-venturi': { cls: 'dynamic', why: 'flow arrows animate on a phase clock', staticGraph: true },
   'ktg-gas': { cls: 'dynamic', why: 'particle velocities random-walk each frame' },
   'wasm-fluid': { cls: 'dynamic', why: 'particles drift and collide' },
-  'atoms-bohr': { cls: 'dynamic', why: 'electron orbits using wall-clock time' },
+  'atoms-bohr': { cls: 'dynamic', why: 'electron orbits using wall-clock time', staticGraph: true },
 
   /* ---- WebGL: pixel readback is impossible without preserveDrawingBuffer,
          so the observable is draw-call count ---- */
   orbit3d: { cls: 'dynamic', why: '3D orbital integration', webgl: true },
   wave3d: { cls: 'dynamic', why: '3D wave surface t advances', webgl: true },
-  efield3d: { cls: 'dynamic', why: 'field rig rotates on clock delta', webgl: true },
+  efield3d: { cls: 'dynamic', why: 'field rig rotates on clock delta', webgl: true, staticGraph: true },
+  'cdn-3d-atom': { cls: 'dynamic', why: '3D atom electrons orbit on the wall clock; CDN texture is optional and falls back offline', webgl: true },
 
   /* ---- interactive, NOT expected to animate on their own ---- */
   efield: {
@@ -187,12 +191,6 @@ const MANIFEST = {
     cls: 'interactive',
     why: 'Vernier calipers: jaws are DRAGGED with the pointer, ' + 'there are no sliders at all',
     interact: { kind: 'canvas-drag', expect: 'any' }
-  },
-  'cdn-3d-atom': {
-    cls: 'interactive',
-    why:
-      'lazy CDN load behind a "Load 3D (CDN)" button, with a ' + 'designed offline fallback path',
-    interact: { kind: 'button', text: 'Load 3D', expect: 'cdn' }
   },
 
   /* ---- third-party iframes ---- */
@@ -293,11 +291,16 @@ const patchGL = (Ctor) => {
 patchGL(window.WebGLRenderingContext);
 patchGL(window.WebGL2RenderingContext);
 
-/* Pixel signature of every 2D canvas in the sim frame. */
+/* Pixel signature of the STAGE canvas in the sim frame. Graph canvases are
+   excluded from the settle/motion signature: a live time-axis graph expands
+   forever, so including it makes even a physically settled bench "never stop
+   changing". The stage is the rendered apparatus the audit is judging. */
 window.__hSample = function () {
   const frame = document.querySelector('.sim-frame');
   if (!frame) return;
-  const cs = [...frame.querySelectorAll('canvas')];
+  const stage = frame.querySelector('.ws-stage-wrap');
+  const cs = [...(stage ? stage.querySelectorAll('canvas') : frame.querySelectorAll('canvas'))];
+  const csAll = [...frame.querySelectorAll('canvas')];
   let hash = 0, twoD = 0, webgl = 0;
   cs.forEach((c, i) => {
     let ctx = null;
@@ -322,7 +325,7 @@ window.__hSample = function () {
   window.__h.readoutSig = readouts;
   const sig = hash + '~' + readouts;
   window.__h.samples++;
-  window.__h.twoD = twoD; window.__h.webgl = webgl; window.__h.canvases = cs.length;
+  window.__h.twoD = twoD; window.__h.webgl = webgl; window.__h.canvases = csAll.length;
   if (window.__h.last && window.__h.last !== sig) window.__h.sigChanges++;
   window.__h.last = sig;
 };
@@ -921,20 +924,26 @@ async function runAudit() {
       });
     }
 
-    /* Graphs, where present, must actually receive samples. */
+    /* Graphs, where present, must actually receive samples. Most workstation
+       plots are live time series and must keep growing; a manifest may instead
+       declare a static sweep (parameterised real data that is published once
+       at mount / on parameter change) — for those, evidence is that the plot
+       is populated at all. */
     if (surface.graphs > 0) {
       const g0 = await page.evaluate(() =>
         window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',')
       );
-      const grew = await until(
-        page,
-        (prev) => {
-          const now = window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',');
-          return now !== prev && now !== '0,0,0';
-        },
-        g0,
-        3000
-      );
+      const grew = spec.staticGraph
+        ? g0.split(',').some((n) => +n > 0)
+        : await until(
+            page,
+            (prev) => {
+              const now = window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',');
+              return now !== prev && now !== '0,0,0';
+            },
+            g0,
+            3000
+          );
       const g1 = await page.evaluate(() =>
         window.PhysixGraph.graphs.all.map((g) => g.sampleCount()).join(',')
       );
