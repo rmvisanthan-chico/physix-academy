@@ -1,9 +1,15 @@
 /* PhysiX Academy — Simulation Lazy Loader (M9)
  *
- * Defers loading of all 51 simulation modules until they are actually needed.
- * The Sims registry (Sims.reg) is populated at module evaluation time in the
- * original sims-*.js files. This loader imports the sims modules on demand,
- * registering their simulations into the shared Sims.reg object.
+ * Defers loading of the 40 PhysiX-built simulation modules until they are
+ * actually needed. The Sims registry (Sims.reg) is populated at module
+ * evaluation time in the original sims-*.js files. This loader imports the
+ * sim modules on demand, registering their simulations into the shared
+ * Sims.reg object.
+ *
+ * sim-transform (Phase B): the 10 PhET iframe entries and the "ns" external-
+ * site embed were dropped from this map (and from Sims.reg) so the catalogue
+ * lists only PhysiX-built simulations. The source files remain; re-enabling is
+ * a map entry + registration revert.
  *
  * Usage:
  *   await Sims.ensure('newton');   // loads sims-a.js if needed, returns the sim def
@@ -11,9 +17,7 @@
  */
 import { Sims } from './sims-a.js';
 
-/* Map of simulation ID → module path that registers it.
- * Generated from the 45 Sims.register() calls across sims-a/b/c/d/e/ncert/phet/more/3d-a/3d-b/3d-pages/realism.
- * PhET sims are registered in sims-phet.js and don't need the iframe loaded until mounted. */
+/* Map of simulation ID → module path that registers it (40 PhysiX-built sims). */
 const SIM_MODULE_MAP = {
   // sims-a.js (mechanics core)
   newton: './sims-a.js',
@@ -57,20 +61,9 @@ const SIM_MODULE_MAP = {
   'ncert11-rotation': './sims-ncert.js',
   'ncert11-solids': './sims-ncert.js',
   'ncert11-venturi': './sims-ncert.js',
-  ns: './sims-ncert.js',
   'ncert11-pv': './sims-ncert.js',
 
-  // sims-phet.js (10 PhET iframes)
-  'phet-energy-skate-park': './sims-phet.js',
-  'phet-forces-motion': './sims-phet.js',
-  'phet-projectile': './sims-phet.js',
-  'phet-circuit': './sims-phet.js',
-  'phet-balancing': './sims-phet.js',
-  'phet-pendulum': './sims-phet.js',
-  'phet-charges-fields': './sims-phet.js',
-  'phet-coulombs-law': './sims-phet.js',
-  'phet-ohms-law': './sims-phet.js',
-  'phet-springs': './sims-phet.js',
+  // sims-phet.js (PhET iframes) — de-registered in Phase B; see file header note
 
   // sims-more.js (thermo-engine, ktg-gas, atoms-bohr)
   'thermo-engine': './sims-more.js',
