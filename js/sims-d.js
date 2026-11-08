@@ -159,8 +159,9 @@ Sims.register(
         const rE = api.SU.readout(api.readouts, '|E| at cursor', '—');
         const rMid = api.SU.readout(api.readouts, '|E| at midpoint', '—');
 
-        /* ---- canvas instruments: cursor meter + clickable test charges ---- */
-        const c = api.cv.c;
+        /* ---- canvas instruments: cursor meter + clickable test charges ----
+           api.cv is the canvas element itself (not SU.canvas's {c,g,W,H}). */
+        const c = api.cv;
         c.addEventListener('mousemove', (e) => {
           const rc = c.getBoundingClientRect();
           const [ex, ey] = fieldAt(e.clientX - rc.left, e.clientY - rc.top);

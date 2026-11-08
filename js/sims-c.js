@@ -392,6 +392,13 @@ Sims.register(
           update,
           draw,
           reset,
+          onPreset() {
+            sU.set(state.u);
+            sA.set(state.ang);
+            sH.set(state.h0);
+            sD.set(state.drag);
+            reset();
+          },
           destroy() {
             if (state._watchTimer) {
               clearInterval(state._watchTimer);
