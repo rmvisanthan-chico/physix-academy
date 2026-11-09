@@ -387,6 +387,10 @@ main {
   transform: none !important;
   transition: none !important;
 }
+/* ...and no view()-timeline reveal (style.css ~3043) — .topic-card would otherwise stay dimmed by scroll position */
+.sim-cat-grid .topic-card {
+  animation: none !important;
+}
 .card h3 {
   margin-top: 0;
 }
