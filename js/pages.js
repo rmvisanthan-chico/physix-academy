@@ -253,7 +253,7 @@ export async function viewSimsPage(id) {
           : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
       <p class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></p>
-      <div class="card hover topic-card" style="margin-top:34px">
+      <div class="card hover topic-card sim-3d-cta" style="margin-top:34px">
         <div class="sim-cat-top">
           <span class="sim-cat-icon" aria-hidden="true">🎲</span>
           <em class="phet-badge">3D</em>
