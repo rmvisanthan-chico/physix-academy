@@ -339,7 +339,9 @@ Sims.register(
       probe(api) {
         const data = cycle(api.state);
         return {
-          t: 0,
+          /* The cycle itself is static, but the workstation clock still runs;
+             a probe that always said t = 0 contradicted every other bench. */
+          t: api.transport.time(),
           th: data.th,
           tc: data.tc,
           ratio: data.th / data.tc,

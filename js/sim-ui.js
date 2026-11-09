@@ -435,6 +435,10 @@ export const Workstation = {
         if (playing) pauseFn();
         const h = 1 / 60;
         t += h;
+        /* A step IS an advance: keep the probe's `calls` bookkeeping truthful
+           (it previously counted only playing frames, so a paused sim looked
+           dead to instrumentation despite stepping correctly). */
+        advanceCalls++;
         if (scene && scene.update) scene.update(h, t);
       },
       reset() {

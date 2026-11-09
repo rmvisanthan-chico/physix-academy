@@ -1665,20 +1665,21 @@ Sims.register(
             g.stroke();
           }
           const { n1, n2, th1, th2, tir, crit } = physics();
+          const th1Deg = (th1 * 180) / Math.PI;
           g.fillStyle = 'rgba(232,237,247,0.1)';
           g.font = '12px "DM Mono", monospace';
           g.textAlign = 'center';
           g.fillText(
-            'n₁·sin θ₁ = n₂·sin θ₂  ·  θ₂ = asin(' + n1 + '·sin' + th1 + '°/' + n2 + ')',
+            'n₁·sin θ₁ = n₂·sin θ₂  ·  θ₂ = asin(' + n1 + '·sin' + th1Deg.toFixed(0) + '°/' + n2 + ')',
             W * 0.4,
             H * 0.4
           );
           g.fillText(
-            'θ₂ = ' + (tir ? '—' : (th2 * 180) / Math.PI).toFixed(1) + '°',
+            'θ₂ = ' + (tir ? '—' : ((th2 * 180) / Math.PI).toFixed(1)) + '°',
             W * 0.4,
             H * 0.4 + 26
           );
-          g.fillText('θc = ' + (crit ? crit.toFixed(1) : '—').toFixed(1) + '°', W * 0.4, H * 0.4 + 52);
+          g.fillText('θc = ' + (crit != null ? crit.toFixed(1) + '°' : '—'), W * 0.4, H * 0.4 + 52);
           g.fillText(tir ? 'TIR: no refracted angle' : 'refracted at theta₂', W * 0.4, H * 0.4 + 78);
           g.textAlign = 'left';
           api.pxLabel(g, 20, 22, 'n₁ sinθ₁ = n₂ sinθ₂ · critical angle defines TIR', 'rgba(232,237,247,0.8)');
@@ -1992,13 +1993,17 @@ Sims.register(
           const Wv = rb * G * side * side * side;
           const subFrac = S.sub;
           const Bv = subFrac * side * side * side * S.rf * G;
+          /* same linear-drag coefficient advance() integrates with:
+             c = 1.1·m·ω,  ω = √(ρf·g·A/m) */
+          const mV = rb * side * side * side;
+          const cDrag = mV > 0 ? 1.1 * mV * Math.sqrt((S.rf * G * side * side) / mV) : 0;
           /* axes: W vs sub for the three force curves */
           g.fillStyle = 'rgba(255,255,255,0.08)';
           g.font = '11px "DM Mono", monospace';
           g.textAlign = 'left';
           g.fillText('Weight W = ' + Wv.toFixed(1) + ' N  (constant)', 30, 60);
           g.fillText('Buoyant B = ' + Bv.toFixed(1) + ' N  at current submersion', 30, 85);
-          g.fillText('Drag coefficient c = ' + c.toFixed(1) + ' N·s/m  (ζ ≈ 0.55)', 30, 110);
+          g.fillText('Drag coefficient c = ' + cDrag.toFixed(1) + ' N·s/m  (ζ ≈ 0.55)', 30, 110);
           g.fillText(floats ? 'Float at ρ/ρf = ' + (rb / S.rf).toFixed(3) : 'Sink — network down', 30, 140);
           api.pxLabel(g, 20, 22, 'sub = depth/side · B = ρf·g·A·depth · F = ma settled', 'rgba(232,237,247,0.8)');
         }
