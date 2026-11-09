@@ -42,21 +42,21 @@ window.Sims3D = [
     k: '3d'
   },
   {
-    f: 'html5-sims/incline.html',
+    f: 'incline.html',
     i: '📐',
     t: 'Inclined Plane 3D',
     d: 'Force decomposition on a 3D ramp. Includes the tanθ > μ threshold where the block breaks free on its own.',
     k: '3d'
   },
   {
-    f: 'html5-sims/collision2d.html',
+    f: 'collision2d.html',
     i: '🎱',
     t: '2D Collision Lab 3D',
     d: 'Two spheres on a frictionless plane. Drag either one to change the line of centres — that sets the scattering angle.',
     k: '3d'
   },
   {
-    f: 'html5-sims/energy.html',
+    f: 'energy.html',
     i: '🎢',
     t: 'Energy Conservation 3D',
     d: 'A ball rolling a 3D track, with live PE / KE / lost bars. The total never moves when friction is zero.',

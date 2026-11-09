@@ -73,9 +73,14 @@ let finishErrors = attachErrors('catalogue');
 try {
   await page.waitForSelector('.sim-cat-card', { timeout: 20000 });
   const cards = await page.locator('.sim-cat-card').count();
-  ok('catalogue shows 40 simulations', cards === 40, 'cards=' + cards);
+  /* 40 in-app benches + the 40 standalone 3D-set cards merged into the same
+     grid = 80 catalogue cards. */
+  ok('catalogue shows 80 simulations (40 in-app + 40 3D set)', cards === 80, 'cards=' + cards);
+  const inApp = await page.locator('.sim-cat-card a[href^="#/sims/"]').count();
+  const threeD = await page.locator('.sim-cat-card a[href^="/html5-sims/"]').count();
+  ok('catalogue splits 40 in-app + 40 standalone', inApp === 40 && threeD === 40, 'inApp=' + inApp + ' 3D=' + threeD);
   const countText = await page.textContent('#sim-count');
-  ok('count label says "40 simulations"', /40 simulations/.test(countText || ''), (countText || '').trim());
+  ok('count label says "80 simulations"', /80 simulations/.test(countText || ''), (countText || '').trim());
 
   /* the de-registered ids must not be routable-as-catalogue or present at all */
   const hasPhet = await page.locator('.sim-cat-card', { hasText: 'PhET' }).count();
