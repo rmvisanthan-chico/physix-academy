@@ -391,6 +391,9 @@ main {
 .sim-cat-grid .topic-card {
   animation: none !important;
 }
+.sim-3d-cta.topic-card {
+  animation: none !important;
+}
 .card h3 {
   margin-top: 0;
 }
