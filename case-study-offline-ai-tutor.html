@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Case Study: Building an Offline Physics Tutor That Shows Its Work</title>
+    <meta
+      name="description"
+      content="How PhysiX Academy built a physics tutor that runs fully in the browser — no API, no model download, no data sent to a server — and why every step it prints is checkable."
+    />
+    <meta name="author" content="R.M. Visanthan" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://physix-academy.vercel.app/case-study-offline-ai-tutor.html" />
+    <meta property="og:title" content="Case Study: Building an Offline Physics Tutor" />
+    <meta
+      property="og:description"
+      content="A browser-based physics tutor with no API and no server — and why every printed step is checkable."
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://physix-academy.vercel.app/case-study-offline-ai-tutor.html" />
+    <meta property="og:site_name" content="PhysiX Academy" />
+    <meta property="og:image" content="https://physix-academy.vercel.app/assets/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Case Study: Building an Offline Physics Tutor" />
+    <meta
+      name="twitter:description"
+      content="No API, no model download, no server. How the offline physics tutor works."
+    />
+    <meta name="twitter:image" content="https://physix-academy.vercel.app/assets/og-image.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Article",
+            "@id": "https://physix-academy.vercel.app/case-study-offline-ai-tutor.html#article",
+            "headline": "Case Study: Building an Offline Physics Tutor That Shows Its Work",
+            "description": "How PhysiX Academy built a physics tutor that runs fully in the browser with no API and no server.",
+            "author": { "@id": "https://physix-academy.vercel.app/#person" },
+            "publisher": { "@id": "https://physix-academy.vercel.app/#organization" },
+            "datePublished": "2026-11-10",
+            "dateModified": "2026-11-10",
+            "inLanguage": "en",
+            "mainEntityOfPage": "https://physix-academy.vercel.app/case-study-offline-ai-tutor.html"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://physix-academy.vercel.app/case-study-offline-ai-tutor.html#breadcrumb",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://physix-academy.vercel.app/" },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Case Study: Offline AI Tutor",
+                "item": "https://physix-academy.vercel.app/case-study-offline-ai-tutor.html"
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <link rel="icon" href="assets/logo.png" type="image/png" />
+    <link rel="stylesheet" href="css/style.css?v=72" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:wght@500;600;700&display=swap"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner" style="display: flex; align-items: center; gap: 0.8rem">
+        <a href="index.html" class="brand" aria-label="PhysiX Academy home" style="display: flex; align-items: center">
+          <span class="brand-name">PhysiX<span class="brand-accent">Academy</span></span>
+        </a>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <div class="wrap" style="max-width: 800px">
+        <div class="page-head">
+          <h1>Case study: an offline physics tutor</h1>
+          <p class="sub">
+            No API key, no model download, no server. A tutor that runs in the browser and prints
+            every step so a student can check it.
+          </p>
+        </div>
+
+        <h2>The problem</h2>
+        <p>
+          A student stuck on a numerical question usually wants one thing: the next step. Chat-based
+          tutors are good at producing confident prose, but a confident wrong answer in physics is
+          worse than no answer — it teaches the error. Most of these tools also need an account, a
+          connection and someone else's server to run.
+        </p>
+
+        <h2>Constraints</h2>
+        <ul>
+          <li>Free, with no per-question cost for the site owner</li>
+          <li>Works offline after the first visit</li>
+          <li>No question ever leaves the student's device</li>
+          <li>Every printed step must be verifiable by hand</li>
+        </ul>
+
+        <h2>The approach</h2>
+        <p>
+          Instead of a language model, the tutor is a set of pure functions over parsed input. A
+          question is read for the quantities it names and the relationship it implies; the solver
+          then selects the matching expression, substitutes the values and prints the sequence.
+        </p>
+        <p>
+          Each relationship carries its own conditions and sign conventions. The lens solver, for
+          example, states which side of the lens the image is on and gives the sign, rather than
+          returning a bare number. When a question falls outside the supported set, the tutor says so
+          instead of improvising.
+        </p>
+
+        <h2>What is covered today</h2>
+        <p>
+          Ohm's law and series/parallel resistance, mirror and thin-lens problems with
+          magnification, uniform-acceleration kinematics, kinetic energy, and echo distance from a
+          time delay. The list grows in batches, and each addition is tested against worked textbook
+          examples.
+        </p>
+
+        <h2>The trade-off</h2>
+        <p>
+          A constrained solver is less flexible than a general chatbot: it cannot discuss a topic
+          freely, and it will refuse anything outside its set. In exchange, it never invents a
+          number, it costs nothing to run, and the entire interaction stays local. For homework
+          checking, that trade is the right one.
+        </p>
+
+        <h2>What it shares with the rest of the site</h2>
+        <p>
+          The tutor uses the same relationship definitions as the formula library, the calculators
+          and the simulations. That single source of truth is why a pendulum simulation, a formula
+          entry and a tutor answer cannot disagree about the period of a pendulum.
+        </p>
+
+        <p style="margin-top: 1.5rem">
+          <a class="btn btn-primary" href="index.html#/tutor">Try the tutor</a>
+          <a class="btn btn-ghost" href="ai-physics-tutor.html">About the tutor</a>
+        </p>
+
+        <p class="muted" style="margin-top: 1.5rem">
+          Written by <a href="author.html">R.M. Visanthan</a>, 10 November 2026.
+        </p>
+
+        <div style="margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--card-brd)">
+          <a class="btn" href="index.html">Back to home</a>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div>
+          <strong>PhysiX Academy</strong>
+          <p>Understand Physics. Don't Just Memorize It.</p>
+        </div>
+        <div class="footer-links">
+          <a href="index.html">Home</a>
+          <a href="html5-sims/index.html">Simulations</a>
+          <a href="ncert-physics-class-9-12.html">NCERT 9–12</a>
+          <a href="ai-physics-tutor.html">AI Tutor</a>
+          <a href="physics-formulas-calculators.html">Formulas</a>
+          <a href="faq.html">FAQ</a>
+          <a href="free-physics-learning.html">Free Learning</a>
+          <a href="author.html">Author</a>
+          <a href="blog/index.html">Blog</a>
+          <a href="privacy.html">Privacy</a>
+          <a href="terms.html">Terms</a>
+        </div>
+        <p class="footer-note">
+          Free physics learning platform for Class 9-12.<br />
+          <span class="stamp">Written by <a href="author.html">R.M. Visanthan</a></span>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

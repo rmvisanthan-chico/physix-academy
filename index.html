@@ -65,7 +65,31 @@
               "https://github.com/rmvisanthan-chico/physix-academy",
               "https://www.youtube.com/@physix-academy-18v",
               "https://www.instagram.com/physix_academy/"
-            ]
+            ],
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "email": "r.m.visanthan@gmail.com",
+              "contactType": "customer support",
+              "availableLanguage": ["en", "hi", "ta"]
+            },
+            "areaServed": { "@type": "Country", "name": "India" },
+            "knowsAbout": [
+              "Physics",
+              "NCERT physics",
+              "Class 9 physics",
+              "Class 10 physics",
+              "Class 11 physics",
+              "Class 12 physics",
+              "Physics simulations",
+              "Physics formulas",
+              "Physics exam preparation"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "INR",
+              "description": "Full access to all lessons, simulations, formulas, calculators, practice questions and the offline tutor at no cost."
+            }
           },
           {
             "@type": "Person",
@@ -101,11 +125,58 @@
             "inLanguage": "en",
             "publisher": { "@id": "https://physix-academy.vercel.app/#organization" },
             "creator": { "@id": "https://physix-academy.vercel.app/#person" }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://physix-academy.vercel.app/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is PhysiX Academy free?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Every lesson, simulation, formula, calculator and practice question is free, with no ads, no paywall and no premium tier."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does PhysiX Academy cover the NCERT syllabus for Class 9 to 12?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. The curriculum follows the NCERT chapter sequence for Class 9, 10, 11 and 12 physics, and each chapter pairs an explanation with a matching interactive simulation and practice questions."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does PhysiX Academy have interactive physics simulations?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. There are 40 interactive simulations covering mechanics, waves, optics, electricity, thermodynamics and modern physics, plus a 3D simulation set."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need an account to use PhysiX Academy?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. There is no sign-up wall. Progress is stored locally in your browser, and the site works offline after the first visit."
+                }
+              }
+            ]
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://physix-academy.vercel.app/#breadcrumb",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://physix-academy.vercel.app/" }
+            ]
           }
         ]
       }
     </script>
     <link rel="icon" href="assets/logo.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Optional profile gate — intentionally DISABLED, and it should stay that way
      unless you have a reason to change your mind. login.html now exists and
      works (js/profile.js), so this would function; it is off because:
@@ -399,6 +470,55 @@
     <!-- ============ MAIN CONTENT ============ -->
     <main id="main" tabindex="-1"></main>
 
+    <!-- Static, crawlable summary: real text for search engines and AI assistants.
+         Hidden on deep hash routes for readers (JS); visible without JS. -->
+    <section class="wrap static-explore" id="static-explore" style="max-width: 900px; padding-top: 1rem">
+      <h2>Free physics learning for Class 9–12</h2>
+      <p>
+        PhysiX Academy is a free physics learning platform built around the NCERT Class 9–12
+        sequence. Each chapter pairs a short explanation with an interactive simulation you operate
+        yourself, a formula reference, practice questions and worked steps. There are 40 interactive
+        simulations plus a 3D set, an offline AI tutor, a formula library and calculators. No
+        account, no ads, no paywall — and the site keeps working offline after the first visit.
+      </p>
+      <p>
+        Written and maintained by <a href="author.html">R.M. Visanthan</a>, educator and author.
+      </p>
+
+      <h3>Explore</h3>
+      <ul>
+        <li><a href="physics-simulations.html">Interactive physics simulations</a> — what you can run and why operating beats watching</li>
+        <li><a href="ncert-physics-class-9-12.html">NCERT physics Class 9–12</a> — the full chapter sequence</li>
+        <li><a href="ai-physics-tutor.html">Offline AI physics tutor</a> — worked steps in your browser</li>
+        <li><a href="physics-formulas-calculators.html">Physics formulas and calculators</a> — every symbol and unit explained</li>
+        <li><a href="faq.html">Frequently asked questions</a></li>
+        <li><a href="free-physics-learning.html">Why it is free</a></li>
+        <li><a href="alternatives.html">How PhysiX compares with PhET and Khan Academy</a></li>
+        <li><a href="physics-learning-research.html">Research summary: why active learning works</a></li>
+        <li><a href="case-study-offline-ai-tutor.html">Case study: building the offline tutor</a></li>
+        <li><a href="blog/index.html">Physics study blog</a></li>
+      </ul>
+
+      <h3>Common questions</h3>
+      <p><b>Is it free?</b> Yes — every lesson, simulation, formula and calculator, with no ads and no paywall.</p>
+      <p><b>Does it follow NCERT?</b> Yes, Class 9–12 physics, chapter by chapter.</p>
+      <p><b>Do I need an account?</b> No. Progress is saved locally in your browser.</p>
+      <p><b>Does it work offline?</b> Yes, after the first visit.</p>
+    </section>
+
+    <script>
+      (function () {
+        var band = document.getElementById("static-explore");
+        if (!band) return;
+        function sync() {
+          var h = (location.hash || "").replace(/^#/, "");
+          band.hidden = !(h === "" || h === "/" || h === "/home");
+        }
+        addEventListener("hashchange", sync);
+        sync();
+      })();
+    </script>
+
     <footer class="footer">
       <div class="footer-inner">
         <div class="footer-brand">
@@ -411,6 +531,14 @@
           <a href="#/practice">Practice</a>
           <a href="#/formulas">Formula Library</a>
           <a href="motion-graphs.html">Motion Graphs</a>
+          <a href="physics-simulations.html">Simulations Guide</a>
+          <a href="ncert-physics-class-9-12.html">NCERT 9–12</a>
+          <a href="ai-physics-tutor.html">AI Tutor</a>
+          <a href="physics-formulas-calculators.html">Formulas &amp; Calculators</a>
+          <a href="faq.html">FAQ</a>
+          <a href="free-physics-learning.html">Free Learning</a>
+          <a href="alternatives.html">Compare</a>
+          <a href="author.html">Author</a>
           <a href="#/progress">Progress</a>
           <a href="#/support">Support</a>
           <a href="#/about">About</a>
@@ -485,22 +613,16 @@
       </div>
     </div>
 
-    <script type="module" src="/js/main.js?v=77"></script>
-
-    <!-- Curriculum data -->
-
-    <!-- Quiz bank -->
-
-    <!-- Simulations -->
-
-    <!-- 3D layer + motion -->
-    <script src="js/vendor/three.min.js?v=74"></script>
-    <script src="js/vendor/qrcode.min.js?v=74"></script>
-    <script src="js/vendor/motion.min.js?v=74"></script>
-    <script src="js/vendor/anime.min.js?v=74"></script>
+    <!-- Vendor libs: deferred so they never block rendering.
+         Classic deferred scripts and the module below both execute after parsing,
+         in document order — vendors first, then the app. -->
+    <script defer src="js/vendor/three.min.js?v=75"></script>
+    <script defer src="js/vendor/qrcode.min.js?v=75"></script>
+    <script defer src="js/vendor/motion.min.js?v=75"></script>
+    <script defer src="js/vendor/anime.min.js?v=75"></script>
 
     <!-- App layer -->
-
+    <script type="module" src="/js/main.js?v=78"></script>
     <!-- Brand Studio Modal -->
     <div
       class="brand-studio"
