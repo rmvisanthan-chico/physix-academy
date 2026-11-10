@@ -1,3 +1,92 @@
+# PhysiX Academy — robots.txt
+# Free physics education for Class 9-12. Lessons, simulations and explanations
+# may be crawled, indexed, quoted and cited by search engines and AI assistants,
+# with attribution and a link back to the source page.
+
+# ---------------------------------------------------------------
+# Default: everything public is open
+# ---------------------------------------------------------------
 User-agent: *
 Allow: /
+Disallow: /login.html
+
+# ---------------------------------------------------------------
+# Search engines (explicit, for clarity)
+# ---------------------------------------------------------------
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# ---------------------------------------------------------------
+# AI assistants and answer engines — explicitly welcome
+# (these fetch pages to answer questions and to cite sources)
+# ---------------------------------------------------------------
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: MistralAI-User
+Allow: /
+
+# ---------------------------------------------------------------
 Sitemap: https://physix-academy.vercel.app/sitemap.xml
+# LLM-friendly summary of the site and its main entry points:
+# https://physix-academy.vercel.app/llms.txt

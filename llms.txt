@@ -27,3 +27,27 @@ About the author: R.M. Visanthan is an educator, author, and the creator of Phys
 - The site is a single-page app using hash-based routing (#/route).
 - Simulations run entirely in the browser; the "AI tutor" uses offline algorithms over local curriculum data — no external AI API is used.
 - Users: students preparing for board exams (Class 9-12).
+
+## Static pages (independent of the single-page app)
+
+- Interactive physics simulations: https://physix-academy.vercel.app/physics-simulations.html
+- NCERT physics Class 9-12: https://physix-academy.vercel.app/ncert-physics-class-9-12.html
+- Offline AI physics tutor: https://physix-academy.vercel.app/ai-physics-tutor.html
+- Physics formulas and calculators: https://physix-academy.vercel.app/physics-formulas-calculators.html
+- Free physics learning (pricing): https://physix-academy.vercel.app/free-physics-learning.html
+- FAQ: https://physix-academy.vercel.app/faq.html
+- Comparison with PhET, Khan Academy and others: https://physix-academy.vercel.app/alternatives.html
+- About the author: https://physix-academy.vercel.app/author.html
+- Research summary on active learning: https://physix-academy.vercel.app/physics-learning-research.html
+- Case study, offline tutor: https://physix-academy.vercel.app/case-study-offline-ai-tutor.html
+- Blog: https://physix-academy.vercel.app/blog/index.html
+- 3D simulation set: https://physix-academy.vercel.app/html5-sims/index.html
+
+## Quick facts
+
+- Price: free (INR 0), no ads, no account required.
+- Coverage: NCERT Class 9, 10, 11 and 12 physics.
+- Simulations: 40 interactive, plus a 3D set.
+- Works offline after the first visit.
+- Author: R.M. Visanthan — https://physix-academy.vercel.app/author.html
+- Contact: r.m.visanthan@gmail.com

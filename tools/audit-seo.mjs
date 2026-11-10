@@ -181,8 +181,40 @@ const sitemap = read(path.join(ROOT, 'sitemap.xml'));
 const sitemapLocs = [...sitemap.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)].map((match) =>
   match[1].trim()
 );
-if (sitemapLocs.length !== 48)
-  failures.push(`sitemap.xml: expected 48 URLs, found ${sitemapLocs.length}`);
+const sitemapPathSet = new Set(
+  sitemapLocs.map((loc) => {
+    try {
+      let pathname = new URL(loc).pathname;
+      if (pathname.endsWith('/')) pathname += 'index.html';
+      return pathname;
+    } catch {
+      return loc;
+    }
+  }),
+);
+const requiredSitemapPaths = [
+  '/index.html',
+  '/motion-graphs.html',
+  '/html5-sims/index.html',
+  '/blog/index.html',
+  '/physics-simulations.html',
+  '/ncert-physics-class-9-12.html',
+  '/ai-physics-tutor.html',
+  '/physics-formulas-calculators.html',
+  '/free-physics-learning.html',
+  '/faq.html',
+  '/alternatives.html',
+  '/author.html',
+  '/physics-learning-research.html',
+  '/case-study-offline-ai-tutor.html',
+  '/privacy.html',
+  '/terms.html',
+];
+for (const required of requiredSitemapPaths)
+  if (!sitemapPathSet.has(required))
+    failures.push(`sitemap.xml: missing required page ${required}`);
+if (sitemapLocs.length < 48)
+  failures.push(`sitemap.xml: expected at least 48 URLs, found ${sitemapLocs.length}`);
 if (sitemapLocs.some((loc) => loc.includes('#/')))
   failures.push('sitemap.xml: contains hash-route URL');
 if (!sitemapLocs.includes(`${BASE}/motion-graphs.html`))
