@@ -252,7 +252,7 @@ export async function viewSimsPage(id) {
             '</div>'
           : '<div class="empty-state"><div class="big">🧪</div><p>No simulations registered yet.</p></div>'
       }
-      <p class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></p>
+      <div class="empty-state" id="sim-no-results" hidden><div class="big">🔍</div><p>No simulation matches that search.</p></div>
       <div class="card hover topic-card sim-3d-cta" style="margin-top:34px">
         <div class="sim-cat-top">
           <span class="sim-cat-icon" aria-hidden="true">🎲</span>
@@ -261,6 +261,15 @@ export async function viewSimsPage(id) {
         <h3>3D Physics Simulations</h3>
         <p class="muted">Standalone WebGL scenes with real lighting and direct manipulation — grab the probe and the velocity handle instead of only moving sliders. ${threeD.length} simulations in the set.</p>
         <div class="topic-meta"><a class="btn btn-sm btn-primary" href="/html5-sims/index.html">Open the 3D set &rarr;</a></div>
+      </div>
+      <div class="card hover topic-card sim-anatomy-cta" style="margin-top:14px">
+        <div class="sim-cat-top">
+          <span class="sim-cat-icon" aria-hidden="true">🔬</span>
+          <em class="phet-badge">Anatomy</em>
+        </div>
+        <h3>Anatomy Physics Simulations</h3>
+        <p class="muted">Hand-plotted isometric benches — instruments where every number on the page comes from the same physics model that moves the parts. A glass display case, a ripple tank, a spring-damper, a circuit, a lens bench, a pendulum and a projectile cannon. 7 simulations in the set.</p>
+        <div class="topic-meta"><a class="btn btn-sm btn-primary" href="/anatomy-sims/index.html">Open the anatomy set &rarr;</a></div>
       </div>
     </div>`;
 

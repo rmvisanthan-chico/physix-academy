@@ -394,6 +394,9 @@ main {
 .sim-3d-cta.topic-card {
   animation: none !important;
 }
+.sim-anatomy-cta.topic-card {
+  animation: none !important;
+}
 .card h3 {
   margin-top: 0;
 }

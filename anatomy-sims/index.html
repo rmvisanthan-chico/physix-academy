@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysiX Academy — Anatomy Physics Simulations</title>
+<meta name="description" content="Free anatomy-style interactive physics simulations from PhysiX Academy: hand-drawn isometric benches where every moving part is driven by the same physics model that labels it." />
+<link rel="canonical" href="https://physix-academy.vercel.app/anatomy-sims/index.html" />
+<meta name="robots" content="index, follow" />
+<meta name="author" content="R.M. Visanthan" />
+<meta property="og:title" content="PhysiX Academy — Anatomy Physics Simulations" />
+<meta property="og:description" content="Free anatomy-style interactive physics simulations from PhysiX Academy: hand-drawn isometric benches where every moving part is driven by the same physics model that labels it." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://physix-academy.vercel.app/anatomy-sims/index.html" />
+<meta property="og:site_name" content="PhysiX Academy" />
+<meta property="og:image" content="https://physix-academy.vercel.app/assets/og-image.png" />
+<meta property="og:image:alt" content="PhysiX Academy — Anatomy Physics Simulations interactive physics simulation" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="PhysiX Academy — Anatomy Physics Simulations" />
+<meta name="twitter:description" content="Free anatomy-style interactive physics simulations from PhysiX Academy: hand-drawn isometric benches where every moving part is driven by the same physics model that labels it." />
+<meta name="twitter:image" content="https://physix-academy.vercel.app/assets/og-image.png" />
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1526; --panel2:#131c31; --brd:rgba(255,255,255,.09);
+    --txt:#e8edf7; --txt2:#9aa8c3; --txt3:#6b7a99; --acc:#6d5df6; --acc2:#22d3ee;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);margin:0;padding:26px 18px 60px;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--txt2);font-size:13.5px;margin:0 0 8px;max-width:70ch;line-height:1.55}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 22px;
+    padding:10px 12px;background:var(--panel);border:1px solid var(--brd);border-radius:11px}
+  .bar b{font-family:var(--mono);font-size:12.5px;color:var(--acc2)}
+  .bar span{font-size:12px;color:var(--txt3)}
+  h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--txt3);
+    margin:26px 0 12px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
+  a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);
+    border:1px solid var(--brd);border-radius:13px;padding:14px;transition:.14s}
+  a.card:hover{border-color:rgba(109,93,246,.55);transform:translateY(-2px);background:var(--panel2)}
+  a.card .ic{font-size:22px;line-height:1}
+  a.card h3{margin:8px 0 4px;font-size:14.5px;letter-spacing:-.01em}
+  a.card p{margin:0;font-size:12px;color:var(--txt2);line-height:1.45}
+  a.card code{display:block;margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
+  .todo{color:var(--txt3);font-size:12.5px;line-height:1.6}
+  .todo code{font-family:var(--mono);color:var(--txt2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Anatomy Physics Simulations</h1>
+  <p class="sub">Instruments drawn as working machines: each bench is a hand-plotted isometric figure &mdash; solids, screws, knobs and all &mdash; and every number the page shows comes from the same physics model that moves the parts. Open any one directly with <code>file://</code> and it works; nothing is fetched from the network.</p>
+
+  <div class="bar">
+    <b id="count">—</b>
+    <span>built so far &nbsp;·&nbsp; anatomy bench series</span>
+  </div>
+
+  <h2>Bench series</h2>
+  <div class="grid" id="ga"></div>
+
+  <h2>All 7 built</h2>
+  <p class="todo">
+    Seven self-contained pages, each one hand-plotted isometric bench. The flagship is the
+    <code>display-case</code>: a glass cabinet on a plinth holding a ripple tank with its strobe lamp
+    and a pendulum swinging at its true period T = 2&pi;&radic;(L/g) &asymp; 1.68 s for a
+    0.70&nbsp;m rod. Around it stand the ripple tank (crests and nodal lines from one water-wave
+    model), the spring-damper (an envelope that follows the damping ratio), the circuit bench
+    (brightness and power from Ohm's law), the lens bench (image position from the thin-lens
+    equation), the pendulum (a dial that reads the period) and the projectile cannon (range, apex
+    and time of flight from the ballistic model). Drag the knobs on any bench and every number on
+    the page follows. Both dark and light themes are provided.
+  </p>
+  <p class="sub" style="margin-top:18px">
+    This set is part of <a href="../index.html">PhysiX Academy</a> &mdash; a free physics learning
+    platform with interactive simulations, physics lessons, practice questions and an AI tutor, with
+    no advertisements. You can also browse the
+    <a href="../html5-sims/index.html">3D physics simulations</a> or all learning content from
+    the <a href="../index.html">PhysiX Academy home page</a>.
+  </p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const ANATOMY = [
+    ['../display-case/display-case.html', '🔬', 'Physics Display Case', 'A glass case holding a ripple tank, its strobe lamp and a pendulum. Drag the knobs; the interference pattern, caustics and readout follow one water-wave model.'],
+    ['../ripple/bench.html', '💧', 'Ripple tank bench', 'Two dippers draw crests and nodal lines on a lit paper screen; the pattern, caustics and readout follow one water-wave model with dispersion and surface tension built in.'],
+    ['../spring-damper/bench.html', '🌀', 'Spring-damper bench', 'A mass on a spring with an adjustable damper. Turn MASS, STIFFNESS or DAMPING, pull and RELEASE, and the envelope follows the real damping ratio and damped period.'],
+    ['../circuit/circuit.html', '🔌', 'Circuit bench', 'A lamp, a cell and a resistance dial. Turn VOLTAGE or RESISTANCE and the current, the lamp brightness and the power dial follow Ohm\u2019s law live.'],
+    ['../lens-bench/lens.html', '🔍', 'Lens bench', 'A bench lamp, a lens and a screen. Move the object or change the focal length and the image position and magnification come from the thin-lens equation.'],
+    ['../pendulum-bench/pendulum.html', '⏱️', 'Pendulum bench', 'An A-frame stand with a rod-and-bob pendulum. The LENGTH and ANGLE knobs rebuild the swing and the dial reads the true period T = 2\u03c0\u221a(l/g).'],
+    ['../projectile-cannon/projectile.html', '🎯', 'Projectile cannon', 'A cannon on a wheeled base. Set the ANGLE and POWER, FIRE, and the trajectory, range, apex and time of flight follow the true ballistic model.']
+  ];
+
+  const card = ([f, ic, t, d]) =>
+    '<a class="card" href="' + f + '"><div class="ic">' + ic + '</div><h3>' + t +
+    '</h3><p>' + d + '</p><code>' + f + '</code></a>';
+
+  document.getElementById('ga').innerHTML = ANATOMY.map(card).join('');
+  const all = [...new Set(ANATOMY.map(c => c[0]))];
+  document.getElementById('count').textContent = all.length + ' of 7';
+})();
+</script>
+</body>
+</html>
